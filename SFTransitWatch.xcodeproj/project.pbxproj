@@ -217,7 +217,7 @@
 			children = (
 				CAFE000000000000000020BD /* Preview Assets.xcassets */,
 			);
-			path = "SFTransitWatch/Preview Content";
+			path = "Preview Content";
 			sourceTree = "<group>";
 		};
 		CAFE0000000000000000C020 /* SFTransitWatch Complication */ = {
