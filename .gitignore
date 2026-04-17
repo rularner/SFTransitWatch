@@ -167,6 +167,9 @@ fastlane/test_output/
 *.bak
 *.backup
 
+# Superpowers working files (plans, specs)
+docs/superpowers/
+
 # IDE files
 .vscode/
 .idea/
