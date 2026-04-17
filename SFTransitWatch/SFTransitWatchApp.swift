@@ -1,5 +1,4 @@
 import SwiftUI
-import WatchKit
 
 @main
 struct SFTransitWatchApp: App {
@@ -8,4 +7,4 @@ struct SFTransitWatchApp: App {
             ContentView()
         }
     }
-} 
+}
