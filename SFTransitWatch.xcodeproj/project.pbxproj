@@ -7,13 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		CAFE0000000000000000T011 /* BusArrivalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000T001 /* BusArrivalTests.swift */; };
-		CAFE0000000000000000T012 /* BusStopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000T002 /* BusStopTests.swift */; };
-		CAFE0000000000000000T013 /* FavoritesManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000T003 /* FavoritesManagerTests.swift */; };
-		CAFE0000000000000000T014 /* TransitAPIParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */; };
-		CAFE0000000000000000T015 /* AppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000T005 /* AppIntentsTests.swift */; };
-		CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
-		CAFE0000000000000000C001 /* ComplicationWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C002 /* ComplicationWidget.swift */; };
 		CAFE000000000000000012A0 /* SFTransitWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000012B0 /* SFTransitWatchApp.swift */; };
 		CAFE000000000000000012C0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000012D0 /* ContentView.swift */; };
 		CAFE000000000000000012E0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000012F0 /* Assets.xcassets */; };
@@ -28,18 +21,10 @@
 		CAFE000000000000000015DA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015D0 /* SettingsView.swift */; };
 		CAFE000000000000000015EA /* SiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015E0 /* SiriManager.swift */; };
 		CAFE000000000000000015FA /* SiriShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015F0 /* SiriShortcutsView.swift */; };
+		CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000T002 /* BusStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopTests.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000T003 /* FavoritesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManagerTests.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPIParsingTests.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000T005 /* AppIntentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntentsTests.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000T010 /* SFTransitWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		CAFE0000000000000000C004 /* ComplicationUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationUpdater.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000C002 /* ComplicationWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationWidget.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE000000000000000012B0 /* SFTransitWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTransitWatchApp.swift; sourceTree = "<group>"; };
 		CAFE000000000000000012D0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000012F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -55,6 +40,15 @@
 		CAFE000000000000000015E0 /* SiriManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriManager.swift; sourceTree = "<group>"; };
 		CAFE000000000000000015F0 /* SiriShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcutsView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SFTransitWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAFE0000000000000000C002 /* ComplicationWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationWidget.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000C004 /* ComplicationUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationUpdater.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000T002 /* BusStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopTests.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000T003 /* FavoritesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManagerTests.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPIParsingTests.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000T005 /* AppIntentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntentsTests.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000T010 /* SFTransitWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,43 +59,9 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-CAFE0000000000000000C033 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-	CAFE0000000000000000T033 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-	/* End PBXFrameworksBuildPhase section */
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		CAFE0000000000000000T020 /* SFTransitWatchTests */ = {
-			isa = PBXGroup;
-			children = (
-				CAFE0000000000000000T001 /* BusArrivalTests.swift */,
-				CAFE0000000000000000T002 /* BusStopTests.swift */,
-				CAFE0000000000000000T003 /* FavoritesManagerTests.swift */,
-				CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */,
-				CAFE0000000000000000T005 /* AppIntentsTests.swift */,
-			);
-			path = SFTransitWatchTests;
-			sourceTree = "<group>";
-		};
-		CAFE0000000000000000C020 /* SFTransitWatch Complication */ = {
-			isa = PBXGroup;
-			children = (
-				CAFE0000000000000000C002 /* ComplicationWidget.swift */,
-			);
-			path = "SFTransitWatch Complication";
-			sourceTree = "<group>";
-		};
 		CAFE000000000000000018A0 = {
 			isa = PBXGroup;
 			children = (
@@ -152,6 +112,26 @@ CAFE0000000000000000C033 /* Frameworks */ = {
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
+		CAFE0000000000000000C020 /* SFTransitWatch Complication */ = {
+			isa = PBXGroup;
+			children = (
+				CAFE0000000000000000C002 /* ComplicationWidget.swift */,
+			);
+			path = "SFTransitWatch Complication";
+			sourceTree = "<group>";
+		};
+		CAFE0000000000000000T020 /* SFTransitWatchTests */ = {
+			isa = PBXGroup;
+			children = (
+				CAFE0000000000000000T001 /* BusArrivalTests.swift */,
+				CAFE0000000000000000T002 /* BusStopTests.swift */,
+				CAFE0000000000000000T003 /* FavoritesManagerTests.swift */,
+				CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */,
+				CAFE0000000000000000T005 /* AppIntentsTests.swift */,
+			);
+			path = SFTransitWatchTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -172,40 +152,7 @@ CAFE0000000000000000C033 /* Frameworks */ = {
 			productReference = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
-CAFE0000000000000000C030 /* SFTransitWatch Complication */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = CAFE0000000000000000C031 /* Build configuration list for PBXNativeTarget "SFTransitWatch Complication" */;
-			buildPhases = (
-				CAFE0000000000000000C032 /* Sources */,
-				CAFE0000000000000000C033 /* Frameworks */,
-				CAFE0000000000000000C034 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = "SFTransitWatch Complication";
-			productName = "SFTransitWatch Complication";
-			productReference = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */;
-			productType = "com.apple.product-type.watchkit2-extension";
-		};
-	CAFE0000000000000000T030 /* SFTransitWatchTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = CAFE0000000000000000T031 /* Build configuration list for PBXNativeTarget "SFTransitWatchTests" */;
-			buildPhases = (
-				CAFE0000000000000000T032 /* Sources */,
-				CAFE0000000000000000T033 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = SFTransitWatchTests;
-			productName = SFTransitWatchTests;
-			productReference = CAFE0000000000000000T010 /* SFTransitWatchTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-	/* End PBXNativeTarget section */
+/* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
 		CAFE000000000000000000B7 /* Project object */ = {
@@ -213,7 +160,7 @@ CAFE0000000000000000C030 /* SFTransitWatch Complication */ = {
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 1640;
 				TargetAttributes = {
 					CAFE000000000000000001AA = {
 						CreatedOnToolsVersion = 15.0;
@@ -248,14 +195,7 @@ CAFE0000000000000000C030 /* SFTransitWatch Complication */ = {
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-CAFE0000000000000000C034 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-	/* End PBXResourcesBuildPhase section */
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		CAFE000000000000000001AC /* Sources */ = {
@@ -278,27 +218,7 @@ CAFE0000000000000000C034 /* Resources */ = {
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-CAFE0000000000000000C032 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CAFE0000000000000000C001 /* ComplicationWidget.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-	CAFE0000000000000000T032 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CAFE0000000000000000T011 /* BusArrivalTests.swift in Sources */,
-				CAFE0000000000000000T012 /* BusStopTests.swift in Sources */,
-				CAFE0000000000000000T013 /* FavoritesManagerTests.swift in Sources */,
-				CAFE0000000000000000T014 /* TransitAPIParsingTests.swift in Sources */,
-				CAFE0000000000000000T015 /* AppIntentsTests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-	/* End PBXSourcesBuildPhase section */
+/* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		CAFE000000000000000001BA /* Debug */ = {
@@ -336,6 +256,7 @@ CAFE0000000000000000C032 /* Sources */ = {
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -399,6 +320,7 @@ CAFE0000000000000000C032 /* Sources */ = {
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -426,13 +348,12 @@ CAFE0000000000000000C032 /* Sources */ = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "SFTransitWatch Watch App/Info.plist";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to find nearby bus stops.";
 				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = org.larner.SFTransitWatch;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "org.larner.SFTransitWatch";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -444,7 +365,7 @@ CAFE0000000000000000C032 /* Sources */ = {
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			};
 			name = Debug;
 		};
@@ -455,13 +376,12 @@ CAFE0000000000000000C032 /* Sources */ = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "SFTransitWatch Watch App/Info.plist";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to find nearby bus stops.";
 				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = org.larner.SFTransitWatch;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "org.larner.SFTransitWatch";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -473,99 +393,11 @@ CAFE0000000000000000C032 /* Sources */ = {
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			};
 			name = Release;
 		};
-CAFE0000000000000000C035 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "SF Transit Complication";
-				INFOPLIST_KEY_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"/Frameworks",
-					"/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.larner.SFTransitWatch.complication";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
-			};
-			name = Debug;
-		};
-		CAFE0000000000000000C036 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "SF Transit Complication";
-				INFOPLIST_KEY_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"/Frameworks",
-					"/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.larner.SFTransitWatch.complication";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
-			};
-			name = Release;
-		};
-	CAFE0000000000000000T035 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.larner.SFTransitWatch.tests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				TEST_HOST = "20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400BUILT_PRODUCTS_DIR)/SFTransitWatch Watch App.app/SFTransitWatch Watch App";
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
-			};
-			name = Debug;
-		};
-		CAFE0000000000000000T036 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.larner.SFTransitWatch.tests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				TEST_HOST = "20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400BUILT_PRODUCTS_DIR)/SFTransitWatch Watch App.app/SFTransitWatch Watch App";
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
-			};
-			name = Release;
-		};
-	/* End XCBuildConfiguration section */
+/* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 		CAFE000000000000000001AB /* Build configuration list for PBXNativeTarget "SFTransitWatch Watch App" */ = {
@@ -586,25 +418,7 @@ CAFE0000000000000000C035 /* Debug */ = {
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-CAFE0000000000000000C031 /* Build configuration list for PBXNativeTarget "SFTransitWatch Complication" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				CAFE0000000000000000C035 /* Debug */,
-				CAFE0000000000000000C036 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-	CAFE0000000000000000T031 /* Build configuration list for PBXNativeTarget "SFTransitWatchTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				CAFE0000000000000000T035 /* Debug */,
-				CAFE0000000000000000T036 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-	/* End XCConfigurationList section */
+/* End XCConfigurationList section */
 	};
 	rootObject = CAFE000000000000000000B7 /* Project object */;
 }

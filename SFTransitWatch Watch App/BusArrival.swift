@@ -1,7 +1,7 @@
 import Foundation
 
 struct BusArrival: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let route: String
     let destination: String
     let arrivalTime: Date

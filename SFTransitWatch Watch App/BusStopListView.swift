@@ -148,12 +148,12 @@ struct BusStopListView: View {
                 await loadNearbyStops()
             }
         }
-        .onChange(of: locationManager.currentLocation) { _ in
+        .onChange(of: locationManager.currentLocation) {
             Task {
                 await loadNearbyStops()
             }
         }
-        .onChange(of: transitAPI.isAPIKeyConfigured) { _ in
+        .onChange(of: transitAPI.isAPIKeyConfigured) {
             Task {
                 await loadNearbyStops()
             }

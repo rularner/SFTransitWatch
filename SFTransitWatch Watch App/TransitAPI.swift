@@ -12,6 +12,7 @@ class TransitAPI: ObservableObject {
         return storedAPIKey.isEmpty ? "YOUR_511_API_KEY" : storedAPIKey
     }
     
+    @MainActor
     func fetchArrivals(for stopId: String) async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
@@ -58,6 +59,7 @@ class TransitAPI: ObservableObject {
         }
     }
     
+    @MainActor
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000) async -> [BusStop] {
         isLoading = true
         errorMessage = nil
