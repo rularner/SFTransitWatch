@@ -23,7 +23,7 @@ struct NextArrivalProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<NextArrivalEntry>) -> Void) {
-        let sharedDefaults = UserDefaults(suiteName: "group.com.example.SFTransitWatch") ?? .standard
+        let sharedDefaults = UserDefaults(suiteName: "group.org.larner.SFTransitWatch") ?? .standard
         let apiKey = sharedDefaults.string(forKey: "511_API_KEY") ?? ""
         let stopName = sharedDefaults.string(forKey: "complication_stop_name") ?? ""
         let route = sharedDefaults.string(forKey: "complication_route") ?? ""

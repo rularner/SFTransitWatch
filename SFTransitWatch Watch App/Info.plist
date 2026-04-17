@@ -34,7 +34,7 @@
 	<key>WKApplication</key>
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
-	<string>com.example.SFTransitWatch</string>
+	<string>org.larner.SFTransitWatch</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<true/>
 </dict>
