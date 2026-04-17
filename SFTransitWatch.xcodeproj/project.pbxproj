@@ -38,6 +38,7 @@
 		CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BD /* Preview Assets.xcassets */; };
 		CAFE000000000000000020AE /* SFTransitWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CAFE000000000000000020F8 /* WatchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020F9 /* WatchSession.swift */; };
+		CAFE000000000000000020FA /* PhoneSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020FB /* PhoneSession.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -82,6 +83,7 @@
 		CAFE000000000000000020BE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE000000000000000020BF /* SFTransitWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFTransitWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE000000000000000020F9 /* WatchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSession.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020FB /* PhoneSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -202,6 +204,7 @@
 				CAFE000000000000000020B9 /* SettingsView.swift */,
 				CAFE000000000000000020BA /* SiriManager.swift */,
 				CAFE000000000000000020BB /* SiriShortcutsView.swift */,
+				CAFE000000000000000020FB /* PhoneSession.swift */,
 				CAFE000000000000000020BC /* Assets.xcassets */,
 				CAFE000000000000000020BE /* Info.plist */,
 				CAFE000000000000000020C1 /* Preview Content */,
@@ -372,6 +375,7 @@
 				CAFE000000000000000020A9 /* SettingsView.swift in Sources */,
 				CAFE000000000000000020AA /* SiriManager.swift in Sources */,
 				CAFE000000000000000020AB /* SiriShortcutsView.swift in Sources */,
+				CAFE000000000000000020FA /* PhoneSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
