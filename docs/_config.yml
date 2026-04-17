@@ -1,0 +1,8 @@
+title: SF Transit Watch
+description: Real-time San Francisco Muni arrivals on your Apple Watch.
+theme: jekyll-theme-minimal
+show_downloads: false
+
+header_pages:
+  - index.md
+  - support.md
