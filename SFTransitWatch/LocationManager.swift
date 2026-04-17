@@ -1,6 +1,5 @@
 import Foundation
 import CoreLocation
-import WatchKit
 
 @MainActor
 class LocationManager: NSObject, ObservableObject {
