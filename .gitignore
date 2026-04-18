@@ -170,6 +170,9 @@ fastlane/test_output/
 # Superpowers working files (plans, specs)
 docs/superpowers/
 
+# Developer-specific signing config (contains team ID)
+Developer.xcconfig
+
 # IDE files
 .vscode/
 .idea/
@@ -184,3 +187,4 @@ docs/superpowers/
 .Trashes
 ehthumbs.db
 Thumbs.db 
+.claude

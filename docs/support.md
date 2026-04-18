@@ -43,4 +43,4 @@ Complications refresh on a schedule set by watchOS. Opening the watch app forces
 
 ## Contact
 
-For bug reports, feature requests, or anything else, email **rlarner@gmail.com**.
+For bug reports, feature requests, or anything else, email **sftransitwatch@larner.org**.
