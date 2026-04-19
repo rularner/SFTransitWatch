@@ -143,12 +143,15 @@ The app intelligently learns your route preferences:
    cd SFTransitWatch
    ```
 
-2. **Configure your Apple Developer team**:
+2. **(Optional) Override signing locally**:
    ```bash
    cp Developer.xcconfig.sample Developer.xcconfig
    # Edit Developer.xcconfig and replace YOUR_TEAM_ID with your team ID
    ```
-   `Developer.xcconfig` is gitignored so your team ID stays out of source control.
+   `Developer.xcconfig` is gitignored and optional — `Config.xcconfig` pulls it
+   in with an optional `#include?` directive, so the project builds fine
+   without it. Create it only if you want to override signing settings like
+   `DEVELOPMENT_TEAM` without editing the project file.
 
 3. **Open in Xcode**:
    ```bash
