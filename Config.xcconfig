@@ -3,3 +3,10 @@
 // DEVELOPMENT_TEAM. The `?` makes the include silent when the file is absent,
 // so fresh clones build without needing any local setup.
 #include? "Developer.xcconfig"
+
+// Version numbers. MARKETING_VERSION is bumped automatically by
+// .github/workflows/version-bump.yml based on merged PR titles.
+// CURRENT_PROJECT_VERSION is overwritten at Xcode Cloud build time by
+// ci_scripts/ci_pre_xcodebuild.sh using $CI_BUILD_NUMBER.
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
