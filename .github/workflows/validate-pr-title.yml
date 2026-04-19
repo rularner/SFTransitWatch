@@ -1,0 +1,43 @@
+name: Validate PR title
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate PR title follows Conventional Commits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title matches Conventional Commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          PATTERN='^(feat|fix|docs|chore|refactor|test|build|ci|perf|style)(\([^)]+\))?!?: [^A-Z].+$'
+
+          if echo "$PR_TITLE" | grep -qE "$PATTERN"; then
+            echo "PR title is valid: $PR_TITLE"
+            exit 0
+          fi
+
+          echo "::error::PR title does not follow Conventional Commits."
+          echo ""
+          echo "Your title: '$PR_TITLE'"
+          echo ""
+          echo "Expected format: <type>(<scope>)?!?: <subject>"
+          echo "  <type>: one of feat, fix, docs, chore, refactor, test, build, ci, perf, style"
+          echo "  <scope>: optional, any non-empty text in parens"
+          echo "  !: optional, marks a breaking change"
+          echo "  <subject>: must start with a lowercase letter (or digit/symbol)"
+          echo ""
+          echo "Examples:"
+          echo "  feat: add favorites sync"
+          echo "  fix(siri): stop crash on empty list"
+          echo "  feat!: drop watchOS 9 support"
+          exit 1
