@@ -99,7 +99,7 @@
 		CAFE000000000000000020BF /* SFTransitWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFTransitWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE000000000000000020F9 /* WatchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSession.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020FB /* PhoneSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSession.swift; sourceTree = "<group>"; };
-		CAFE000000000000000020FC /* Developer.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Developer.xcconfig; sourceTree = "<group>"; };
+		CAFE000000000000000020FC /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		CAFE0000000000000000C002 /* ComplicationWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationWidget.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C004 /* ComplicationUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationUpdater.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -132,7 +132,7 @@
 		84F1E6EC2F92778100742F6A /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
-				CAFE000000000000000020FC /* Developer.xcconfig */,
+				CAFE000000000000000020FC /* Config.xcconfig */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -394,7 +394,7 @@
 /* Begin XCBuildConfiguration section */
 		CAFE000000000000000001BA /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CAFE000000000000000020FC /* Developer.xcconfig */;
+			baseConfigurationReference = CAFE000000000000000020FC /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -459,7 +459,7 @@
 		};
 		CAFE000000000000000001BB /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CAFE000000000000000020FC /* Developer.xcconfig */;
+			baseConfigurationReference = CAFE000000000000000020FC /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;

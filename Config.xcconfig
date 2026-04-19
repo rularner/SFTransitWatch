@@ -1,0 +1,5 @@
+// Committed project config. Optionally includes a developer-local override
+// file (Developer.xcconfig) for personal signing settings such as
+// DEVELOPMENT_TEAM. The `?` makes the include silent when the file is absent,
+// so fresh clones build without needing any local setup.
+#include? "Developer.xcconfig"
