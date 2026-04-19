@@ -169,10 +169,28 @@ The app intelligently learns your route preferences:
    - Press Cmd+R to build and run
 
 5. **Configure API Key**:
-   - Open the app on your Apple Watch
-   - Tap the settings gear icon
-   - Enter your 511.org API key
-   - Tap "Save"
+
+   Pick whichever of these is easiest:
+
+   - **On the iPhone app** (recommended): open **Settings** and paste the
+     token into **511.org API Key**. The watch picks it up the next time it
+     connects.
+   - **On the watch**: open the app, tap the settings gear, select
+     **Enter API Key**, and paste or dictate the key.
+   - **Via text or email**: send yourself a Messages or Mail message
+     containing the link
+     `https://rularner.github.io/sftransitwatch/key?k=YOUR_API_KEY`
+     (replace `YOUR_API_KEY` with the token from 511.org), then open
+     that message **on your Apple Watch** and tap the link. The watch
+     app is registered as the handler for that URL via Universal
+     Links, so the app opens and saves the key automatically. Tapping
+     the link on the iPhone just shows a short fallback page — the
+     link has to be opened on the watch itself. If the universal link
+     isn't active yet, the app also accepts a custom-scheme fallback
+     (`sftransitwatch://key/YOUR_API_KEY`).
+
+   See [docs/support.md](docs/support.md#loading-your-api-key-via-text-or-email)
+   for more detail on the link method.
 
 6. **Set Up Siri**:
    - Go to Settings > Siri Integration

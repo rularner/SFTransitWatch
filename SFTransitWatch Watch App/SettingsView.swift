@@ -36,7 +36,7 @@ struct SettingsView: View {
                     Text("Send yourself a message containing:")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("sftransitwatch://key/YOUR_KEY")
+                    Text("https://rularner.github.io/sftransitwatch/key?k=YOUR_KEY")
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.primary)
                     Text("Then tap the link on your watch.")

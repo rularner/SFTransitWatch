@@ -13,16 +13,26 @@ struct SFTransitWatchApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    // Accept: sftransitwatch://key/YOUR_API_KEY
-                    if url.scheme == "sftransitwatch",
-                       url.host == "key",
-                       !url.path.isEmpty {
-                        let key = String(url.path.dropFirst()) // strip leading "/"
-                        if !key.isEmpty {
-                            storedAPIKey = key
-                        }
+                    if let key = apiKey(from: url), !key.isEmpty {
+                        storedAPIKey = key
                     }
                 }
         }
+    }
+
+    // Accepts either:
+    //   sftransitwatch://key/YOUR_API_KEY                          (custom scheme)
+    //   https://rularner.github.io/sftransitwatch/key?k=YOUR_KEY   (universal link)
+    private func apiKey(from url: URL) -> String? {
+        if url.scheme == "sftransitwatch", url.host == "key" {
+            return String(url.path.dropFirst())
+        }
+        if url.scheme == "https",
+           url.host == "rularner.github.io",
+           url.path == "/sftransitwatch/key",
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            return components.queryItems?.first { $0.name == "k" }?.value
+        }
+        return nil
     }
 } 
