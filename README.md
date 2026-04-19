@@ -143,7 +143,14 @@ The app intelligently learns your route preferences:
    cd SFTransitWatch
    ```
 
-2. **Open in Xcode**:
+2. **Configure your Apple Developer team**:
+   ```bash
+   cp Developer.xcconfig.sample Developer.xcconfig
+   # Edit Developer.xcconfig and replace YOUR_TEAM_ID with your team ID
+   ```
+   `Developer.xcconfig` is gitignored so your team ID stays out of source control.
+
+3. **Open in Xcode**:
    ```bash
    open SFTransitWatch.xcodeproj
    ```

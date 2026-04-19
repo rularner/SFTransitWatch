@@ -1,6 +1,5 @@
 import Foundation
 import CoreLocation
-import WatchKit
 
 @MainActor
 class LocationManager: NSObject, ObservableObject {
@@ -47,7 +46,7 @@ class LocationManager: NSObject, ObservableObject {
     }
 }
 
-extension LocationManager: CLLocationManagerDelegate {
+extension LocationManager: @preconcurrency CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         currentLocation = location

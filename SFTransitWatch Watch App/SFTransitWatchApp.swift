@@ -5,6 +5,10 @@ import WatchKit
 struct SFTransitWatchApp: App {
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
 
+    init() {
+        WatchSession.shared.activate()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

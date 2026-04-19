@@ -21,8 +21,49 @@
 		CAFE000000000000000015DA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015D0 /* SettingsView.swift */; };
 		CAFE000000000000000015EA /* SiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015E0 /* SiriManager.swift */; };
 		CAFE000000000000000015FA /* SiriShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015F0 /* SiriShortcutsView.swift */; };
+		CAFE000000000000000020A0 /* SFTransitWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B0 /* SFTransitWatchApp.swift */; };
+		CAFE000000000000000020A1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B1 /* ContentView.swift */; };
+		CAFE000000000000000020A2 /* BusStopListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B2 /* BusStopListView.swift */; };
+		CAFE000000000000000020A3 /* BusArrivalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B3 /* BusArrivalView.swift */; };
+		CAFE000000000000000020A4 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B4 /* LocationManager.swift */; };
+		CAFE000000000000000020A5 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B5 /* TransitAPI.swift */; };
+		CAFE000000000000000020A6 /* BusStop.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B6 /* BusStop.swift */; };
+		CAFE000000000000000020A7 /* BusArrival.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B7 /* BusArrival.swift */; };
+		CAFE000000000000000020A8 /* FavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B8 /* FavoritesManager.swift */; };
+		CAFE000000000000000020A9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B9 /* SettingsView.swift */; };
+		CAFE000000000000000020AA /* SiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BA /* SiriManager.swift */; };
+		CAFE000000000000000020AB /* SiriShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BB /* SiriShortcutsView.swift */; };
+		CAFE000000000000000020AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BC /* Assets.xcassets */; };
+		CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BD /* Preview Assets.xcassets */; };
+		CAFE000000000000000020AE /* SFTransitWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CAFE000000000000000020F8 /* WatchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020F9 /* WatchSession.swift */; };
+		CAFE000000000000000020FA /* PhoneSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020FB /* PhoneSession.swift */; };
 		CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CAFE000000000000000020D4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CAFE000000000000000000B7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CAFE000000000000000001AA;
+			remoteInfo = "SFTransitWatch Watch App";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CAFE000000000000000020D3 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				CAFE000000000000000020AE /* SFTransitWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		CAFE000000000000000012B0 /* SFTransitWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTransitWatchApp.swift; sourceTree = "<group>"; };
@@ -40,6 +81,25 @@
 		CAFE000000000000000015E0 /* SiriManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriManager.swift; sourceTree = "<group>"; };
 		CAFE000000000000000015F0 /* SiriShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcutsView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SFTransitWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAFE000000000000000020B0 /* SFTransitWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTransitWatchApp.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B2 /* BusStopListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopListView.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B3 /* BusArrivalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalView.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B4 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B5 /* TransitAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPI.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B6 /* BusStop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStop.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B7 /* BusArrival.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrival.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B8 /* FavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManager.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020B9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020BA /* SiriManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriManager.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020BB /* SiriShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcutsView.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020BC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		CAFE000000000000000020BD /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		CAFE000000000000000020BE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CAFE000000000000000020BF /* SFTransitWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFTransitWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAFE000000000000000020F9 /* WatchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSession.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020FB /* PhoneSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSession.swift; sourceTree = "<group>"; };
+		CAFE000000000000000020FC /* Developer.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Developer.xcconfig; sourceTree = "<group>"; };
 		CAFE0000000000000000C002 /* ComplicationWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationWidget.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C004 /* ComplicationUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationUpdater.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -59,16 +119,33 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CAFE000000000000000020D2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		84F1E6EC2F92778100742F6A /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				CAFE000000000000000020FC /* Developer.xcconfig */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		CAFE000000000000000018A0 = {
 			isa = PBXGroup;
 			children = (
+				CAFE000000000000000020C0 /* SFTransitWatch */,
 				CAFE0000000000000000T020 /* SFTransitWatchTests */,
 				CAFE0000000000000000C020 /* SFTransitWatch Complication */,
 				CAFE000000000000000018C0 /* SFTransitWatch Watch App */,
 				CAFE000000000000000018D0 /* Products */,
+				84F1E6EC2F92778100742F6A /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -88,6 +165,7 @@
 				CAFE000000000000000015E0 /* SiriManager.swift */,
 				CAFE000000000000000015F0 /* SiriShortcutsView.swift */,
 				CAFE0000000000000000C004 /* ComplicationUpdater.swift */,
+				CAFE000000000000000020F9 /* WatchSession.swift */,
 				CAFE000000000000000012F0 /* Assets.xcassets */,
 				CAFE000000000000000019A0 /* Preview Content */,
 			);
@@ -100,6 +178,7 @@
 				CAFE0000000000000000T010 /* SFTransitWatchTests.xctest */,
 				CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */,
 				CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */,
+				CAFE000000000000000020BF /* SFTransitWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,6 +187,37 @@
 			isa = PBXGroup;
 			children = (
 				CAFE000000000000000013B0 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		CAFE000000000000000020C0 /* SFTransitWatch */ = {
+			isa = PBXGroup;
+			children = (
+				CAFE000000000000000020B0 /* SFTransitWatchApp.swift */,
+				CAFE000000000000000020B1 /* ContentView.swift */,
+				CAFE000000000000000020B2 /* BusStopListView.swift */,
+				CAFE000000000000000020B3 /* BusArrivalView.swift */,
+				CAFE000000000000000020B4 /* LocationManager.swift */,
+				CAFE000000000000000020B5 /* TransitAPI.swift */,
+				CAFE000000000000000020B6 /* BusStop.swift */,
+				CAFE000000000000000020B7 /* BusArrival.swift */,
+				CAFE000000000000000020B8 /* FavoritesManager.swift */,
+				CAFE000000000000000020B9 /* SettingsView.swift */,
+				CAFE000000000000000020BA /* SiriManager.swift */,
+				CAFE000000000000000020BB /* SiriShortcutsView.swift */,
+				CAFE000000000000000020FB /* PhoneSession.swift */,
+				CAFE000000000000000020BC /* Assets.xcassets */,
+				CAFE000000000000000020BE /* Info.plist */,
+				CAFE000000000000000020C1 /* Preview Content */,
+			);
+			path = SFTransitWatch;
+			sourceTree = "<group>";
+		};
+		CAFE000000000000000020C1 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				CAFE000000000000000020BD /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
 			sourceTree = "<group>";
@@ -152,6 +262,25 @@
 			productReference = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CAFE000000000000000020E0 /* SFTransitWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CAFE000000000000000020E1 /* Build configuration list for PBXNativeTarget "SFTransitWatch" */;
+			buildPhases = (
+				CAFE000000000000000020D0 /* Sources */,
+				CAFE000000000000000020D2 /* Frameworks */,
+				CAFE000000000000000020D1 /* Resources */,
+				CAFE000000000000000020D3 /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CAFE000000000000000020D5 /* PBXTargetDependency */,
+			);
+			name = SFTransitWatch;
+			productName = SFTransitWatch;
+			productReference = CAFE000000000000000020BF /* SFTransitWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -164,6 +293,9 @@
 				TargetAttributes = {
 					CAFE000000000000000001AA = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					CAFE000000000000000020E0 = {
+						CreatedOnToolsVersion = 16.4;
 					};
 				};
 			};
@@ -180,6 +312,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				CAFE000000000000000020E0 /* SFTransitWatch */,
 				CAFE000000000000000001AA /* SFTransitWatch Watch App */,
 			);
 		};
@@ -192,6 +325,15 @@
 			files = (
 				CAFE000000000000000012E0 /* Assets.xcassets in Resources */,
 				CAFE000000000000000013A0 /* Preview Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAFE000000000000000020D1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFE000000000000000020AC /* Assets.xcassets in Resources */,
+				CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -215,14 +357,44 @@
 				CAFE000000000000000015EA /* SiriManager.swift in Sources */,
 				CAFE000000000000000015FA /* SiriShortcutsView.swift in Sources */,
 				CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */,
+				CAFE000000000000000020F8 /* WatchSession.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAFE000000000000000020D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFE000000000000000020A0 /* SFTransitWatchApp.swift in Sources */,
+				CAFE000000000000000020A1 /* ContentView.swift in Sources */,
+				CAFE000000000000000020A2 /* BusStopListView.swift in Sources */,
+				CAFE000000000000000020A3 /* BusArrivalView.swift in Sources */,
+				CAFE000000000000000020A4 /* LocationManager.swift in Sources */,
+				CAFE000000000000000020A5 /* TransitAPI.swift in Sources */,
+				CAFE000000000000000020A6 /* BusStop.swift in Sources */,
+				CAFE000000000000000020A7 /* BusArrival.swift in Sources */,
+				CAFE000000000000000020A8 /* FavoritesManager.swift in Sources */,
+				CAFE000000000000000020A9 /* SettingsView.swift in Sources */,
+				CAFE000000000000000020AA /* SiriManager.swift in Sources */,
+				CAFE000000000000000020AB /* SiriShortcutsView.swift in Sources */,
+				CAFE000000000000000020FA /* PhoneSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		CAFE000000000000000020D5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CAFE000000000000000001AA /* SFTransitWatch Watch App */;
+			targetProxy = CAFE000000000000000020D4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		CAFE000000000000000001BA /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CAFE000000000000000020FC /* Developer.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -287,6 +459,7 @@
 		};
 		CAFE000000000000000001BB /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CAFE000000000000000020FC /* Developer.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -362,6 +535,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -390,10 +564,77 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
+		CAFE000000000000000020F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"SFTransitWatch/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SFTransitWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "SF Transit Watch";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CAFE000000000000000020F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"SFTransitWatch/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SFTransitWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "SF Transit Watch";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -414,6 +655,15 @@
 			buildConfigurations = (
 				CAFE000000000000000001BA /* Debug */,
 				CAFE000000000000000001BB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CAFE000000000000000020E1 /* Build configuration list for PBXNativeTarget "SFTransitWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CAFE000000000000000020F0 /* Debug */,
+				CAFE000000000000000020F1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

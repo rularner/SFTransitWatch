@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @StateObject private var transitAPI = TransitAPI()
@@ -163,8 +164,7 @@ struct SettingsView: View {
     
     private func open511Website() {
         if let url = URL(string: "https://511.org/developers/") {
-            // On Apple Watch, this will open the URL on the paired iPhone
-            WKExtension.shared().openSystemURL(url)
+            UIApplication.shared.open(url)
         }
     }
 }

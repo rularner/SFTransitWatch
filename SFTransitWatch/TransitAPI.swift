@@ -1,14 +1,24 @@
 import Foundation
+import SwiftUI
 
 class TransitAPI: ObservableObject {
     private let baseURL = "https://api.511.org/transit"
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
-    
+    @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
+
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+
+    private var resolvedKey: String {
+        return phoneAPIKey.isEmpty ? storedAPIKey : phoneAPIKey
+    }
+
+    private var hasUsableKey: Bool {
+        return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
+    }
+
     private var apiKey: String {
-        return storedAPIKey.isEmpty ? "YOUR_511_API_KEY" : storedAPIKey
+        return resolvedKey.isEmpty ? "YOUR_511_API_KEY" : resolvedKey
     }
     
     func fetchArrivals(for stopId: String) async -> [BusArrival] {
@@ -16,7 +26,7 @@ class TransitAPI: ObservableObject {
         errorMessage = nil
         
         // Check if we have a valid API key
-        guard !storedAPIKey.isEmpty else {
+        guard hasUsableKey else {
             errorMessage = "Please configure your 511.org API key in Settings"
             isLoading = false
             return getSampleArrivals(for: stopId)
@@ -62,7 +72,7 @@ class TransitAPI: ObservableObject {
         errorMessage = nil
         
         // Check if we have a valid API key
-        guard !storedAPIKey.isEmpty else {
+        guard hasUsableKey else {
             errorMessage = "Please configure your 511.org API key in Settings"
             isLoading = false
             return BusStop.sampleStops
@@ -219,7 +229,7 @@ class TransitAPI: ObservableObject {
     
     // Check if API key is configured
     var isAPIKeyConfigured: Bool {
-        return !storedAPIKey.isEmpty
+        return hasUsableKey
     }
 }
 
