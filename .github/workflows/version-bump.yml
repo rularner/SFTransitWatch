@@ -105,10 +105,14 @@ jobs:
             if git push origin HEAD:main; then
               echo "Pushed main on attempt $attempt"
               git tag "v${NEW}"
-              git push origin "v${NEW}"
-              exit 0
+              if git push origin "v${NEW}"; then
+                exit 0
+              fi
+              echo "Tag push failed on attempt $attempt; cleaning up and retrying"
+              git tag -d "v${NEW}"
+              continue
             fi
-            echo "Push failed on attempt $attempt; rebasing and retrying"
+            echo "Main push failed on attempt $attempt; rebasing and retrying"
             git pull --rebase origin main
           done
           echo "Push failed after 3 attempts" >&2
