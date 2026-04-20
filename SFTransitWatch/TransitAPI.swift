@@ -2,7 +2,14 @@ import Foundation
 import SwiftUI
 
 class TransitAPI: ObservableObject {
-    private let baseURL = "https://api.511.org/transit"
+    private let defaultBaseURL = "https://api.511.org/transit"
+    private var baseURL: String {
+        if let configured = Bundle.main.object(forInfoDictionaryKey: "TRANSIT_API_BASE_URL") as? String,
+           !configured.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return configured
+        }
+        return defaultBaseURL
+    }
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
 
@@ -17,6 +24,10 @@ class TransitAPI: ObservableObject {
         return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
     }
 
+    private var isDirect511Mode: Bool {
+        return baseURL.contains("api.511.org")
+    }
+
     private var apiKey: String {
         return resolvedKey.isEmpty ? "YOUR_511_API_KEY" : resolvedKey
     }
@@ -25,8 +36,8 @@ class TransitAPI: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        // Check if we have a valid API key
-        guard hasUsableKey else {
+        // In direct mode we need a user key, but worker-proxy mode does not.
+        if isDirect511Mode && !hasUsableKey {
             errorMessage = "Please configure your 511.org API key in Settings"
             isLoading = false
             return getSampleArrivals(for: stopId)
@@ -35,9 +46,17 @@ class TransitAPI: ObservableObject {
         do {
             // 511.org API endpoint for real-time arrivals
             let endpoint = "StopMonitoring"
-            let urlString = "\(baseURL)/\(endpoint)?api_key=\(apiKey)&agency=SF&stopCode=\(stopId)"
+            var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+            var queryItems = [
+                URLQueryItem(name: "agency", value: "SF"),
+                URLQueryItem(name: "stopCode", value: stopId)
+            ]
+            if isDirect511Mode {
+                queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+            }
+            components?.queryItems = queryItems
             
-            guard let url = URL(string: urlString) else {
+            guard let url = components?.url else {
                 throw APIError.invalidURL
             }
             
@@ -71,8 +90,7 @@ class TransitAPI: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        // Check if we have a valid API key
-        guard hasUsableKey else {
+        if isDirect511Mode && !hasUsableKey {
             errorMessage = "Please configure your 511.org API key in Settings"
             isLoading = false
             return BusStop.sampleStops
@@ -81,9 +99,18 @@ class TransitAPI: ObservableObject {
         do {
             // 511.org API endpoint for nearby stops
             let endpoint = "StopPlace"
-            let urlString = "\(baseURL)/\(endpoint)?api_key=\(apiKey)&lat=\(latitude)&lon=\(longitude)&radius=\(radius)"
+            var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+            var queryItems = [
+                URLQueryItem(name: "lat", value: String(latitude)),
+                URLQueryItem(name: "lon", value: String(longitude)),
+                URLQueryItem(name: "radius", value: String(radius))
+            ]
+            if isDirect511Mode {
+                queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+            }
+            components?.queryItems = queryItems
             
-            guard let url = URL(string: urlString) else {
+            guard let url = components?.url else {
                 throw APIError.invalidURL
             }
             
