@@ -3,3 +3,7 @@
 // https://developer.apple.com/account in the Membership section.
 
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// Optional local override for the shared transit API base URL.
+// Example: https://sftransitwatch.your-subdomain.workers.dev
+// TRANSIT_API_BASE_URL = https://example.workers.dev

@@ -188,3 +188,14 @@ Developer.xcconfig
 ehthumbs.db
 Thumbs.db 
 .claude
+
+# Cloudflare worker (CloudflareWorker)
+CloudflareWorker/node_modules/
+CloudflareWorker/.wrangler/
+CloudflareWorker/.dev.vars*
+!CloudflareWorker/.dev.vars.example
+CloudflareWorker/.env*
+!CloudflareWorker/.env.example
+CloudflareWorker/coverage/
+CloudflareWorker/.nyc_output/
+CloudflareWorker/*.tsbuildinfo

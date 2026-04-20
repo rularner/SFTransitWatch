@@ -10,3 +10,8 @@
 // ci_scripts/ci_pre_xcodebuild.sh using $CI_BUILD_NUMBER.
 MARKETING_VERSION = 1.0.0
 CURRENT_PROJECT_VERSION = 1
+
+// Shared transit API base URL for iPhone and Watch targets.
+// Leave blank to use direct 511.org calls; set to your Cloudflare Worker URL
+// (for example: https://sftransitwatch.your-subdomain.workers.dev).
+TRANSIT_API_BASE_URL =
