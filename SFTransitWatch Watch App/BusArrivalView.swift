@@ -229,8 +229,23 @@ struct BusArrivalRow: View {
     }
 
     private func routeColor(for route: String) -> Color {
-        let colors: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
-        return colors[abs(route.hashValue) % colors.count]
+        if let metro = metroLineColor(for: route) { return metro }
+        let fallback: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
+        return fallback[abs(route.hashValue) % fallback.count]
+    }
+
+    private func metroLineColor(for route: String) -> Color? {
+        switch route.uppercased() {
+        case "F": return Color(red: 0.73, green: 0.20, blue: 0.05)   // F Market, historic red
+        case "J": return Color(red: 0.55, green: 0.35, blue: 0.17)   // J Church, brown
+        case "K", "KT": return Color(red: 0.43, green: 0.20, blue: 0.56) // K Ingleside / KT, purple
+        case "L": return Color(red: 0.47, green: 0.47, blue: 0.47)   // L Taraval, gray
+        case "M": return Color(red: 0.15, green: 0.55, blue: 0.25)   // M Ocean View, green
+        case "N": return Color(red: 0.00, green: 0.35, blue: 0.62)   // N Judah, blue
+        case "T": return Color(red: 0.78, green: 0.13, blue: 0.18)   // T Third, red
+        case "S": return Color(red: 0.95, green: 0.62, blue: 0.07)   // S Shuttle, yellow-orange
+        default: return nil
+        }
     }
 }
 
