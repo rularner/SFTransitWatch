@@ -18,6 +18,13 @@ class CommuteSlotsManager: ObservableObject {
             }
         }
 
+        var displayName: String {
+            switch self {
+            case .morning:   return "Morning"
+            case .afternoon: return "Afternoon"
+            }
+        }
+
         /// Which slot is active at a given hour. Morning < 12:00, afternoon >= 12:00.
         static func active(at date: Date, calendar: Calendar = .current) -> Slot {
             let hour = calendar.component(.hour, from: date)

@@ -3,6 +3,8 @@ import WatchKit
 
 struct SettingsView: View {
     @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var pinnedStopsManager = PinnedStopsManager()
+    @StateObject private var commuteSlotsManager = CommuteSlotsManager()
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @State private var showingAPIKeyEntry = false
 
@@ -50,6 +52,32 @@ struct SettingsView: View {
                         storedAPIKey = ""
                     }
                     .foregroundColor(.red)
+                }
+            }
+
+            Section(header: Text("Complication")) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Commute Stops")
+                        .font(.headline)
+                    Text("Shown on your watch face. Morning before noon, afternoon after.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+
+                ForEach(CommuteSlotsManager.Slot.allCases, id: \.self) { slot in
+                    NavigationLink {
+                        CommuteSlotPickerView(slot: slot, slotsManager: commuteSlotsManager, pinnedStopsManager: pinnedStopsManager)
+                    } label: {
+                        HStack {
+                            Text(slot.displayName)
+                            Spacer()
+                            Text(currentStopName(for: slot))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
                 }
             }
 
@@ -106,6 +134,64 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAPIKeyEntry) {
             APIKeyEntryView(storedAPIKey: $storedAPIKey)
         }
+    }
+
+    private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {
+        guard let id = commuteSlotsManager.stopId(for: slot) else { return "Not set" }
+        return pinnedStopsManager.pinned.first(where: { $0.id == id })?.name ?? "Stop \(id)"
+    }
+}
+
+// MARK: - Slot picker
+
+struct CommuteSlotPickerView: View {
+    let slot: CommuteSlotsManager.Slot
+    @ObservedObject var slotsManager: CommuteSlotsManager
+    @ObservedObject var pinnedStopsManager: PinnedStopsManager
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            if pinnedStopsManager.pinned.isEmpty {
+                Section {
+                    Text("Pin a stop from the main list first.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                Section {
+                    ForEach(pinnedStopsManager.pinned) { stop in
+                        Button {
+                            slotsManager.setStopId(stop.id, for: slot)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(stop.name).font(.body)
+                                    Text("Stop \(stop.code)").font(.caption2).foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if slotsManager.stopId(for: slot) == stop.id {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if slotsManager.stopId(for: slot) != nil {
+                Section {
+                    Button("Clear") {
+                        slotsManager.setStopId(nil, for: slot)
+                        dismiss()
+                    }
+                    .foregroundColor(.red)
+                }
+            }
+        }
+        .navigationTitle(slot.displayName)
     }
 }
 
