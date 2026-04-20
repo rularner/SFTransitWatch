@@ -199,3 +199,4 @@ CloudflareWorker/.env*
 CloudflareWorker/coverage/
 CloudflareWorker/.nyc_output/
 CloudflareWorker/*.tsbuildinfo
+CloudflareWorker/.wrangler.generated.jsonc
