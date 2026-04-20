@@ -41,6 +41,7 @@
 		CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 		CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000P001 /* PinnedStopsManager.swift */; };
 		CAFE0000000000000000X002 /* SIRIXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000X001 /* SIRIXMLParser.swift */; };
+		CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -84,6 +85,7 @@
 		CAFE000000000000000015F0 /* SiriShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcutsView.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000P001 /* PinnedStopsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedStopsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000X001 /* SIRIXMLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SIRIXMLParser.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000S001 /* CommuteSlotsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotsManager.swift; sourceTree = "<group>"; };
 		CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SFTransitWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE000000000000000020B0 /* SFTransitWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTransitWatchApp.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020B1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -171,6 +173,7 @@
 				CAFE000000000000000015F0 /* SiriShortcutsView.swift */,
 				CAFE0000000000000000P001 /* PinnedStopsManager.swift */,
 				CAFE0000000000000000X001 /* SIRIXMLParser.swift */,
+				CAFE0000000000000000S001 /* CommuteSlotsManager.swift */,
 				CAFE0000000000000000C004 /* ComplicationUpdater.swift */,
 				CAFE000000000000000020F9 /* WatchSession.swift */,
 				CAFE000000000000000012F0 /* Assets.xcassets */,
@@ -366,6 +369,7 @@
 				CAFE000000000000000015FA /* SiriShortcutsView.swift in Sources */,
 				CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */,
 				CAFE0000000000000000X002 /* SIRIXMLParser.swift in Sources */,
+				CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */,
 				CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */,
 				CAFE000000000000000020F8 /* WatchSession.swift in Sources */,
 			);
