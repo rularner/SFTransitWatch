@@ -4,14 +4,13 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   bump:
     name: Bump MARKETING_VERSION, tag, and release
     runs-on: ubuntu-latest
-    if: "${{ !startsWith(github.event.head_commit.message, 'chore: release v') }}"
+    permissions:
+      contents: write
+    if: "!startsWith(github.event.head_commit.message, 'chore: release v')"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,7 +82,7 @@ jobs:
         if: steps.decide.outputs.bump != 'none'
         run: |
           set -euo pipefail
-          sed -i "s/^MARKETING_VERSION = .*/MARKETING_VERSION = ${{ steps.version.outputs.new }}/" Config.xcconfig
+          sed -i "s|^MARKETING_VERSION = .*|MARKETING_VERSION = ${{ steps.version.outputs.new }}|" Config.xcconfig
 
           # Safety: exactly one line must have changed.
           CHANGED=$(git diff --numstat Config.xcconfig | awk '{print $1+$2}')
@@ -101,11 +100,12 @@ jobs:
           NEW="${{ steps.version.outputs.new }}"
           git add Config.xcconfig
           git commit -m "chore: release v${NEW} [skip ci]"
-          git tag "v${NEW}"
 
           for attempt in 1 2 3; do
-            if git push origin HEAD:main --tags; then
-              echo "Pushed on attempt $attempt"
+            if git push origin HEAD:main; then
+              echo "Pushed main on attempt $attempt"
+              git tag "v${NEW}"
+              git push origin "v${NEW}"
               exit 0
             fi
             echo "Push failed on attempt $attempt; rebasing and retrying"

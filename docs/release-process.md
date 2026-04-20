@@ -32,9 +32,11 @@ If the Action is down and you need to ship:
 
 ```sh
 # Edit Config.xcconfig, change MARKETING_VERSION to the new value.
-git commit -am "chore: release vX.Y.Z [skip ci]"
+git add Config.xcconfig
+git commit -m "chore: release vX.Y.Z [skip ci]"
+git push origin main
 git tag vX.Y.Z
-git push origin main --tags
+git push origin vX.Y.Z
 gh release create vX.Y.Z --title "vX.Y.Z" --generate-notes
 ```
 
@@ -45,6 +47,7 @@ The `[skip ci]` in the commit message prevents the bump workflow from running on
 - **Two PRs merged but only one bump landed:** the workflow includes a 3-attempt rebase/retry loop, so this shouldn't happen. If it does, manually re-run the workflow on the later commit via the Actions tab.
 - **Bump ran on a docs-only PR:** it shouldn't — `docs:` is in the "none" bucket. If it did, check whether the PR title actually started with `feat`/`fix`/`perf` or whether a body line contained `BREAKING CHANGE:`.
 - **Xcode Cloud build number didn't increment:** check Xcode Cloud's build log for the `ci_pre_xcodebuild.sh` output. Confirm `CI_BUILD_NUMBER` was set.
+- **Workflow pushed the commit and tag but `gh release create` failed:** the release step runs last; a failure here leaves the tag on the remote without a matching GitHub Release. Recover with `gh release create vX.Y.Z --title "vX.Y.Z" --generate-notes` from a local clone.
 
 ## What's explicitly out of scope
 
