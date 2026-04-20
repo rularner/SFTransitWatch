@@ -5,11 +5,11 @@ struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @State private var nearbyStops: [BusStop] = []
     @State private var isLoading = false
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
-    @State private var pinnedStops: [BusStop] = []
     
     var body: some View {
         List {
@@ -71,9 +71,9 @@ struct BusStopListView: View {
                 .listRowBackground(Color.clear)
             } else {
                 // Pinned stops (added by code)
-                if !pinnedStops.isEmpty {
+                if !pinnedStopsManager.pinned.isEmpty {
                     Section(header: Text("Pinned")) {
-                        ForEach(pinnedStops) { stop in
+                        ForEach(pinnedStopsManager.pinned) { stop in
                             NavigationLink(destination: BusArrivalView(stop: stop)) {
                                 BusStopRow(
                                     stop: stop,
@@ -82,6 +82,7 @@ struct BusStopListView: View {
                                 )
                             }
                         }
+                        .onDelete { pinnedStopsManager.unpin(at: $0) }
                     }
                 }
 
@@ -125,9 +126,7 @@ struct BusStopListView: View {
         }
         .sheet(isPresented: $showingStopCodeEntry) {
             StopCodeEntryView(transitAPI: transitAPI) { foundStop in
-                if !pinnedStops.contains(where: { $0.id == foundStop.id }) {
-                    pinnedStops.append(foundStop)
-                }
+                pinnedStopsManager.pin(foundStop)
             }
         }
         .refreshable {
