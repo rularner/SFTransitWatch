@@ -231,6 +231,7 @@ struct BusStopRow: View {
                             .font(.caption)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel(stop.isFavorite ? "Remove from favorites" : "Add to favorites")
                 }
             }
             
@@ -245,7 +246,7 @@ struct BusStopRow: View {
                             .foregroundColor(.blue)
                             .cornerRadius(4)
                     }
-                    
+
                     if stop.routes.count > 3 {
                         Text("+\(stop.routes.count - 3)")
                             .font(.caption2)
@@ -255,8 +256,23 @@ struct BusStopRow: View {
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityHint("Tap to view arrivals")
     }
-    
+
+    private var accessibilityDescription: String {
+        var parts: [String] = [stop.name, "stop code \(stop.code)"]
+        if let currentLocation = currentLocation {
+            parts.append(formatDistance(stop.distance(to: currentLocation)) + " away")
+        }
+        if stop.isFavorite { parts.append("favorite") }
+        if !stop.routes.isEmpty {
+            parts.append("routes \(stop.routes.joined(separator: ", "))")
+        }
+        return parts.joined(separator: ", ")
+    }
+
     private func formatDistance(_ distance: CLLocationDistance) -> String {
         if distance < 1000 {
             return "\(Int(distance))m"

@@ -45,6 +45,7 @@ struct BusArrivalView: View {
                                 .font(.title2)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel(favoritesManager.isFavorite(stop.id) ? "Remove from favorites" : "Add to favorites")
                     }
 
                     if !stop.routes.isEmpty {
@@ -174,6 +175,9 @@ struct RouteFilterPill: View {
                 .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityLabel(label == "All" ? "All routes" : "Route \(label)")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityHint(isSelected ? "Tap to clear filter" : "Tap to filter arrivals")
     }
 }
 
@@ -226,6 +230,13 @@ struct BusArrivalRow: View {
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        let timing = arrival.isRealTime ? "real time" : "scheduled"
+        return "Route \(arrival.route) to \(arrival.destination), \(arrival.minutesString), \(timing)"
     }
 
     private func routeColor(for route: String) -> Color {
