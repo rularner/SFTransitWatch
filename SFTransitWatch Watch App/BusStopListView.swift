@@ -5,14 +5,27 @@ struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @State private var nearbyStops: [BusStop] = []
     @State private var isLoading = false
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
-    @State private var pinnedStops: [BusStop] = []
     
     var body: some View {
         List {
+            if let error = transitAPI.errorMessage, transitAPI.isAPIKeyConfigured {
+                Section {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Error: \(error)")
+                }
+            }
+
             if !transitAPI.isAPIKeyConfigured {
                 // API Key not configured section
                 Section {
@@ -71,9 +84,9 @@ struct BusStopListView: View {
                 .listRowBackground(Color.clear)
             } else {
                 // Pinned stops (added by code)
-                if !pinnedStops.isEmpty {
+                if !pinnedStopsManager.pinned.isEmpty {
                     Section(header: Text("Pinned")) {
-                        ForEach(pinnedStops) { stop in
+                        ForEach(pinnedStopsManager.pinned) { stop in
                             NavigationLink(destination: BusArrivalView(stop: stop)) {
                                 BusStopRow(
                                     stop: stop,
@@ -82,6 +95,7 @@ struct BusStopListView: View {
                                 )
                             }
                         }
+                        .onDelete { pinnedStopsManager.unpin(at: $0) }
                     }
                 }
 
@@ -125,9 +139,7 @@ struct BusStopListView: View {
         }
         .sheet(isPresented: $showingStopCodeEntry) {
             StopCodeEntryView(transitAPI: transitAPI) { foundStop in
-                if !pinnedStops.contains(where: { $0.id == foundStop.id }) {
-                    pinnedStops.append(foundStop)
-                }
+                pinnedStopsManager.pin(foundStop)
             }
         }
         .refreshable {
@@ -169,8 +181,7 @@ struct BusStopListView: View {
                 longitude: location.coordinate.longitude
             )
         } else {
-            // Fallback to sample data if location not available
-            nearbyStops = BusStop.sampleStops
+            nearbyStops = []
         }
         
         // Sort by distance if location is available
@@ -231,6 +242,7 @@ struct BusStopRow: View {
                             .font(.caption)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel(stop.isFavorite ? "Remove from favorites" : "Add to favorites")
                 }
             }
             
@@ -245,7 +257,7 @@ struct BusStopRow: View {
                             .foregroundColor(.blue)
                             .cornerRadius(4)
                     }
-                    
+
                     if stop.routes.count > 3 {
                         Text("+\(stop.routes.count - 3)")
                             .font(.caption2)
@@ -255,8 +267,23 @@ struct BusStopRow: View {
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityHint("Tap to view arrivals")
     }
-    
+
+    private var accessibilityDescription: String {
+        var parts: [String] = [stop.name, "stop code \(stop.code)"]
+        if let currentLocation = currentLocation {
+            parts.append(formatDistance(stop.distance(to: currentLocation)) + " away")
+        }
+        if stop.isFavorite { parts.append("favorite") }
+        if !stop.routes.isEmpty {
+            parts.append("routes \(stop.routes.joined(separator: ", "))")
+        }
+        return parts.joined(separator: ", ")
+    }
+
     private func formatDistance(_ distance: CLLocationDistance) -> String {
         if distance < 1000 {
             return "\(Int(distance))m"

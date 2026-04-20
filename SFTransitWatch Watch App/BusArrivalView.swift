@@ -45,6 +45,7 @@ struct BusArrivalView: View {
                                 .font(.title2)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel(favoritesManager.isFavorite(stop.id) ? "Remove from favorites" : "Add to favorites")
                     }
 
                     if !stop.routes.isEmpty {
@@ -63,6 +64,19 @@ struct BusArrivalView: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            if let error = transitAPI.errorMessage {
+                Section {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Error: \(error)")
+                }
             }
 
             // Arrivals
@@ -174,6 +188,9 @@ struct RouteFilterPill: View {
                 .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityLabel(label == "All" ? "All routes" : "Route \(label)")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityHint(isSelected ? "Tap to clear filter" : "Tap to filter arrivals")
     }
 }
 
@@ -226,11 +243,33 @@ struct BusArrivalRow: View {
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        let timing = arrival.isRealTime ? "real time" : "scheduled"
+        return "Route \(arrival.route) to \(arrival.destination), \(arrival.minutesString), \(timing)"
     }
 
     private func routeColor(for route: String) -> Color {
-        let colors: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
-        return colors[abs(route.hashValue) % colors.count]
+        if let metro = metroLineColor(for: route) { return metro }
+        let fallback: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
+        return fallback[abs(route.hashValue) % fallback.count]
+    }
+
+    private func metroLineColor(for route: String) -> Color? {
+        switch route.uppercased() {
+        case "F": return Color(red: 0.73, green: 0.20, blue: 0.05)   // F Market, historic red
+        case "J": return Color(red: 0.55, green: 0.35, blue: 0.17)   // J Church, brown
+        case "K", "KT": return Color(red: 0.43, green: 0.20, blue: 0.56) // K Ingleside / KT, purple
+        case "L": return Color(red: 0.47, green: 0.47, blue: 0.47)   // L Taraval, gray
+        case "M": return Color(red: 0.15, green: 0.55, blue: 0.25)   // M Ocean View, green
+        case "N": return Color(red: 0.00, green: 0.35, blue: 0.62)   // N Judah, blue
+        case "T": return Color(red: 0.78, green: 0.13, blue: 0.18)   // T Third, red
+        case "S": return Color(red: 0.95, green: 0.62, blue: 0.07)   // S Shuttle, yellow-orange
+        default: return nil
+        }
     }
 }
 
