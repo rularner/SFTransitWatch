@@ -3,10 +3,11 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"cf-typegen": "wrangler types"
+		"prepare:wrangler": "node ./scripts/set-kv-id.mjs",
+		"deploy": "npm run prepare:wrangler && wrangler deploy",
+		"dev": "npm run prepare:wrangler && wrangler dev",
+		"start": "npm run prepare:wrangler && wrangler dev",
+		"cf-typegen": "npm run prepare:wrangler && wrangler types"
 	},
 	"devDependencies": {
 		"@types/node": "^25.6.0",
