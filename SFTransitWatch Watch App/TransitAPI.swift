@@ -95,87 +95,51 @@ class TransitAPI: ObservableObject {
         }
     }
     
-    // Parse 511.org XML response for arrivals
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
-        // 511.org returns XML data, so we need to parse it
-        // This is a simplified parser - in production you'd use a proper XML parser
-        
-        let xmlString = String(data: data, encoding: .utf8) ?? ""
-        
-        // Extract arrival times from XML
-        // 511.org format: <MonitoredVehicleJourney><MonitoredCall><ExpectedDepartureTime>...</ExpectedDepartureTime></MonitoredCall></MonitoredVehicleJourney>
-        
-        var arrivals: [BusArrival] = []
-        
-        // Simple regex parsing for demonstration
-        // In production, use XMLParser or a proper XML library
-        let pattern = #"<MonitoredVehicleJourney>.*?<LineRef>([^<]+)</LineRef>.*?<DirectionRef>([^<]+)</DirectionRef>.*?<ExpectedDepartureTime>([^<]+)</ExpectedDepartureTime>.*?</MonitoredVehicleJourney>"#
-        
-        let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
-        let matches = regex.matches(in: xmlString, options: [], range: NSRange(xmlString.startIndex..., in: xmlString))
-        
-        for match in matches {
-            if let routeRange = Range(match.range(at: 1), in: xmlString),
-               let destinationRange = Range(match.range(at: 2), in: xmlString),
-               let timeRange = Range(match.range(at: 3), in: xmlString) {
-                
-                let route = String(xmlString[routeRange])
-                let destination = String(xmlString[destinationRange])
-                let timeString = String(xmlString[timeRange])
-                
-                // Parse ISO 8601 date format
-                let formatter = ISO8601DateFormatter()
-                if let arrivalTime = formatter.date(from: timeString) {
-                    let arrival = BusArrival(
-                        route: route,
-                        destination: destination,
-                        arrivalTime: arrivalTime,
-                        isRealTime: true
-                    )
-                    arrivals.append(arrival)
-                }
-            }
+        let formatter = ISO8601DateFormatter()
+        let records = SIRIXMLParser.parseRecords(
+            data: data,
+            entryElement: "MonitoredVehicleJourney",
+            fields: ["LineRef", "DirectionRef", "ExpectedDepartureTime"]
+        )
+        return records.compactMap { record in
+            guard
+                let route = record["LineRef"],
+                let destination = record["DirectionRef"],
+                let timeString = record["ExpectedDepartureTime"],
+                let arrivalTime = formatter.date(from: timeString)
+            else { return nil }
+            return BusArrival(
+                route: route,
+                destination: destination,
+                arrivalTime: arrivalTime,
+                isRealTime: true
+            )
         }
-        
-        return arrivals
     }
-    
-    // Parse 511.org XML response for stops
+
     private func parse511Stops(data: Data) throws -> [BusStop] {
-        let xmlString = String(data: data, encoding: .utf8) ?? ""
-        
-        var stops: [BusStop] = []
-        
-        // Simple regex parsing for demonstration
-        let pattern = #"<StopPlace>.*?<StopPlaceRef>([^<]+)</StopPlaceRef>.*?<StopPlaceName>([^<]+)</StopPlaceName>.*?<Location>.*?<Latitude>([^<]+)</Latitude>.*?<Longitude>([^<]+)</Longitude>.*?</Location>.*?</StopPlace>"#
-        
-        let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
-        let matches = regex.matches(in: xmlString, options: [], range: NSRange(xmlString.startIndex..., in: xmlString))
-        
-        for match in matches {
-            if let idRange = Range(match.range(at: 1), in: xmlString),
-               let nameRange = Range(match.range(at: 2), in: xmlString),
-               let latRange = Range(match.range(at: 3), in: xmlString),
-               let lonRange = Range(match.range(at: 4), in: xmlString) {
-                
-                let id = String(xmlString[idRange])
-                let name = String(xmlString[nameRange])
-                let latitude = Double(xmlString[latRange]) ?? 0.0
-                let longitude = Double(xmlString[lonRange]) ?? 0.0
-                
-                let stop = BusStop(
-                    id: id,
-                    name: name,
-                    code: id,
-                    latitude: latitude,
-                    longitude: longitude,
-                    routes: [] // Routes would need separate API call
-                )
-                stops.append(stop)
-            }
+        let records = SIRIXMLParser.parseRecords(
+            data: data,
+            entryElement: "StopPlace",
+            fields: ["StopPlaceRef", "StopPlaceName", "Latitude", "Longitude"]
+        )
+        return records.compactMap { record in
+            guard
+                let id = record["StopPlaceRef"],
+                let name = record["StopPlaceName"],
+                let latString = record["Latitude"], let latitude = Double(latString),
+                let lonString = record["Longitude"], let longitude = Double(lonString)
+            else { return nil }
+            return BusStop(
+                id: id,
+                name: name,
+                code: id,
+                latitude: latitude,
+                longitude: longitude,
+                routes: []
+            )
         }
-        
-        return stops
     }
 
     // Helper method to get API key from user

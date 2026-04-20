@@ -31,12 +31,11 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertGreaterThan(arrivals[0].minutesAway, 0)
     }
 
-    func testParseArrivalsEmptyXMLReturnsSampleData() throws {
+    func testParseArrivalsEmptyXMLReturnsEmpty() throws {
         let xml = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
         let api = TransitAPI()
         let arrivals = try api.parseArrivalsForTesting(data: xml)
-        // Falls back to sample data when no matches found
-        XCTAssertFalse(arrivals.isEmpty)
+        XCTAssertTrue(arrivals.isEmpty)
     }
 
     // MARK: - Stops XML parsing
@@ -64,10 +63,36 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(stops[0].longitude, -122.4064, accuracy: 0.0001)
     }
 
-    func testParseStopsEmptyXMLReturnsSampleData() throws {
+    func testParseStopsEmptyXMLReturnsEmpty() throws {
         let xml = "<StopPlaces></StopPlaces>".data(using: .utf8)!
         let api = TransitAPI()
         let stops = try api.parseStopsForTesting(data: xml)
-        XCTAssertFalse(stops.isEmpty)
+        XCTAssertTrue(stops.isEmpty)
+    }
+
+    func testParseArrivalsIgnoresUTF8BOM() throws {
+        let iso = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let body = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ServiceDelivery>
+          <StopMonitoringDelivery>
+            <MonitoredStopVisit>
+              <MonitoredVehicleJourney>
+                <LineRef>14</LineRef>
+                <DirectionRef>IB</DirectionRef>
+                <MonitoredCall>
+                  <ExpectedDepartureTime>\(iso)</ExpectedDepartureTime>
+                </MonitoredCall>
+              </MonitoredVehicleJourney>
+            </MonitoredStopVisit>
+          </StopMonitoringDelivery>
+        </ServiceDelivery>
+        """
+        var data = Data([0xEF, 0xBB, 0xBF])
+        data.append(body.data(using: .utf8)!)
+
+        let api = TransitAPI()
+        let arrivals = try api.parseArrivalsForTesting(data: data)
+        XCTAssertEqual(arrivals.first?.route, "14")
     }
 }
