@@ -66,6 +66,19 @@ struct BusArrivalView: View {
                 .padding(.vertical, 4)
             }
 
+            if let error = transitAPI.errorMessage {
+                Section {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Error: \(error)")
+                }
+            }
+
             // Arrivals
             Section {
                 if isLoading {

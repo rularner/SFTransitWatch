@@ -13,6 +13,19 @@ struct BusStopListView: View {
     
     var body: some View {
         List {
+            if let error = transitAPI.errorMessage, transitAPI.isAPIKeyConfigured {
+                Section {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Error: \(error)")
+                }
+            }
+
             if !transitAPI.isAPIKeyConfigured {
                 // API Key not configured section
                 Section {
@@ -168,8 +181,7 @@ struct BusStopListView: View {
                 longitude: location.coordinate.longitude
             )
         } else {
-            // Fallback to sample data if location not available
-            nearbyStops = BusStop.sampleStops
+            nearbyStops = []
         }
         
         // Sort by distance if location is available

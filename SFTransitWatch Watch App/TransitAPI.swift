@@ -25,46 +25,36 @@ class TransitAPI: ObservableObject {
     func fetchArrivals(for stopId: String) async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
-        
-        // Check if we have a valid API key
+        defer { isLoading = false }
+
         guard hasUsableKey else {
             errorMessage = "Please configure your 511.org API key in Settings"
-            isLoading = false
-            return getSampleArrivals(for: stopId)
+            return []
         }
-        
+
         do {
-            // 511.org API endpoint for real-time arrivals
             let endpoint = "StopMonitoring"
             let urlString = "\(baseURL)/\(endpoint)?api_key=\(apiKey)&agency=SF&stopCode=\(stopId)"
-            
+
             guard let url = URL(string: urlString) else {
                 throw APIError.invalidURL
             }
-            
+
             let (data, response) = try await URLSession.shared.data(from: url)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
-            
-            if httpResponse.statusCode != 200 {
-                print("API Error: \(httpResponse.statusCode)")
-                // Fallback to sample data if API fails
-                return getSampleArrivals(for: stopId)
+
+            guard httpResponse.statusCode == 200 else {
+                errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
+                return []
             }
-            
-            // Parse 511.org XML response
-            let arrivals = try parse511Arrivals(data: data)
-            isLoading = false
-            return arrivals
-            
+
+            return try parse511Arrivals(data: data)
         } catch {
-            print("API Error: \(error.localizedDescription)")
-            errorMessage = "Failed to load arrivals"
-            isLoading = false
-            // Fallback to sample data
-            return getSampleArrivals(for: stopId)
+            errorMessage = "Failed to load arrivals: \(error.localizedDescription)"
+            return []
         }
     }
     
@@ -72,46 +62,36 @@ class TransitAPI: ObservableObject {
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000) async -> [BusStop] {
         isLoading = true
         errorMessage = nil
-        
-        // Check if we have a valid API key
+        defer { isLoading = false }
+
         guard hasUsableKey else {
             errorMessage = "Please configure your 511.org API key in Settings"
-            isLoading = false
-            return BusStop.sampleStops
+            return []
         }
-        
+
         do {
-            // 511.org API endpoint for nearby stops
             let endpoint = "StopPlace"
             let urlString = "\(baseURL)/\(endpoint)?api_key=\(apiKey)&lat=\(latitude)&lon=\(longitude)&radius=\(radius)"
-            
+
             guard let url = URL(string: urlString) else {
                 throw APIError.invalidURL
             }
-            
+
             let (data, response) = try await URLSession.shared.data(from: url)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
-            
-            if httpResponse.statusCode != 200 {
-                print("API Error: \(httpResponse.statusCode)")
-                // Fallback to sample data if API fails
-                return BusStop.sampleStops
+
+            guard httpResponse.statusCode == 200 else {
+                errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
+                return []
             }
-            
-            // Parse 511.org XML response
-            let stops = try parse511Stops(data: data)
-            isLoading = false
-            return stops
-            
+
+            return try parse511Stops(data: data)
         } catch {
-            print("API Error: \(error.localizedDescription)")
-            errorMessage = "Failed to load nearby stops"
-            isLoading = false
-            // Fallback to sample data
-            return BusStop.sampleStops
+            errorMessage = "Failed to load nearby stops: \(error.localizedDescription)"
+            return []
         }
     }
     
@@ -157,7 +137,7 @@ class TransitAPI: ObservableObject {
             }
         }
         
-        return arrivals.isEmpty ? getSampleArrivals(for: "default") : arrivals
+        return arrivals
     }
     
     // Parse 511.org XML response for stops
@@ -195,34 +175,9 @@ class TransitAPI: ObservableObject {
             }
         }
         
-        return stops.isEmpty ? BusStop.sampleStops : stops
+        return stops
     }
-    
-    // Fallback sample data
-    private func getSampleArrivals(for stopId: String) -> [BusArrival] {
-        switch stopId {
-        case "1": // Market St & 4th St
-            return [
-                BusArrival(route: "38", destination: "Downtown", arrivalTime: Date().addingTimeInterval(180)),
-                BusArrival(route: "38R", destination: "Downtown", arrivalTime: Date().addingTimeInterval(420)),
-                BusArrival(route: "F", destination: "Fisherman's Wharf", arrivalTime: Date().addingTimeInterval(600))
-            ]
-        case "2": // Mission St & 16th St
-            return [
-                BusArrival(route: "14", destination: "Downtown", arrivalTime: Date().addingTimeInterval(240)),
-                BusArrival(route: "14R", destination: "Downtown", arrivalTime: Date().addingTimeInterval(480)),
-                BusArrival(route: "22", destination: "Potrero Hill", arrivalTime: Date().addingTimeInterval(360))
-            ]
-        case "3": // Geary Blvd & 22nd Ave
-            return [
-                BusArrival(route: "38", destination: "Downtown", arrivalTime: Date().addingTimeInterval(300)),
-                BusArrival(route: "38R", destination: "Downtown", arrivalTime: Date().addingTimeInterval(540))
-            ]
-        default:
-            return BusArrival.sampleArrivals
-        }
-    }
-    
+
     // Helper method to get API key from user
     func setAPIKey(_ key: String) {
         storedAPIKey = key
