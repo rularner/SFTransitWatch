@@ -5,7 +5,7 @@ import Foundation
 /// without a network call.
 @MainActor
 class CommuteSlotsManager: ObservableObject {
-    static let appGroupSuiteName = "group.org.larner.SFTransitWatch"
+    nonisolated static let appGroupSuiteName = "group.org.larner.SFTransitWatch"
 
     enum Slot: String, CaseIterable {
         case morning

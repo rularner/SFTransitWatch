@@ -42,6 +42,10 @@
 		CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000P001 /* PinnedStopsManager.swift */; };
 		CAFE0000000000000000X002 /* SIRIXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000X001 /* SIRIXMLParser.swift */; };
 		CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
+		CAFE0000000000000000CT10 /* ComplicationWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C002 /* ComplicationWidget.swift */; };
+		CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
+		CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
+		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +55,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = CAFE000000000000000001AA;
 			remoteInfo = "SFTransitWatch Watch App";
+		};
+		CAFE0000000000000000CT09 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CAFE000000000000000000B7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CAFE0000000000000000CT00;
+			remoteInfo = "SFTransitWatch Complication";
 		};
 /* End PBXContainerItemProxy section */
 
@@ -64,6 +75,17 @@
 				CAFE000000000000000020AE /* SFTransitWatch Watch App.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAFE0000000000000000CT04 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -110,6 +132,8 @@
 		CAFE0000000000000000C002 /* ComplicationWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationWidget.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C004 /* ComplicationUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationUpdater.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Complication.entitlements"; sourceTree = "<group>"; };
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T002 /* BusStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T003 /* FavoritesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManagerTests.swift; sourceTree = "<group>"; };
@@ -127,6 +151,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CAFE000000000000000020D2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAFE0000000000000000CT02 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -237,6 +268,8 @@
 			isa = PBXGroup;
 			children = (
 				CAFE0000000000000000C002 /* ComplicationWidget.swift */,
+				CAFE0000000000000000CT14 /* Info.plist */,
+				CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */,
 			);
 			path = "SFTransitWatch Complication";
 			sourceTree = "<group>";
@@ -263,15 +296,34 @@
 				CAFE000000000000000001AC /* Sources */,
 				CAFE000000000000000017A0 /* Frameworks */,
 				CAFE000000000000000001AD /* Resources */,
+				CAFE0000000000000000CT04 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CAFE0000000000000000CT08 /* PBXTargetDependency */,
 			);
 			name = "SFTransitWatch Watch App";
 			productName = "SFTransitWatch Watch App";
 			productReference = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		CAFE0000000000000000CT00 /* SFTransitWatch Complication */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CAFE0000000000000000CT05 /* Build configuration list for PBXNativeTarget "SFTransitWatch Complication" */;
+			buildPhases = (
+				CAFE0000000000000000CT01 /* Sources */,
+				CAFE0000000000000000CT02 /* Frameworks */,
+				CAFE0000000000000000CT03 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "SFTransitWatch Complication";
+			productName = "SFTransitWatch Complication";
+			productReference = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		CAFE000000000000000020E0 /* SFTransitWatch */ = {
 			isa = PBXNativeTarget;
@@ -308,6 +360,9 @@
 					CAFE000000000000000020E0 = {
 						CreatedOnToolsVersion = 16.4;
 					};
+					CAFE0000000000000000CT00 = {
+						CreatedOnToolsVersion = 15.0;
+					};
 				};
 			};
 			buildConfigurationList = CAFE000000000000000001B8 /* Build configuration list for PBXProject "SFTransitWatch" */;
@@ -325,6 +380,7 @@
 			targets = (
 				CAFE000000000000000020E0 /* SFTransitWatch */,
 				CAFE000000000000000001AA /* SFTransitWatch Watch App */,
+				CAFE0000000000000000CT00 /* SFTransitWatch Complication */,
 			);
 		};
 /* End PBXProject section */
@@ -345,6 +401,13 @@
 			files = (
 				CAFE000000000000000020AC /* Assets.xcassets in Resources */,
 				CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAFE0000000000000000CT03 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -395,6 +458,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CAFE0000000000000000CT01 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFE0000000000000000CT10 /* ComplicationWidget.swift in Sources */,
+				CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */,
+				CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -402,6 +475,11 @@
 			isa = PBXTargetDependency;
 			target = CAFE000000000000000001AA /* SFTransitWatch Watch App */;
 			targetProxy = CAFE000000000000000020D4 /* PBXContainerItemProxy */;
+		};
+		CAFE0000000000000000CT08 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CAFE0000000000000000CT00 /* SFTransitWatch Complication */;
+			targetProxy = CAFE0000000000000000CT09 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -646,6 +724,54 @@
 			};
 			name = Release;
 		};
+		CAFE0000000000000000CT06 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "SFTransitWatch Complication/SFTransitWatch Complication.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "SFTransitWatch Complication/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch.watchkitapp.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		CAFE0000000000000000CT07 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "SFTransitWatch Complication/SFTransitWatch Complication.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "SFTransitWatch Complication/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch.watchkitapp.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -672,6 +798,15 @@
 			buildConfigurations = (
 				CAFE000000000000000020F0 /* Debug */,
 				CAFE000000000000000020F1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CAFE0000000000000000CT05 /* Build configuration list for PBXNativeTarget "SFTransitWatch Complication" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CAFE0000000000000000CT06 /* Debug */,
+				CAFE0000000000000000CT07 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
