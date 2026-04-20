@@ -5,6 +5,7 @@ struct BusArrivalView: View {
     let stop: BusStop
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var commuteSlotsManager = CommuteSlotsManager()
 
     @State private var arrivals: [BusArrival] = []
     @State private var isLoading = false
@@ -151,11 +152,13 @@ struct BusArrivalView: View {
 
         fireHapticsIfNeeded()
 
-        if favoritesManager.isFavorite(stop.id), let first = arrivals.first {
+        if let first = arrivals.first {
             ComplicationUpdater.update(
+                stopId: stop.id,
                 stopName: stop.name,
                 route: first.route,
-                minutesAway: first.minutesAway
+                minutesAway: first.minutesAway,
+                slotsManager: commuteSlotsManager
             )
         }
     }
