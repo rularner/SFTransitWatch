@@ -7,6 +7,7 @@ const REFRESH_LOCK_KEY = "meta:refresh_lock";
 
 interface Env {
 	API_511_KEY: string;
+	APP_TOKEN: string;
 	TRANSIT_CACHE: KVNamespace;
 }
 
@@ -22,6 +23,11 @@ export default {
 		try {
 			if (request.method === "OPTIONS") {
 				return new Response(null, { status: 204, headers: corsHeaders() });
+			}
+
+			const providedToken = request.headers.get("X-App-Token");
+			if (!providedToken || providedToken !== env.APP_TOKEN) {
+				return jsonError("Missing or invalid X-App-Token.", 401);
 			}
 
 			if (request.method !== "GET") {
@@ -72,8 +78,8 @@ export default {
 function corsHeaders(): HeadersInit {
 	return {
 		"Access-Control-Allow-Origin": "*",
-		"Access-Control-Allow-Methods": "GET, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type",
+		"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+		"Access-Control-Allow-Headers": "Content-Type, X-App-Token",
 	};
 }
 
