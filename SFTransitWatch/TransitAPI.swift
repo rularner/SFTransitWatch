@@ -31,57 +31,102 @@ class TransitAPI: ObservableObject {
     private var apiKey: String {
         return resolvedKey.isEmpty ? "YOUR_511_API_KEY" : resolvedKey
     }
-    
+
+    private var appToken: String? {
+        let raw = (Bundle.main.object(forInfoDictionaryKey: "APP_TOKEN") as? String) ?? ""
+        return raw.isEmpty ? nil : raw
+    }
+
+    private func makeRequest(url: URL) -> URLRequest? {
+        var request = URLRequest(url: url)
+        if !isDirect511Mode {
+            guard let token = appToken else { return nil }
+            request.setValue(token, forHTTPHeaderField: "X-App-Token")
+        }
+        return request
+    }
+
+    private func errorKind(for error: Error, status: Int?) -> String {
+        if let status {
+            if status == 401 { return "missing_key" }
+            if (400...499).contains(status) { return "http_4xx" }
+            if (500...599).contains(status) { return "http_5xx" }
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost:
+                return "network"
+            default:
+                break
+            }
+        }
+        if case .xmlParsingError? = error as? APIError { return "parse" }
+        return "network"
+    }
+
     func fetchArrivals(for stopId: String) async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
-        
-        // In direct mode we need a user key, but worker-proxy mode does not.
+
         if isDirect511Mode && !hasUsableKey {
             errorMessage = "Please configure your 511.org API key in Settings"
             isLoading = false
             return getSampleArrivals(for: stopId)
         }
-        
+
+        let endpoint = "StopMonitoring"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+        var queryItems = [
+            URLQueryItem(name: "agency", value: "SF"),
+            URLQueryItem(name: "stopCode", value: stopId)
+        ]
+        if isDirect511Mode {
+            queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            isLoading = false
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
+            return getSampleArrivals(for: stopId)
+        }
+        guard let request = makeRequest(url: url) else {
+            errorMessage = "App token not configured. See README."
+            isLoading = false
+            return getSampleArrivals(for: stopId)
+        }
+
+        let started = Date()
         do {
-            // 511.org API endpoint for real-time arrivals
-            let endpoint = "StopMonitoring"
-            var components = URLComponents(string: "\(baseURL)/\(endpoint)")
-            var queryItems = [
-                URLQueryItem(name: "agency", value: "SF"),
-                URLQueryItem(name: "stopCode", value: stopId)
-            ]
-            if isDirect511Mode {
-                queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
-            }
-            components?.queryItems = queryItems
-            
-            guard let url = components?.url else {
-                throw APIError.invalidURL
-            }
-            
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+
             guard let httpResponse = response as? HTTPURLResponse else {
+                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
                 throw APIError.invalidResponse
             }
-            
+
             if httpResponse.statusCode != 200 {
-                print("API Error: \(httpResponse.statusCode)")
-                // Fallback to sample data if API fails
+                Telemetry.shared.logFetchError(
+                    endpoint: endpoint,
+                    errorKind: errorKind(for: APIError.invalidResponse, status: httpResponse.statusCode),
+                    httpStatus: httpResponse.statusCode,
+                    latencyMs: latencyMs
+                )
+                isLoading = false
                 return getSampleArrivals(for: stopId)
             }
-            
-            // Parse 511.org XML response
+
+            let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
+            Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
             let arrivals = try parse511Arrivals(data: data)
             isLoading = false
             return arrivals
-            
         } catch {
-            print("API Error: \(error.localizedDescription)")
+            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
             errorMessage = "Failed to load arrivals"
             isLoading = false
-            // Fallback to sample data
             return getSampleArrivals(for: stopId)
         }
     }
@@ -89,53 +134,67 @@ class TransitAPI: ObservableObject {
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000) async -> [BusStop] {
         isLoading = true
         errorMessage = nil
-        
+
         if isDirect511Mode && !hasUsableKey {
             errorMessage = "Please configure your 511.org API key in Settings"
             isLoading = false
             return BusStop.sampleStops
         }
-        
+
+        let endpoint = "StopPlace"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+        var queryItems = [
+            URLQueryItem(name: "lat", value: String(latitude)),
+            URLQueryItem(name: "lon", value: String(longitude)),
+            URLQueryItem(name: "radius", value: String(radius))
+        ]
+        if isDirect511Mode {
+            queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            isLoading = false
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
+            return BusStop.sampleStops
+        }
+        guard let request = makeRequest(url: url) else {
+            errorMessage = "App token not configured. See README."
+            isLoading = false
+            return BusStop.sampleStops
+        }
+
+        let started = Date()
         do {
-            // 511.org API endpoint for nearby stops
-            let endpoint = "StopPlace"
-            var components = URLComponents(string: "\(baseURL)/\(endpoint)")
-            var queryItems = [
-                URLQueryItem(name: "lat", value: String(latitude)),
-                URLQueryItem(name: "lon", value: String(longitude)),
-                URLQueryItem(name: "radius", value: String(radius))
-            ]
-            if isDirect511Mode {
-                queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
-            }
-            components?.queryItems = queryItems
-            
-            guard let url = components?.url else {
-                throw APIError.invalidURL
-            }
-            
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+
             guard let httpResponse = response as? HTTPURLResponse else {
+                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
                 throw APIError.invalidResponse
             }
-            
+
             if httpResponse.statusCode != 200 {
-                print("API Error: \(httpResponse.statusCode)")
-                // Fallback to sample data if API fails
+                Telemetry.shared.logFetchError(
+                    endpoint: endpoint,
+                    errorKind: errorKind(for: APIError.invalidResponse, status: httpResponse.statusCode),
+                    httpStatus: httpResponse.statusCode,
+                    latencyMs: latencyMs
+                )
+                isLoading = false
                 return BusStop.sampleStops
             }
-            
-            // Parse 511.org XML response
+
+            let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
+            Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
             let stops = try parse511Stops(data: data)
             isLoading = false
             return stops
-            
         } catch {
-            print("API Error: \(error.localizedDescription)")
+            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
             errorMessage = "Failed to load nearby stops"
             isLoading = false
-            // Fallback to sample data
             return BusStop.sampleStops
         }
     }
