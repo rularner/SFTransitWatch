@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		84E3617F2F9E589D009B4ADA /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E3617E2F9E589D009B4ADA /* Telemetry.swift */; };
+		84E361802F9E589D009B4ADA /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E3617E2F9E589D009B4ADA /* Telemetry.swift */; };
+		84E361812F9E589D009B4ADA /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E3617E2F9E589D009B4ADA /* Telemetry.swift */; };
 		CAFE000000000000000012A0 /* SFTransitWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000012B0 /* SFTransitWatchApp.swift */; };
 		CAFE000000000000000012C0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000012D0 /* ContentView.swift */; };
 		CAFE000000000000000012E0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000012F0 /* Assets.xcassets */; };
@@ -42,7 +45,7 @@
 		CAFE0000000000000000CT10 /* ComplicationWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C002 /* ComplicationWidget.swift */; };
 		CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 		CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
-		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000P001 /* PinnedStopsManager.swift */; };
 		CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 		CAFE0000000000000000X002 /* SIRIXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000X001 /* SIRIXMLParser.swift */; };
@@ -84,21 +87,23 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CAFE0000000000000000CT04 /* Embed App Extensions */ = {
+		CAFE0000000000000000CT04 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed App Extensions */,
+				CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		84C1B1DA2F9DE3D700833749 /* SFTransitWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		84E3617C2F9E5852009B4ADA /* TelemetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryTests.swift; sourceTree = "<group>"; };
+		84E3617E2F9E589D009B4ADA /* Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry.swift; sourceTree = "<group>"; };
 		CAFE000000000000000012B0 /* SFTransitWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFTransitWatchApp.swift; sourceTree = "<group>"; };
 		CAFE000000000000000012D0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000012F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -256,6 +261,7 @@
 		CAFE000000000000000020C0 /* SFTransitWatch */ = {
 			isa = PBXGroup;
 			children = (
+				84E3617E2F9E589D009B4ADA /* Telemetry.swift */,
 				CAFE000000000000000020B0 /* SFTransitWatchApp.swift */,
 				CAFE000000000000000020B1 /* ContentView.swift */,
 				CAFE000000000000000020B2 /* BusStopListView.swift */,
@@ -297,6 +303,7 @@
 		CAFE0000000000000000T020 /* SFTransitWatchTests */ = {
 			isa = PBXGroup;
 			children = (
+				84E3617C2F9E5852009B4ADA /* TelemetryTests.swift */,
 				CAFE0000000000000000T001 /* BusArrivalTests.swift */,
 				CAFE0000000000000000T002 /* BusStopTests.swift */,
 				CAFE0000000000000000T003 /* FavoritesManagerTests.swift */,
@@ -338,7 +345,7 @@
 				CAFE000000000000000001AC /* Sources */,
 				CAFE000000000000000017A0 /* Frameworks */,
 				CAFE000000000000000001AD /* Resources */,
-				CAFE0000000000000000CT04 /* Embed App Extensions */,
+				CAFE0000000000000000CT04 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -394,7 +401,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2640;
-				LastUpgradeCheck = 1640;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					84C1B1D92F9DE3D700833749 = {
 						CreatedOnToolsVersion = 26.4.1;
@@ -472,6 +479,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				84E361812F9E589D009B4ADA /* Telemetry.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -480,6 +488,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CAFE000000000000000012A0 /* SFTransitWatchApp.swift in Sources */,
+				84E361802F9E589D009B4ADA /* Telemetry.swift in Sources */,
 				CAFE000000000000000012C0 /* ContentView.swift in Sources */,
 				CAFE000000000000000013C0 /* BusStopListView.swift in Sources */,
 				CAFE000000000000000013E0 /* BusArrivalView.swift in Sources */,
@@ -516,6 +525,7 @@
 				CAFE000000000000000020AA /* SiriManager.swift in Sources */,
 				CAFE000000000000000020AB /* SiriShortcutsView.swift in Sources */,
 				CAFE000000000000000020FA /* PhoneSession.swift in Sources */,
+				84E3617F2F9E589D009B4ADA /* Telemetry.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -654,6 +664,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				WATCHOS_DEPLOYMENT_TARGET = 10.0;
@@ -712,6 +723,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
