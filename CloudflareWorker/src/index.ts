@@ -30,6 +30,11 @@ export default {
 				return jsonError("Missing or invalid X-App-Token.", 401);
 			}
 
+			const url = new URL(request.url);
+			if (url.pathname === "/log") {
+				return await handleLog(request);
+			}
+
 			if (request.method !== "GET") {
 				return jsonError("Only GET requests are supported.", 405);
 			}
@@ -244,4 +249,34 @@ async function tryAcquireRefreshLock(env: Env): Promise<boolean> {
 
 async function releaseRefreshLock(env: Env): Promise<void> {
 	await env.TRANSIT_CACHE.delete(REFRESH_LOCK_KEY);
+}
+
+const MAX_LOG_BATCH = 50;
+
+async function handleLog(request: Request): Promise<Response> {
+	if (request.method !== "POST") {
+		return jsonError("POST required.", 405);
+	}
+
+	let parsed: unknown;
+	try {
+		parsed = await request.json();
+	} catch {
+		return jsonError("Body must be valid JSON.", 400);
+	}
+
+	if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as { events?: unknown }).events)) {
+		return jsonError('Body must be {"events": [...]}.', 400);
+	}
+
+	const events = (parsed as { events: unknown[] }).events;
+	if (events.length > MAX_LOG_BATCH) {
+		return jsonError(`At most ${MAX_LOG_BATCH} events per batch.`, 400);
+	}
+
+	for (const event of events) {
+		console.log(JSON.stringify({ source: "app-telemetry", ...(event as object) }));
+	}
+
+	return new Response(null, { status: 204, headers: corsHeaders() });
 }
