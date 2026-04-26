@@ -7,3 +7,11 @@ DEVELOPMENT_TEAM = YOUR_TEAM_ID
 // Optional local override for the shared transit API base URL.
 // Example: https://sftransitwatch.your-subdomain.workers.dev
 // TRANSIT_API_BASE_URL = https://example.workers.dev
+
+// Shared secret matching the worker's APP_TOKEN secret.
+// Generate with: openssl rand -hex 32
+// Then set on the worker side with: cd CloudflareWorker && wrangler secret put APP_TOKEN
+APP_TOKEN = REPLACE_WITH_TOKEN
+
+// Optional override for the telemetry/worker URL.
+// TELEMETRY_BASE_URL = https://sftransitwatch-staging.example.workers.dev

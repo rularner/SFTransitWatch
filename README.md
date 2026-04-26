@@ -153,6 +153,24 @@ The app intelligently learns your route preferences:
    without it. Create it only if you want to override signing settings like
    `DEVELOPMENT_TEAM` without editing the project file.
 
+   **App token (for the Cloudflare Worker proxy):** when `TRANSIT_API_BASE_URL`
+   points at the Cloudflare Worker, the worker requires an `X-App-Token` header.
+   Set it up:
+
+   1. Generate a token: `openssl rand -hex 32`.
+   2. Add it to your local `Developer.xcconfig`:
+      ```
+      APP_TOKEN = <token from step 1>
+      ```
+   3. Set the same value as a worker secret:
+      ```bash
+      cd CloudflareWorker
+      npx wrangler secret put APP_TOKEN
+      ```
+
+   If you only build against `api.511.org` directly (i.e. `TRANSIT_API_BASE_URL`
+   is empty), `APP_TOKEN` is not required.
+
 3. **Open in Xcode**:
    ```bash
    open SFTransitWatch.xcodeproj

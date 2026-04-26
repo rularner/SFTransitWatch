@@ -15,3 +15,12 @@ CURRENT_PROJECT_VERSION = 1
 // Leave blank to use direct 511.org calls; set to your Cloudflare Worker URL
 // (for example: https://sftransitwatch.your-subdomain.workers.dev).
 TRANSIT_API_BASE_URL =
+
+// App-side shared secret presented as X-App-Token to the Cloudflare Worker.
+// Required when TRANSIT_API_BASE_URL points at the worker; ignored in direct-511 mode.
+// Set in Developer.xcconfig (gitignored).
+APP_TOKEN = $(APP_TOKEN)
+
+// Base URL of the worker that accepts POST /log telemetry events.
+// Defaults to the production worker; override in Developer.xcconfig for local testing.
+TELEMETRY_BASE_URL = https://sftransitwatch.rusty-cloudflare.workers.dev
