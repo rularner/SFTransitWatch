@@ -8,7 +8,11 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2026-04-20",
 	"observability": {
-		"enabled": true
+		"enabled": true,
+                "logs": {
+                  "enabled": true,
+                  "invocation_logs": true
+                }
 	},
 	"upload_source_maps": true,
 	"kv_namespaces": [
