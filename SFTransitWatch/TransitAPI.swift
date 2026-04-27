@@ -64,7 +64,7 @@ class TransitAPI: ObservableObject {
         return "network"
     }
 
-    func fetchArrivals(for stopId: String) async -> [BusArrival] {
+    func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
 
@@ -77,7 +77,7 @@ class TransitAPI: ObservableObject {
         let endpoint = "StopMonitoring"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
-            URLQueryItem(name: "agency", value: "SF"),
+            URLQueryItem(name: "agency", value: agency),
             URLQueryItem(name: "stopCode", value: stopId)
         ]
         if isDirect511Mode {
@@ -131,7 +131,7 @@ class TransitAPI: ObservableObject {
         }
     }
     
-    func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000) async -> [BusStop] {
+    func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
         isLoading = true
         errorMessage = nil
 
@@ -141,9 +141,14 @@ class TransitAPI: ObservableObject {
             return BusStop.sampleStops
         }
 
+        // Single-agency mode for the companion app — sample fallback only
+        // makes sense for one agency at a time, and the iOS surface is much
+        // less load-bearing than the watch.
+        let agency = agencies.first ?? "SF"
         let endpoint = "StopPlace"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
+            URLQueryItem(name: "agency", value: agency),
             URLQueryItem(name: "lat", value: String(latitude)),
             URLQueryItem(name: "lon", value: String(longitude)),
             URLQueryItem(name: "radius", value: String(radius))
@@ -187,7 +192,7 @@ class TransitAPI: ObservableObject {
 
             let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            let stops = try parse511Stops(data: data)
+            let stops = try parse511Stops(data: data, agency: agency)
             isLoading = false
             return stops
         } catch {
@@ -245,7 +250,7 @@ class TransitAPI: ObservableObject {
     }
     
     // Parse 511.org XML response for stops
-    private func parse511Stops(data: Data) throws -> [BusStop] {
+    private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
         let xmlString = String(data: data, encoding: .utf8) ?? ""
         
         var stops: [BusStop] = []
@@ -273,7 +278,8 @@ class TransitAPI: ObservableObject {
                     code: id,
                     latitude: latitude,
                     longitude: longitude,
-                    routes: [] // Routes would need separate API call
+                    routes: [], // Routes would need separate API call
+                    agency: agency
                 )
                 stops.append(stop)
             }
