@@ -7,6 +7,7 @@ const REFRESH_LOCK_KEY = "meta:refresh_lock";
 
 interface Env {
 	API_511_KEY: string;
+	APP_TOKEN: string;
 	TRANSIT_CACHE: KVNamespace;
 }
 
@@ -22,6 +23,16 @@ export default {
 		try {
 			if (request.method === "OPTIONS") {
 				return new Response(null, { status: 204, headers: corsHeaders() });
+			}
+
+			const providedToken = request.headers.get("X-App-Token");
+			if (!providedToken || providedToken !== env.APP_TOKEN) {
+				return jsonError("Missing or invalid X-App-Token.", 401);
+			}
+
+			const url = new URL(request.url);
+			if (url.pathname === "/log") {
+				return await handleLog(request);
 			}
 
 			if (request.method !== "GET") {
@@ -72,8 +83,8 @@ export default {
 function corsHeaders(): HeadersInit {
 	return {
 		"Access-Control-Allow-Origin": "*",
-		"Access-Control-Allow-Methods": "GET, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type",
+		"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+		"Access-Control-Allow-Headers": "Content-Type, X-App-Token",
 	};
 }
 
@@ -238,4 +249,34 @@ async function tryAcquireRefreshLock(env: Env): Promise<boolean> {
 
 async function releaseRefreshLock(env: Env): Promise<void> {
 	await env.TRANSIT_CACHE.delete(REFRESH_LOCK_KEY);
+}
+
+const MAX_LOG_BATCH = 50;
+
+async function handleLog(request: Request): Promise<Response> {
+	if (request.method !== "POST") {
+		return jsonError("POST required.", 405);
+	}
+
+	let parsed: unknown;
+	try {
+		parsed = await request.json();
+	} catch {
+		return jsonError("Body must be valid JSON.", 400);
+	}
+
+	if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as { events?: unknown }).events)) {
+		return jsonError('Body must be {"events": [...]}.', 400);
+	}
+
+	const events = (parsed as { events: unknown[] }).events;
+	if (events.length > MAX_LOG_BATCH) {
+		return jsonError(`At most ${MAX_LOG_BATCH} events per batch.`, 400);
+	}
+
+	for (const event of events) {
+		console.log(JSON.stringify({ source: "app-telemetry", ...(event as object) }));
+	}
+
+	return new Response(null, { status: 204, headers: corsHeaders() });
 }

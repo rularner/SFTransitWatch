@@ -4,6 +4,7 @@ import WatchKit
 @main
 struct SFTransitWatchApp: App {
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         WatchSession.shared.activate()
@@ -17,6 +18,11 @@ struct SFTransitWatchApp: App {
                         storedAPIKey = key
                     }
                 }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Telemetry.shared.flush()
+            }
         }
     }
 

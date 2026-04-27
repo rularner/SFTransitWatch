@@ -4,14 +4,17 @@
 	"private": true,
 	"scripts": {
 		"prepare:wrangler": "node -e \"const fs=require('node:fs');const id=process.env.TRANSIT_CACHE_KV_ID?.trim();if(!id){console.error('Missing required environment variable: TRANSIT_CACHE_KV_ID');process.exit(1);}const source='wrangler.jsonc';const output='.wrangler.generated.jsonc';const config=fs.readFileSync(source,'utf8');if(!config.includes('__TRANSIT_CACHE_KV_ID__')){console.error('Missing __TRANSIT_CACHE_KV_ID__ placeholder in wrangler.jsonc');process.exit(1);}fs.writeFileSync(output,config.replace('__TRANSIT_CACHE_KV_ID__',id));console.log('Generated', output, 'with TRANSIT_CACHE_KV_ID');\"",
+		"test": "vitest run",
 		"deploy": "npm run prepare:wrangler && wrangler deploy --config .wrangler.generated.jsonc",
 		"dev": "npm run prepare:wrangler && wrangler dev --config .wrangler.generated.jsonc",
 		"start": "npm run prepare:wrangler && wrangler dev --config .wrangler.generated.jsonc",
 		"cf-typegen": "npm run prepare:wrangler && wrangler types --config .wrangler.generated.jsonc"
 	},
 	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.15.0",
 		"@types/node": "^25.6.0",
 		"typescript": "^5.5.2",
+		"vitest": "^4.1.5",
 		"wrangler": "^4.83.0"
 	}
 }
