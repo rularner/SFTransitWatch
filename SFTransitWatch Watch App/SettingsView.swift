@@ -6,6 +6,7 @@ struct SettingsView: View {
     @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
+    @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
     @State private var showingAPIKeyEntry = false
 
     var body: some View {
@@ -79,6 +80,17 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                Toggle("Notify me when bus is ≤2 min away", isOn: $notificationsEnabled)
+                    .font(.caption)
+                    .onChange(of: notificationsEnabled) { _, newValue in
+                        if newValue {
+                            Task {
+                                let granted = await BackgroundRefreshController.shared.requestNotificationAuthorization()
+                                if !granted { notificationsEnabled = false }
+                            }
+                        }
+                    }
             }
 
             Section(header: Text("Favorites")) {
