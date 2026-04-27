@@ -56,5 +56,35 @@ final class BusStopTests: XCTestCase {
         XCTAssertEqual(decoded.name, marketAndFourth.name)
         XCTAssertEqual(decoded.routes, marketAndFourth.routes)
         XCTAssertEqual(decoded.latitude, marketAndFourth.latitude)
+        XCTAssertEqual(decoded.agency, "SF")
+    }
+
+    // MARK: - agency
+
+    func testAgencyDefaultsToMuniWhenOmitted() {
+        let stop = BusStop(id: "x", name: "T", code: "T1", latitude: 0, longitude: 0)
+        XCTAssertEqual(stop.agency, "SF")
+    }
+
+    func testAgencyExplicit() {
+        let stop = BusStop(id: "x", name: "T", code: "T1", latitude: 0, longitude: 0, agency: "BA")
+        XCTAssertEqual(stop.agency, "BA")
+    }
+
+    /// Pinned/favorite stops persisted before agency was introduced lack the
+    /// `agency` field. Decoding must default them to "SF" rather than fail.
+    func testDecodingLegacyJSONDefaultsAgencyToMuni() throws {
+        let json = """
+        {"id":"1","name":"X","code":"X1","latitude":1.0,"longitude":2.0,"routes":[],"isFavorite":false}
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(BusStop.self, from: json)
+        XCTAssertEqual(decoded.agency, "SF")
+    }
+
+    func testCodableRoundTripPreservesAgency() throws {
+        let bart = BusStop(id: "9", name: "Embarcadero", code: "EMB", latitude: 37.793, longitude: -122.397, agency: "BA")
+        let data = try JSONEncoder().encode(bart)
+        let decoded = try JSONDecoder().decode(BusStop.self, from: data)
+        XCTAssertEqual(decoded.agency, "BA")
     }
 }

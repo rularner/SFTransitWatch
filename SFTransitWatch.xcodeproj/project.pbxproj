@@ -41,6 +41,8 @@
 		CAFE000000000000000020AE /* SFTransitWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CAFE000000000000000020F8 /* WatchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020F9 /* WatchSession.swift */; };
 		CAFE000000000000000020FA /* PhoneSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020FB /* PhoneSession.swift */; };
+		CAFE0000000000000000A002 /* Agency.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000A001 /* Agency.swift */; };
+		CAFE0000000000000000A004 /* Agency.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000A003 /* Agency.swift */; };
 		CAFE0000000000000000B002 /* BackgroundRefreshController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000B001 /* BackgroundRefreshController.swift */; };
 		CAFE0000000000000000B004 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000B003 /* AppDelegate.swift */; };
 		CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
@@ -141,6 +143,8 @@
 		CAFE000000000000000020FB /* PhoneSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSession.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020FC /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		CAFE000000000000000020FD /* SFTransitWatch Watch App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Watch App.entitlements"; sourceTree = "<group>"; };
+		CAFE0000000000000000A001 /* Agency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Agency.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000A003 /* Agency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Agency.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000B001 /* BackgroundRefreshController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundRefreshController.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000B003 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C002 /* ComplicationWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationWidget.swift; sourceTree = "<group>"; };
@@ -230,6 +234,7 @@
 				CAFE000000000000000015D0 /* SettingsView.swift */,
 				CAFE000000000000000015E0 /* SiriManager.swift */,
 				CAFE000000000000000015F0 /* SiriShortcutsView.swift */,
+				CAFE0000000000000000A001 /* Agency.swift */,
 				CAFE0000000000000000P001 /* PinnedStopsManager.swift */,
 				CAFE0000000000000000X001 /* SIRIXMLParser.swift */,
 				CAFE0000000000000000S001 /* CommuteSlotsManager.swift */,
@@ -280,6 +285,7 @@
 				CAFE000000000000000020B9 /* SettingsView.swift */,
 				CAFE000000000000000020BA /* SiriManager.swift */,
 				CAFE000000000000000020BB /* SiriShortcutsView.swift */,
+				CAFE0000000000000000A003 /* Agency.swift */,
 				CAFE000000000000000020FB /* PhoneSession.swift */,
 				CAFE000000000000000020BC /* Assets.xcassets */,
 				CAFE000000000000000020BE /* Info.plist */,
@@ -512,6 +518,7 @@
 				CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */,
 				CAFE0000000000000000B002 /* BackgroundRefreshController.swift in Sources */,
 				CAFE0000000000000000B004 /* AppDelegate.swift in Sources */,
+				CAFE0000000000000000A002 /* Agency.swift in Sources */,
 				CAFE000000000000000020F8 /* WatchSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -532,6 +539,7 @@
 				CAFE000000000000000020A9 /* SettingsView.swift in Sources */,
 				CAFE000000000000000020AA /* SiriManager.swift in Sources */,
 				CAFE000000000000000020AB /* SiriShortcutsView.swift in Sources */,
+				CAFE0000000000000000A004 /* Agency.swift in Sources */,
 				CAFE000000000000000020FA /* PhoneSession.swift in Sources */,
 				84E3617F2F9E589D009B4ADA /* Telemetry.swift in Sources */,
 			);

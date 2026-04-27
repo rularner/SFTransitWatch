@@ -12,6 +12,13 @@
 
 set -euo pipefail
 
+# In test-only workflows Xcode Cloud only checks out ci_scripts/, not the full
+# source — so CI_PRIMARY_REPOSITORY_PATH is unset and there's nothing to patch.
+if [ -z "${CI_PRIMARY_REPOSITORY_PATH:-}" ]; then
+  echo "ci_pre_xcodebuild: no source checkout (test-only workflow); skipping build-number injection"
+  exit 0
+fi
+
 XCCONFIG="${CI_PRIMARY_REPOSITORY_PATH}/Config.xcconfig"
 
 if [ -z "${CI_BUILD_NUMBER:-}" ]; then

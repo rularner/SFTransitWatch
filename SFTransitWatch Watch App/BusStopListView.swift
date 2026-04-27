@@ -6,10 +6,18 @@ struct BusStopListView: View {
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var pinnedStopsManager = PinnedStopsManager()
+    @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var nearbyStops: [BusStop] = []
     @State private var isLoading = false
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
+
+    private var enabledAgencies: [String] {
+        EnabledAgencies.parse(enabledAgenciesRaw)
+    }
+    private var showAgencyBadges: Bool {
+        enabledAgencies.count > 1
+    }
     
     var body: some View {
         List {
@@ -91,7 +99,8 @@ struct BusStopListView: View {
                                 BusStopRow(
                                     stop: stop,
                                     currentLocation: locationManager.currentLocation,
-                                    favoritesManager: favoritesManager
+                                    favoritesManager: favoritesManager,
+                                    showAgencyBadge: showAgencyBadges
                                 )
                             }
                         }
@@ -108,7 +117,8 @@ struct BusStopListView: View {
                                 BusStopRow(
                                     stop: stop,
                                     currentLocation: locationManager.currentLocation,
-                                    favoritesManager: favoritesManager
+                                    favoritesManager: favoritesManager,
+                                    showAgencyBadge: showAgencyBadges
                                 )
                             }
                         }
@@ -122,7 +132,8 @@ struct BusStopListView: View {
                             BusStopRow(
                                 stop: stop,
                                 currentLocation: locationManager.currentLocation,
-                                favoritesManager: favoritesManager
+                                favoritesManager: favoritesManager,
+                                showAgencyBadge: showAgencyBadges
                             )
                         }
                     }
@@ -138,7 +149,10 @@ struct BusStopListView: View {
             }
         }
         .sheet(isPresented: $showingStopCodeEntry) {
-            StopCodeEntryView(transitAPI: transitAPI) { foundStop in
+            StopCodeEntryView(
+                transitAPI: transitAPI,
+                defaultAgency: EnabledAgencies.defaultAgency(enabledAgenciesRaw)
+            ) { foundStop in
                 pinnedStopsManager.pin(foundStop)
             }
         }
@@ -174,11 +188,12 @@ struct BusStopListView: View {
     
     private func loadNearbyStops() async {
         isLoading = true
-        
+
         if let location = locationManager.currentLocation {
             nearbyStops = await transitAPI.fetchNearbyStops(
                 latitude: location.coordinate.latitude,
-                longitude: location.coordinate.longitude
+                longitude: location.coordinate.longitude,
+                agencies: enabledAgencies
             )
         } else {
             nearbyStops = []
@@ -202,7 +217,13 @@ struct BusStopRow: View {
     let stop: BusStop
     let currentLocation: CLLocation?
     let favoritesManager: FavoritesManager
-    
+    var showAgencyBadge: Bool = false
+
+    private var agencyBadgeText: String? {
+        guard showAgencyBadge else { return nil }
+        return Agency.named(stop.agency)?.badge ?? stop.agency
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -211,17 +232,28 @@ struct BusStopRow: View {
                         Text(stop.name)
                             .font(.headline)
                             .lineLimit(1)
-                        
+
                         if stop.isFavorite {
                             Image(systemName: "star.fill")
                                 .foregroundColor(.yellow)
                                 .font(.caption)
                         }
                     }
-                    
-                    Text("Stop \(stop.code)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 4) {
+                        if let badge = agencyBadgeText {
+                            Text(badge)
+                                .font(.caption2)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.gray.opacity(0.25))
+                                .foregroundColor(.secondary)
+                                .cornerRadius(3)
+                        }
+                        Text("Stop \(stop.code)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 Spacer()
@@ -273,7 +305,11 @@ struct BusStopRow: View {
     }
 
     private var accessibilityDescription: String {
-        var parts: [String] = [stop.name, "stop code \(stop.code)"]
+        var parts: [String] = [stop.name]
+        if let agency = Agency.named(stop.agency)?.displayName, showAgencyBadge {
+            parts.append(agency)
+        }
+        parts.append("stop code \(stop.code)")
         if let currentLocation = currentLocation {
             parts.append(formatDistance(stop.distance(to: currentLocation)) + " away")
         }
@@ -297,6 +333,7 @@ struct BusStopRow: View {
 
 struct StopCodeEntryView: View {
     let transitAPI: TransitAPI
+    let defaultAgency: String
     let onFound: (BusStop) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -339,7 +376,7 @@ struct StopCodeEntryView: View {
         isSearching = true
         errorMessage = nil
 
-        if let stop = await transitAPI.fetchStop(code: trimmed) {
+        if let stop = await transitAPI.fetchStop(code: trimmed, agency: defaultAgency) {
             onFound(stop)
             dismiss()
         } else {

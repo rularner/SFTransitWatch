@@ -145,7 +145,7 @@ struct BusArrivalView: View {
 
     private func loadArrivals() async {
         isLoading = true
-        arrivals = await transitAPI.fetchArrivals(for: stop.id)
+        arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
         lastUpdated = Date()
         secondsUntilRefresh = refreshInterval
         isLoading = false

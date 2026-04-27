@@ -65,7 +65,7 @@ class TransitAPI: ObservableObject {
     }
 
     @MainActor
-    func fetchArrivals(for stopId: String) async -> [BusArrival] {
+    func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -78,7 +78,7 @@ class TransitAPI: ObservableObject {
         let endpoint = "StopMonitoring"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
-            URLQueryItem(name: "agency", value: "SF"),
+            URLQueryItem(name: "agency", value: agency),
             URLQueryItem(name: "stopCode", value: stopId)
         ]
         if isDirect511Mode {
@@ -128,8 +128,11 @@ class TransitAPI: ObservableObject {
         }
     }
     
+    /// Fans out the StopPlace lookup across each enabled agency in parallel
+    /// and merges the results, tagging every returned stop with its agency.
+    /// One agency failing doesn't kill the others — we just drop its stops.
     @MainActor
-    func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000) async -> [BusStop] {
+    func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -139,9 +142,30 @@ class TransitAPI: ObservableObject {
             return []
         }
 
+        let queryAgencies = agencies.isEmpty ? ["SF"] : agencies
+
+        let stops: [BusStop] = await withTaskGroup(of: [BusStop].self) { group in
+            for agency in queryAgencies {
+                group.addTask { [self] in
+                    await self.fetchNearbyStops(latitude: latitude, longitude: longitude, radius: radius, agency: agency)
+                }
+            }
+            var merged: [BusStop] = []
+            for await batch in group { merged.append(contentsOf: batch) }
+            return merged
+        }
+
+        return stops
+    }
+
+    /// Single-agency StopPlace lookup. Returns [] on any failure (logged to
+    /// telemetry); the caller is expected to merge with other agencies'
+    /// results.
+    private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async -> [BusStop] {
         let endpoint = "StopPlace"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
+            URLQueryItem(name: "agency", value: agency),
             URLQueryItem(name: "lat", value: String(latitude)),
             URLQueryItem(name: "lon", value: String(longitude)),
             URLQueryItem(name: "radius", value: String(radius))
@@ -151,13 +175,9 @@ class TransitAPI: ObservableObject {
         }
         components?.queryItems = queryItems
 
-        guard let url = components?.url else {
-            errorMessage = "Failed to load nearby stops: invalid URL"
+        guard let url = components?.url,
+              let request = makeRequest(url: url) else {
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
-            return []
-        }
-        guard let request = makeRequest(url: url) else {
-            errorMessage = "App token not configured. See README."
             return []
         }
 
@@ -168,7 +188,7 @@ class TransitAPI: ObservableObject {
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
-                throw APIError.invalidResponse
+                return []
             }
 
             if httpResponse.statusCode != 200 {
@@ -178,17 +198,15 @@ class TransitAPI: ObservableObject {
                     httpStatus: httpResponse.statusCode,
                     latencyMs: latencyMs
                 )
-                errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
                 return []
             }
 
             let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            return try parse511Stops(data: data)
+            return try parse511Stops(data: data, agency: agency)
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
-            errorMessage = "Failed to load nearby stops: \(error.localizedDescription)"
             return []
         }
     }
@@ -216,7 +234,7 @@ class TransitAPI: ObservableObject {
         }
     }
 
-    private func parse511Stops(data: Data) throws -> [BusStop] {
+    private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
         let records = SIRIXMLParser.parseRecords(
             data: data,
             entryElement: "StopPlace",
@@ -235,7 +253,8 @@ class TransitAPI: ObservableObject {
                 code: id,
                 latitude: latitude,
                 longitude: longitude,
-                routes: []
+                routes: [],
+                agency: agency
             )
         }
     }
@@ -252,12 +271,16 @@ class TransitAPI: ObservableObject {
     }
 
     /// Look up a single stop by its 511.org stop code. Returns nil if not found.
-    func fetchStop(code: String) async -> BusStop? {
+    /// Stop codes are agency-scoped, so the caller must specify which agency.
+    func fetchStop(code: String, agency: String = "SF") async -> BusStop? {
         if isDirect511Mode && !hasUsableKey { return nil }
 
         let endpoint = "StopPlace"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
-        var queryItems = [URLQueryItem(name: "stopCode", value: code)]
+        var queryItems = [
+            URLQueryItem(name: "agency", value: agency),
+            URLQueryItem(name: "stopCode", value: code)
+        ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
         }
@@ -284,7 +307,7 @@ class TransitAPI: ObservableObject {
             }
             let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            let stops = try parse511Stops(data: data)
+            let stops = try parse511Stops(data: data, agency: agency)
             return stops.first
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)

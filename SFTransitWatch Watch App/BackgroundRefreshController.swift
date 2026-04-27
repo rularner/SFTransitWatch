@@ -69,11 +69,16 @@ final class BackgroundRefreshController {
             return
         }
 
+        let pinnedStop = pinnedStop(for: stopId)
+        let agency = pinnedStop?.agency ?? EnabledAgencies.defaultAgency(
+            UserDefaults.standard.string(forKey: EnabledAgencies.storageKey) ?? ""
+        )
+
         let api = TransitAPI()
-        let arrivals = await api.fetchArrivals(for: stopId)
+        let arrivals = await api.fetchArrivals(for: stopId, agency: agency)
         guard let first = arrivals.first else { return }
 
-        let stopName = pinnedStopName(for: stopId) ?? "Stop \(stopId)"
+        let stopName = pinnedStop?.name ?? "Stop \(stopId)"
         ComplicationUpdater.write(
             slot: slot,
             stopName: stopName,
@@ -130,13 +135,13 @@ final class BackgroundRefreshController {
         }
     }
 
-    /// Best-effort lookup of the human-readable stop name from the user's
-    /// pinned list. Falls back to the stop ID if not found.
-    private func pinnedStopName(for stopId: String) -> String? {
+    /// Best-effort lookup of the user's pinned stop. Returns nil if not found
+    /// (e.g. the slot was set against a stop that's since been unpinned).
+    private func pinnedStop(for stopId: String) -> BusStop? {
         guard let data = UserDefaults.standard.data(forKey: "PinnedStops"),
               let pinned = try? JSONDecoder().decode([BusStop].self, from: data) else {
             return nil
         }
-        return pinned.first(where: { $0.id == stopId })?.name
+        return pinned.first(where: { $0.id == stopId })
     }
 }

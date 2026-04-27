@@ -7,6 +7,7 @@ struct SettingsView: View {
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
+    @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
 
     var body: some View {
@@ -53,6 +54,25 @@ struct SettingsView: View {
                         storedAPIKey = ""
                     }
                     .foregroundColor(.red)
+                }
+            }
+
+            Section(header: Text("Agencies")) {
+                Text("Pick which Bay Area transit operators to query for nearby stops.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 4)
+
+                ForEach(Agency.known) { agency in
+                    Toggle(isOn: agencyBinding(for: agency)) {
+                        VStack(alignment: .leading) {
+                            Text(agency.displayName)
+                            Text(agency.code)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .font(.caption)
                 }
             }
 
@@ -151,6 +171,25 @@ struct SettingsView: View {
     private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {
         guard let id = commuteSlotsManager.stopId(for: slot) else { return "Not set" }
         return pinnedStopsManager.pinned.first(where: { $0.id == id })?.name ?? "Stop \(id)"
+    }
+
+    /// Two-way binding between the per-agency toggle and the comma-separated
+    /// `enabled_agencies` string. Disabling the last enabled agency snaps
+    /// back to Muni so the app never queries 511 with an empty agency list.
+    private func agencyBinding(for agency: Agency) -> Binding<Bool> {
+        Binding(
+            get: { EnabledAgencies.parse(enabledAgenciesRaw).contains(agency.code) },
+            set: { isOn in
+                var codes = EnabledAgencies.parse(enabledAgenciesRaw)
+                if isOn {
+                    if !codes.contains(agency.code) { codes.append(agency.code) }
+                } else {
+                    codes.removeAll { $0 == agency.code }
+                    if codes.isEmpty { codes = [EnabledAgencies.default] }
+                }
+                enabledAgenciesRaw = EnabledAgencies.format(codes)
+            }
+        )
     }
 }
 
