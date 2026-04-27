@@ -3,6 +3,7 @@ import WatchKit
 
 @main
 struct SFTransitWatchApp: App {
+    @WKApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @Environment(\.scenePhase) private var scenePhase
 
