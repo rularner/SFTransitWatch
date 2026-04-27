@@ -12,7 +12,8 @@
 
 set -euo pipefail
 
-XCCONFIG="${CI_PRIMARY_REPOSITORY_PATH}/Config.xcconfig"
+REPO_ROOT="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$(dirname "$0")/.." && pwd)}"
+XCCONFIG="${REPO_ROOT}/Config.xcconfig"
 
 if [ -z "${CI_BUILD_NUMBER:-}" ]; then
   echo "CI_BUILD_NUMBER not set - refusing to bump build number" >&2
