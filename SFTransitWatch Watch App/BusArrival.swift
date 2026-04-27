@@ -8,13 +8,13 @@ struct BusArrival: Identifiable, Codable {
     let minutesAway: Int
     let isRealTime: Bool
     
-    init(route: String, destination: String, arrivalTime: Date, isRealTime: Bool = true) {
+    init(route: String, destination: String, arrivalTime: Date, isRealTime: Bool = true, now: Date = Date()) {
         self.route = route
         self.destination = destination
         self.arrivalTime = arrivalTime
         self.isRealTime = isRealTime
-        
-        let timeInterval = arrivalTime.timeIntervalSinceNow
+
+        let timeInterval = arrivalTime.timeIntervalSince(now)
         self.minutesAway = max(0, Int(timeInterval / 60))
     }
     
