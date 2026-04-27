@@ -22,6 +22,16 @@ fi
 
 if [ ! -f "$XCCONFIG" ]; then
   echo "Config.xcconfig not found at $XCCONFIG" >&2
+  echo "--- DIAG: env paths ---" >&2
+  echo "CI_PRIMARY_REPOSITORY_PATH=${CI_PRIMARY_REPOSITORY_PATH:-<unset>}" >&2
+  echo "CI_WORKSPACE_PATH=${CI_WORKSPACE_PATH:-<unset>}" >&2
+  echo "CI_WORKSPACE=${CI_WORKSPACE:-<unset>}" >&2
+  echo "PWD=$(pwd)" >&2
+  echo "script=$0" >&2
+  echo "--- DIAG: ls $REPO_ROOT ---" >&2
+  ls -la "$REPO_ROOT" >&2 || true
+  echo "--- DIAG: ls /Volumes/workspace ---" >&2
+  ls -la /Volumes/workspace >&2 || true
   exit 1
 fi
 
