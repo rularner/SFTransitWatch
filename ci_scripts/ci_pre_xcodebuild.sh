@@ -12,8 +12,14 @@
 
 set -euo pipefail
 
-REPO_ROOT="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$(dirname "$0")/.." && pwd)}"
-XCCONFIG="${REPO_ROOT}/Config.xcconfig"
+# In test-only workflows Xcode Cloud only checks out ci_scripts/, not the full
+# source — so CI_PRIMARY_REPOSITORY_PATH is unset and there's nothing to patch.
+if [ -z "${CI_PRIMARY_REPOSITORY_PATH:-}" ]; then
+  echo "ci_pre_xcodebuild: no source checkout (test-only workflow); skipping build-number injection"
+  exit 0
+fi
+
+XCCONFIG="${CI_PRIMARY_REPOSITORY_PATH}/Config.xcconfig"
 
 if [ -z "${CI_BUILD_NUMBER:-}" ]; then
   echo "CI_BUILD_NUMBER not set - refusing to bump build number" >&2
@@ -22,16 +28,6 @@ fi
 
 if [ ! -f "$XCCONFIG" ]; then
   echo "Config.xcconfig not found at $XCCONFIG" >&2
-  echo "--- DIAG: env paths ---" >&2
-  echo "CI_PRIMARY_REPOSITORY_PATH=${CI_PRIMARY_REPOSITORY_PATH:-<unset>}" >&2
-  echo "CI_WORKSPACE_PATH=${CI_WORKSPACE_PATH:-<unset>}" >&2
-  echo "CI_WORKSPACE=${CI_WORKSPACE:-<unset>}" >&2
-  echo "PWD=$(pwd)" >&2
-  echo "script=$0" >&2
-  echo "--- DIAG: ls $REPO_ROOT ---" >&2
-  ls -la "$REPO_ROOT" >&2 || true
-  echo "--- DIAG: ls /Volumes/workspace ---" >&2
-  ls -la /Volumes/workspace >&2 || true
   exit 1
 fi
 
