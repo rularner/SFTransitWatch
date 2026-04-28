@@ -142,8 +142,7 @@ struct BusStopListView: View {
                 longitude: location.coordinate.longitude
             )
         } else {
-            // Fallback to sample data if location not available
-            nearbyStops = BusStop.sampleStops
+            nearbyStops = []
         }
         
         // Sort by distance if location is available
