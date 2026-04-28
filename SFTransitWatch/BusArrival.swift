@@ -35,25 +35,28 @@ struct BusArrival: Identifiable, Codable {
     }
 }
 
+#if DEBUG
 extension BusArrival {
-    static let sampleArrivals = [
+    static let previewArrivals: [BusArrival] = [
         BusArrival(
             route: "38",
             destination: "Downtown",
-            arrivalTime: Date().addingTimeInterval(300), // 5 minutes
+            arrivalTime: Date().addingTimeInterval(300),
             isRealTime: true
         ),
         BusArrival(
             route: "38R",
             destination: "Downtown",
-            arrivalTime: Date().addingTimeInterval(600), // 10 minutes
+            arrivalTime: Date().addingTimeInterval(600),
             isRealTime: true
         ),
         BusArrival(
             route: "F",
             destination: "Fisherman's Wharf",
-            arrivalTime: Date().addingTimeInterval(900), // 15 minutes
+            arrivalTime: Date().addingTimeInterval(900),
             isRealTime: false
         )
     ]
-} 
+}
+#endif
+ 
