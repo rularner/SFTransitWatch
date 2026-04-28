@@ -23,20 +23,27 @@ jobs:
       - name: Verify Main Health and Report Failures
         if: env.BYPASS == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # 1. Get the latest run on main
-          LATEST_RUN=$(gh run list --branch main --limit 1 --json databaseId,conclusion -q '.[0]')
+          LATEST_RUN=$(gh run list --branch main --limit 1 --json databaseId,status,conclusion,url -q '.[0]')
+
+          if [ -z "$LATEST_RUN" ] || [ "$LATEST_RUN" = "null" ]; then
+            echo "No workflow runs found on main yet; skipping gate."
+            exit 0
+          fi
+
           RUN_ID=$(echo "$LATEST_RUN" | jq -r '.databaseId')
           STATUS=$(echo "$LATEST_RUN" | jq -r '.status')
           CONCLUSION=$(echo "$LATEST_RUN" | jq -r '.conclusion')
+          RUN_URL=$(echo "$LATEST_RUN" | jq -r '.url')
 
           # 2. Check if currently running
           if [ "$STATUS" != "completed" ]; then
             echo "⏳ WAIT: A workflow is currently running on 'main' (Run #$RUN_ID)."
             echo "Status: $STATUS"
             echo "Please wait for the deployment to finish before merging new features."
-            echo "View progress: https://github.com/${{ github.repository }}/actions/runs/$RUN_ID"
+            echo "View progress: $RUN_URL"
             exit 1
           fi
 
