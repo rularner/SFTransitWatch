@@ -130,16 +130,13 @@ class TransitAPI: ObservableObject {
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         if isDirect511Mode && !hasUsableKey {
             errorMessage = "Please configure your 511.org API key in Settings"
-            isLoading = false
-            return BusStop.sampleStops
+            return []
         }
 
-        // Single-agency mode for the companion app — sample fallback only
-        // makes sense for one agency at a time, and the iOS surface is much
-        // less load-bearing than the watch.
         let agency = agencies.first ?? "SF"
         let endpoint = "StopPlace"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
@@ -155,14 +152,13 @@ class TransitAPI: ObservableObject {
         components?.queryItems = queryItems
 
         guard let url = components?.url else {
-            isLoading = false
+            errorMessage = "Failed to load nearby stops: invalid URL"
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
-            return BusStop.sampleStops
+            return []
         }
         guard let request = makeRequest(url: url) else {
             errorMessage = "App token not configured. See README."
-            isLoading = false
-            return BusStop.sampleStops
+            return []
         }
 
         let started = Date()
@@ -182,21 +178,22 @@ class TransitAPI: ObservableObject {
                     httpStatus: httpResponse.statusCode,
                     latencyMs: latencyMs
                 )
-                isLoading = false
-                return BusStop.sampleStops
+                errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
+                return []
             }
 
             let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
             let stops = try parse511Stops(data: data, agency: agency)
-            isLoading = false
+            if stops.isEmpty {
+                errorMessage = "No nearby stops found"
+            }
             return stops
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
-            errorMessage = "Failed to load nearby stops"
-            isLoading = false
-            return BusStop.sampleStops
+            errorMessage = "Failed to load nearby stops: \(error.localizedDescription)"
+            return []
         }
     }
     
@@ -281,32 +278,7 @@ class TransitAPI: ObservableObject {
             }
         }
         
-        return stops.isEmpty ? BusStop.sampleStops : stops
-    }
-    
-    // Fallback sample data
-    private func getSampleArrivals(for stopId: String) -> [BusArrival] {
-        switch stopId {
-        case "1": // Market St & 4th St
-            return [
-                BusArrival(route: "38", destination: "Downtown", arrivalTime: Date().addingTimeInterval(180)),
-                BusArrival(route: "38R", destination: "Downtown", arrivalTime: Date().addingTimeInterval(420)),
-                BusArrival(route: "F", destination: "Fisherman's Wharf", arrivalTime: Date().addingTimeInterval(600))
-            ]
-        case "2": // Mission St & 16th St
-            return [
-                BusArrival(route: "14", destination: "Downtown", arrivalTime: Date().addingTimeInterval(240)),
-                BusArrival(route: "14R", destination: "Downtown", arrivalTime: Date().addingTimeInterval(480)),
-                BusArrival(route: "22", destination: "Potrero Hill", arrivalTime: Date().addingTimeInterval(360))
-            ]
-        case "3": // Geary Blvd & 22nd Ave
-            return [
-                BusArrival(route: "38", destination: "Downtown", arrivalTime: Date().addingTimeInterval(300)),
-                BusArrival(route: "38R", destination: "Downtown", arrivalTime: Date().addingTimeInterval(540))
-            ]
-        default:
-            return BusArrival.sampleArrivals
-        }
+        return stops
     }
     
     // Helper method to get API key from user
