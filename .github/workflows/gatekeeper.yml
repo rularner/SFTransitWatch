@@ -1,0 +1,62 @@
+name: Production Health Gate
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-main-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check PR Title for Fix Keyword
+        id: title_check
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          if echo "$TITLE" | grep -iqE "fix[(]main[)]: "; then
+            echo "BYPASS=true" >> $GITHUB_ENV
+          else
+            echo "BYPASS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Verify Main Health and Report Failures
+        if: env.BYPASS == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 1. Get the latest run on main
+          LATEST_RUN=$(gh run list --branch main --limit 1 --json databaseId,status,conclusion,url -q '.[0]')
+
+          if [ -z "$LATEST_RUN" ] || [ "$LATEST_RUN" = "null" ]; then
+            echo "No workflow runs found on main yet; skipping gate."
+            exit 0
+          fi
+
+          RUN_ID=$(echo "$LATEST_RUN" | jq -r '.databaseId')
+          STATUS=$(echo "$LATEST_RUN" | jq -r '.status')
+          CONCLUSION=$(echo "$LATEST_RUN" | jq -r '.conclusion')
+          RUN_URL=$(echo "$LATEST_RUN" | jq -r '.url')
+
+          # 2. Check if currently running
+          if [ "$STATUS" != "completed" ]; then
+            echo "⏳ WAIT: A workflow is currently running on 'main' (Run #$RUN_ID)."
+            echo "Status: $STATUS"
+            echo "Please wait for the deployment to finish before merging new features."
+            echo "View progress: $RUN_URL"
+            exit 1
+          fi
+
+          if [ "$CONCLUSION" == "failure" ]; then
+            echo "❌ ERROR: Main branch is failing. The following jobs need attention:"
+            echo ""
+            
+            # 2. Fetch specific failed jobs and their URLs from that run
+            gh run view $RUN_ID --json jobs --jq '.jobs[] | select(.conclusion=="failure") | "- **\(.name)**: \(.url)"'
+            
+            echo ""
+            echo "⚠️ To bypass this check, include 'fix(main): ' in your PR title."
+            exit 1
+          else
+            echo "✨ Main is healthy and idle."
+          fi
