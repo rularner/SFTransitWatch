@@ -1,0 +1,42 @@
+name: Production Health Gate
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-main-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Title for Fix Keyword
+        id: title_check
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          if echo "$TITLE" | grep -iqE "fix[(]main[)]: "; then
+            echo "BYPASS=true" >> $GITHUB_ENV
+          else
+            echo "BYPASS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Verify Main Health and Report Failures
+        if: env.BYPASS == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Get the latest run on main
+          LATEST_RUN=$(gh run list --branch main --limit 1 --json databaseId,conclusion -q '.[0]')
+          RUN_ID=$(echo "$LATEST_RUN" | jq -r '.databaseId')
+          CONCLUSION=$(echo "$LATEST_RUN" | jq -r '.conclusion')
+
+          if [ "$CONCLUSION" == "failure" ]; then
+            echo "❌ ERROR: Main branch is failing. The following jobs need attention:"
+            echo ""
+            
+            # 2. Fetch specific failed jobs and their URLs from that run
+            gh run view $RUN_ID --json jobs --jq '.jobs[] | select(.conclusion=="failure") | "- **\(.name)**: \(.url)"'
+            
+            echo ""
+            echo "⚠️ To bypass this check, include 'fix(main): ' in your PR title."
+            exit 1
+          else
+            echo "✨ Main is healthy."
+          fi
