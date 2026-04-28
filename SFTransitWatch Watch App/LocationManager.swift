@@ -35,16 +35,6 @@ class LocationManager: NSObject, ObservableObject {
         locationManager.stopUpdatingLocation()
         isLocationEnabled = false
     }
-    
-    func findNearbyStops(within radius: CLLocationDistance = 1000) -> [BusStop] {
-        guard let currentLocation = currentLocation else { return [] }
-        
-        return BusStop.sampleStops.filter { stop in
-            stop.distance(to: currentLocation) <= radius
-        }.sorted { stop1, stop2 in
-            stop1.distance(to: currentLocation) < stop2.distance(to: currentLocation)
-        }
-    }
 }
 
 extension LocationManager: CLLocationManagerDelegate {
