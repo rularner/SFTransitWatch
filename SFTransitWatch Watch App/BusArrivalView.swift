@@ -8,7 +8,6 @@ struct BusArrivalView: View {
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
 
     @State private var arrivals: [BusArrival] = []
-    @State private var isLoading = false
     @State private var lastUpdated = Date()
     @State private var secondsUntilRefresh = 30
     @State private var notifiedArrivalIDs: Set<UUID> = []
@@ -82,7 +81,7 @@ struct BusArrivalView: View {
 
             // Arrivals
             Section {
-                if isLoading {
+                if transitAPI.isLoading && arrivals.isEmpty {
                     HStack {
                         ProgressView()
                         Text("Loading arrivals...")
@@ -90,12 +89,17 @@ struct BusArrivalView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .listRowBackground(Color.clear)
+                } else if let error = transitAPI.errorMessage, arrivals.isEmpty {
+                    ErrorStateView(message: error) {
+                        Task { await loadArrivals() }
+                    }
+                    .listRowBackground(Color.clear)
                 } else if filteredArrivals.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "bus")
                             .font(.system(size: 30))
                             .foregroundColor(.secondary)
-                        Text(arrivals.isEmpty ? "No arrivals scheduled" : "No \(selectedRoute ?? "") arrivals")
+                        Text(arrivals.isEmpty ? "No upcoming arrivals" : "No \(selectedRoute ?? "") arrivals")
                             .font(.headline)
                         Text("Check back later for updates")
                             .font(.caption)
@@ -113,7 +117,7 @@ struct BusArrivalView: View {
                 HStack {
                     Text("Next Arrivals")
                     Spacer()
-                    if isLoading {
+                    if transitAPI.isLoading {
                         ProgressView()
                             .scaleEffect(0.7)
                     } else {
@@ -133,7 +137,7 @@ struct BusArrivalView: View {
             Task { await loadArrivals() }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            guard !isLoading else { return }
+            guard !transitAPI.isLoading else { return }
             if secondsUntilRefresh <= 1 {
                 secondsUntilRefresh = refreshInterval
                 Task { await loadArrivals() }
@@ -144,11 +148,9 @@ struct BusArrivalView: View {
     }
 
     private func loadArrivals() async {
-        isLoading = true
         arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
         lastUpdated = Date()
         secondsUntilRefresh = refreshInterval
-        isLoading = false
 
         fireHapticsIfNeeded()
 
