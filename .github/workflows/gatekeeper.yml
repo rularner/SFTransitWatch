@@ -7,6 +7,9 @@ jobs:
   check-main-health:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Check PR Title for Fix Keyword
         id: title_check
         run: |
