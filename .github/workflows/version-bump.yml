@@ -1,4 +1,4 @@
-name: Version bump
+name: Release Tagger
 
 on:
   push:
@@ -6,24 +6,26 @@ on:
 
 jobs:
   bump:
-    name: Bump MARKETING_VERSION, tag, and release
+    name: Tag and publish release
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    # Avoid recursion if a release-tag commit is ever introduced later.
     if: "!startsWith(github.event.head_commit.message, 'chore: release v')"
     steps:
-      - name: Checkout
+      - name: Checkout full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.VERSION_BUMP_TOKEN || github.token }}
 
       - name: Configure git identity
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-      - name: Parse PR title and decide bump
+      - name: Determine bump from commit message
         id: decide
         run: |
           set -euo pipefail
@@ -32,7 +34,7 @@ jobs:
           BODY=$(git log -1 --pretty=%b)
           echo "Commit subject: $SUBJECT"
 
-          # Conventional Commits regex: type(scope)?!?: subject
+          # Conventional Commits: type(scope)?!?: subject
           if ! echo "$SUBJECT" | grep -qE '^(feat|fix|docs|chore|refactor|test|build|ci|perf|style)(\([^)]+\))?!?: '; then
             echo "Commit subject does not match Conventional Commits; skipping bump."
             echo "bump=none" >> "$GITHUB_OUTPUT"
@@ -55,14 +57,24 @@ jobs:
           echo "Decided bump: $BUMP"
           echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
 
-      - name: Compute new version
+      - name: Compute next version from tags
         id: version
         if: steps.decide.outputs.bump != 'none'
         run: |
           set -euo pipefail
 
-          CURRENT=$(grep -E '^MARKETING_VERSION = ' Config.xcconfig | sed -E 's/^MARKETING_VERSION = //')
-          echo "Current MARKETING_VERSION: $CURRENT"
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            CURRENT="0.0.0"
+          else
+            CURRENT="${LATEST_TAG#v}"
+          fi
+          echo "Current version: $CURRENT"
+
+          if ! echo "$CURRENT" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Latest version '$CURRENT' is not semver (x.y.z)" >&2
+            exit 1
+          fi
 
           MAJOR=$(echo "$CURRENT" | cut -d. -f1)
           MINOR=$(echo "$CURRENT" | cut -d. -f2)
@@ -75,53 +87,40 @@ jobs:
           esac
 
           NEW="${MAJOR}.${MINOR}.${PATCH}"
-          echo "New MARKETING_VERSION: $NEW"
+          echo "New version: $NEW"
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
 
-      - name: Edit Config.xcconfig
-        if: steps.decide.outputs.bump != 'none'
-        run: |
-          set -euo pipefail
-          sed -i "s|^MARKETING_VERSION = .*|MARKETING_VERSION = ${{ steps.version.outputs.new }}|" Config.xcconfig
-
-          # Safety: exactly one line must have changed.
-          CHANGED=$(git diff --numstat Config.xcconfig | awk '{print $1+$2}')
-          if [ "$CHANGED" != "2" ]; then
-            echo "Expected exactly 2 line changes (1 deletion + 1 insertion) in Config.xcconfig, got $CHANGED" >&2
-            git diff Config.xcconfig
-            exit 1
-          fi
-
-      - name: Commit, tag, and push (with retry)
+      - name: Create and push tag
         if: steps.decide.outputs.bump != 'none'
         run: |
           set -euo pipefail
 
           NEW="${{ steps.version.outputs.new }}"
-          git add Config.xcconfig
-          git commit -m "chore: release v${NEW} [skip ci]"
+          TAG="v${NEW}"
 
           for attempt in 1 2 3; do
-            if git push origin HEAD:main; then
-              echo "Pushed main on attempt $attempt"
-              git tag "v${NEW}"
-              if git push origin "v${NEW}"; then
-                exit 0
-              fi
-              echo "Tag push failed on attempt $attempt; cleaning up and retrying"
-              git tag -d "v${NEW}"
-              continue
+            git fetch --tags origin
+
+            if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+              echo "Tag ${TAG} already exists; nothing to do."
+              exit 0
             fi
-            echo "Main push failed on attempt $attempt; rebasing and retrying"
-            git pull --rebase origin main
+
+            git tag "${TAG}"
+            if git push origin "${TAG}"; then
+              echo "Pushed ${TAG} on attempt $attempt"
+              exit 0
+            fi
+
+            echo "Tag push failed on attempt $attempt; retrying"
+            git tag -d "${TAG}" || true
+            sleep "$attempt"
           done
-          echo "Push failed after 3 attempts" >&2
+          echo "Tag push failed after 3 attempts" >&2
           exit 1
 
-      - name: Create GitHub Release
+      - name: Publish GitHub release
         if: steps.decide.outputs.bump != 'none'
-        env:
-          GH_TOKEN: ${{ secrets.VERSION_BUMP_TOKEN || github.token }}
         run: |
           gh release create "v${{ steps.version.outputs.new }}" \
             --title "v${{ steps.version.outputs.new }}" \
