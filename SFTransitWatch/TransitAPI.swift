@@ -67,11 +67,11 @@ class TransitAPI: ObservableObject {
     func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         if isDirect511Mode && !hasUsableKey {
             errorMessage = "Please configure your 511.org API key in Settings"
-            isLoading = false
-            return getSampleArrivals(for: stopId)
+            return []
         }
 
         let endpoint = "StopMonitoring"
@@ -86,14 +86,13 @@ class TransitAPI: ObservableObject {
         components?.queryItems = queryItems
 
         guard let url = components?.url else {
-            isLoading = false
+            errorMessage = "Failed to load arrivals: invalid URL"
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
-            return getSampleArrivals(for: stopId)
+            return []
         }
         guard let request = makeRequest(url: url) else {
             errorMessage = "App token not configured. See README."
-            isLoading = false
-            return getSampleArrivals(for: stopId)
+            return []
         }
 
         let started = Date()
@@ -113,21 +112,18 @@ class TransitAPI: ObservableObject {
                     httpStatus: httpResponse.statusCode,
                     latencyMs: latencyMs
                 )
-                isLoading = false
-                return getSampleArrivals(for: stopId)
+                errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
+                return []
             }
 
             let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            let arrivals = try parse511Arrivals(data: data)
-            isLoading = false
-            return arrivals
+            return try parse511Arrivals(data: data)
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
-            errorMessage = "Failed to load arrivals"
-            isLoading = false
-            return getSampleArrivals(for: stopId)
+            errorMessage = "Failed to load arrivals: \(error.localizedDescription)"
+            return []
         }
     }
     
@@ -246,7 +242,7 @@ class TransitAPI: ObservableObject {
             }
         }
         
-        return arrivals.isEmpty ? getSampleArrivals(for: "default") : arrivals
+        return arrivals
     }
     
     // Parse 511.org XML response for stops
