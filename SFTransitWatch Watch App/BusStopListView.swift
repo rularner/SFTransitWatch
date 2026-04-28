@@ -17,7 +17,7 @@ struct BusStopListView: View {
     private var showAgencyBadges: Bool {
         enabledAgencies.count > 1
     }
-    
+
     var body: some View {
         List {
             if !transitAPI.isAPIKeyConfigured {
@@ -262,9 +262,9 @@ struct BusStopRow: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 VStack(alignment: .trailing, spacing: 4) {
                     if let currentLocation = currentLocation {
                         let distance = stop.distance(to: currentLocation)
@@ -272,7 +272,7 @@ struct BusStopRow: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     Button(action: {
                         favoritesManager.toggleFavorite(for: stop.id)
                     }) {
@@ -284,7 +284,7 @@ struct BusStopRow: View {
                     .accessibilityLabel(stop.isFavorite ? "Remove from favorites" : "Add to favorites")
                 }
             }
-            
+
             if !stop.routes.isEmpty {
                 HStack {
                     ForEach(stop.routes.prefix(3), id: \.self) { route in
@@ -395,4 +395,4 @@ struct StopCodeEntryView: View {
 
 #Preview {
     BusStopListView()
-} 
+}
