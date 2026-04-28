@@ -8,7 +8,6 @@ struct BusStopListView: View {
     @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var nearbyStops: [BusStop] = []
-    @State private var isLoading = false
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
 
@@ -21,123 +20,33 @@ struct BusStopListView: View {
     
     var body: some View {
         List {
-            if let error = transitAPI.errorMessage, transitAPI.isAPIKeyConfigured {
-                Section {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text(error)
-                            .font(.caption)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Error: \(error)")
-                }
-            }
-
             if !transitAPI.isAPIKeyConfigured {
-                // API Key not configured section
+                apiKeyPromptSection
+            } else if transitAPI.isLoading && nearbyStops.isEmpty {
+                loadingSection
+            } else if let error = transitAPI.errorMessage, nearbyStops.isEmpty {
                 Section {
-                    VStack(spacing: 12) {
-                        Image(systemName: "key.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.orange)
-                        
-                        Text("API Key Required")
-                            .font(.headline)
-                        
-                        Text("Configure your 511.org API key to get real-time transit data")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        
-                        Button("Open Settings") {
-                            showingSettingsAlert = true
-                        }
-                        .buttonStyle(.bordered)
+                    ErrorStateView(message: error) {
+                        Task { await loadNearbyStops() }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
                     .listRowBackground(Color.clear)
                 }
-            } else if isLoading {
-                HStack {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                    Text("Finding nearby stops...")
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .listRowBackground(Color.clear)
             } else if nearbyStops.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "location.slash")
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary)
-                    
-                    Text("No nearby stops found")
-                        .font(.headline)
-                    
-                    Text("Make sure location services are enabled")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                    
-                    Button("Enable Location") {
-                        locationManager.requestLocationPermission()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .listRowBackground(Color.clear)
+                locationPromptSection
             } else {
-                // Pinned stops (added by code)
-                if !pinnedStopsManager.pinned.isEmpty {
-                    Section(header: Text("Pinned")) {
-                        ForEach(pinnedStopsManager.pinned) { stop in
-                            NavigationLink(destination: BusArrivalView(stop: stop)) {
-                                BusStopRow(
-                                    stop: stop,
-                                    currentLocation: locationManager.currentLocation,
-                                    favoritesManager: favoritesManager,
-                                    showAgencyBadge: showAgencyBadges
-                                )
-                            }
+                if let error = transitAPI.errorMessage {
+                    Section {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text(error)
+                                .font(.caption)
                         }
-                        .onDelete { pinnedStopsManager.unpin(at: $0) }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Error: \(error)")
                     }
                 }
-
-                // Favorites section
-                let favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
-                if !favoriteStops.isEmpty {
-                    Section(header: Text("Favorites")) {
-                        ForEach(favoriteStops) { stop in
-                            NavigationLink(destination: BusArrivalView(stop: stop)) {
-                                BusStopRow(
-                                    stop: stop,
-                                    currentLocation: locationManager.currentLocation,
-                                    favoritesManager: favoritesManager,
-                                    showAgencyBadge: showAgencyBadges
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // All stops section
-                Section(header: Text("Nearby Stops")) {
-                    ForEach(nearbyStops) { stop in
-                        NavigationLink(destination: BusArrivalView(stop: stop)) {
-                            BusStopRow(
-                                stop: stop,
-                                currentLocation: locationManager.currentLocation,
-                                favoritesManager: favoritesManager,
-                                showAgencyBadge: showAgencyBadges
-                            )
-                        }
-                    }
-                }
+                stopSections
             }
         }
         .navigationTitle("Nearby Stops")
@@ -185,10 +94,112 @@ struct BusStopListView: View {
             }
         }
     }
-    
-    private func loadNearbyStops() async {
-        isLoading = true
 
+    @ViewBuilder
+    private var apiKeyPromptSection: some View {
+        Section {
+            VStack(spacing: 12) {
+                Image(systemName: "key.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.orange)
+                Text("API Key Required")
+                    .font(.headline)
+                Text("Configure your 511.org API key to get real-time transit data")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Open Settings") { showingSettingsAlert = true }
+                    .buttonStyle(.bordered)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    @ViewBuilder
+    private var loadingSection: some View {
+        HStack {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle())
+            Text("Finding nearby stops...")
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .listRowBackground(Color.clear)
+    }
+
+    @ViewBuilder
+    private var locationPromptSection: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "location.slash")
+                .font(.system(size: 40))
+                .foregroundColor(.secondary)
+            Text("No nearby stops found")
+                .font(.headline)
+            Text("Make sure location services are enabled")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Enable Location") {
+                locationManager.requestLocationPermission()
+            }
+            .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .listRowBackground(Color.clear)
+    }
+
+    @ViewBuilder
+    private var stopSections: some View {
+        if !pinnedStopsManager.pinned.isEmpty {
+            Section(header: Text("Pinned")) {
+                ForEach(pinnedStopsManager.pinned) { stop in
+                    NavigationLink(destination: BusArrivalView(stop: stop)) {
+                        BusStopRow(
+                            stop: stop,
+                            currentLocation: locationManager.currentLocation,
+                            favoritesManager: favoritesManager,
+                            showAgencyBadge: showAgencyBadges
+                        )
+                    }
+                }
+                .onDelete { pinnedStopsManager.unpin(at: $0) }
+            }
+        }
+
+        let favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
+        if !favoriteStops.isEmpty {
+            Section(header: Text("Favorites")) {
+                ForEach(favoriteStops) { stop in
+                    NavigationLink(destination: BusArrivalView(stop: stop)) {
+                        BusStopRow(
+                            stop: stop,
+                            currentLocation: locationManager.currentLocation,
+                            favoritesManager: favoritesManager,
+                            showAgencyBadge: showAgencyBadges
+                        )
+                    }
+                }
+            }
+        }
+
+        Section(header: Text("Nearby Stops")) {
+            ForEach(nearbyStops) { stop in
+                NavigationLink(destination: BusArrivalView(stop: stop)) {
+                    BusStopRow(
+                        stop: stop,
+                        currentLocation: locationManager.currentLocation,
+                        favoritesManager: favoritesManager,
+                        showAgencyBadge: showAgencyBadges
+                    )
+                }
+            }
+        }
+    }
+
+    private func loadNearbyStops() async {
         if let location = locationManager.currentLocation {
             nearbyStops = await transitAPI.fetchNearbyStops(
                 latitude: location.coordinate.latitude,
@@ -198,18 +209,14 @@ struct BusStopListView: View {
         } else {
             nearbyStops = []
         }
-        
-        // Sort by distance if location is available
+
         if let currentLocation = locationManager.currentLocation {
             nearbyStops.sort { stop1, stop2 in
                 stop1.distance(to: currentLocation) < stop2.distance(to: currentLocation)
             }
         }
-        
-        // Apply favorites sorting
+
         nearbyStops = favoritesManager.sortStopsWithFavoritesFirst(nearbyStops)
-        
-        isLoading = false
     }
 }
 
