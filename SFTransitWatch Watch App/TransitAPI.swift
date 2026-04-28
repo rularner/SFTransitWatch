@@ -130,7 +130,7 @@ class TransitAPI: ObservableObject {
     
     /// Fans out the StopPlace lookup across each enabled agency in parallel
     /// and merges the results, tagging every returned stop with its agency.
-    /// One agency failing doesn't kill the others — we just drop its stops.
+    /// Sets errorMessage when all agencies fail or some are degraded.
     @MainActor
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
         isLoading = true
@@ -144,24 +144,46 @@ class TransitAPI: ObservableObject {
 
         let queryAgencies = agencies.isEmpty ? ["SF"] : agencies
 
-        let stops: [BusStop] = await withTaskGroup(of: [BusStop].self) { group in
+        let outcomes: [Result<[BusStop], Error>] = await withTaskGroup(of: Result<[BusStop], Error>.self) { group in
             for agency in queryAgencies {
                 group.addTask { [self] in
-                    await self.fetchNearbyStops(latitude: latitude, longitude: longitude, radius: radius, agency: agency)
+                    do {
+                        let stops = try await self.fetchNearbyStops(latitude: latitude, longitude: longitude, radius: radius, agency: agency)
+                        return .success(stops)
+                    } catch {
+                        return .failure(error)
+                    }
                 }
             }
-            var merged: [BusStop] = []
-            for await batch in group { merged.append(contentsOf: batch) }
-            return merged
+            var collected: [Result<[BusStop], Error>] = []
+            for await outcome in group { collected.append(outcome) }
+            return collected
         }
 
-        return stops
+        var merged: [BusStop] = []
+        var failureCount = 0
+        for outcome in outcomes {
+            switch outcome {
+            case .success(let stops): merged.append(contentsOf: stops)
+            case .failure: failureCount += 1
+            }
+        }
+
+        if failureCount == queryAgencies.count {
+            errorMessage = "Couldn't reach 511.org for any agency"
+        } else if failureCount > 0 {
+            errorMessage = "Some agencies unavailable"
+        } else if merged.isEmpty {
+            errorMessage = "No nearby stops found"
+        }
+
+        return merged
     }
 
-    /// Single-agency StopPlace lookup. Returns [] on any failure (logged to
+    /// Single-agency StopPlace lookup. Throws on any failure (logged to
     /// telemetry); the caller is expected to merge with other agencies'
     /// results.
-    private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async -> [BusStop] {
+    private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async throws -> [BusStop] {
         let endpoint = "StopPlace"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
@@ -178,37 +200,31 @@ class TransitAPI: ObservableObject {
         guard let url = components?.url,
               let request = makeRequest(url: url) else {
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
-            return []
+            throw APIError.invalidURL
         }
 
         let started = Date()
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
-                return []
-            }
-
-            if httpResponse.statusCode != 200 {
-                Telemetry.shared.logFetchError(
-                    endpoint: endpoint,
-                    errorKind: errorKind(for: APIError.invalidResponse, status: httpResponse.statusCode),
-                    httpStatus: httpResponse.statusCode,
-                    latencyMs: latencyMs
-                )
-                return []
-            }
-
-            let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
-            Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            return try parse511Stops(data: data, agency: agency)
-        } catch {
-            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
-            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
-            return []
+        guard let httpResponse = response as? HTTPURLResponse else {
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
+            throw APIError.invalidResponse
         }
+
+        if httpResponse.statusCode != 200 {
+            Telemetry.shared.logFetchError(
+                endpoint: endpoint,
+                errorKind: errorKind(for: APIError.invalidResponse, status: httpResponse.statusCode),
+                httpStatus: httpResponse.statusCode,
+                latencyMs: latencyMs
+            )
+            throw APIError.invalidResponse
+        }
+
+        let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
+        Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
+        return try parse511Stops(data: data, agency: agency)
     }
     
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
