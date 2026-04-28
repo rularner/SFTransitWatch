@@ -200,6 +200,6 @@ struct BusArrivalRow: View {
 
 #Preview {
     NavigationView {
-        BusArrivalView(stop: BusStop.sampleStops[0])
+        BusArrivalView(stop: BusStop.previewStops[0])
     }
 } 

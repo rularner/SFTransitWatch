@@ -46,7 +46,7 @@ final class FavoritesManagerTests: XCTestCase {
     }
 
     func testGetFavoriteStopsFiltersCorrectly() {
-        let stops = BusStop.sampleStops
+        let stops = makeStops()
         manager.addToFavorites(stops[0].id)
         let favorites = manager.getFavoriteStops(from: stops)
         XCTAssertEqual(favorites.count, 1)
@@ -54,10 +54,24 @@ final class FavoritesManagerTests: XCTestCase {
     }
 
     func testSortStopsWithFavoritesFirst() {
-        let stops = BusStop.sampleStops
+        let stops = makeStops()
         manager.addToFavorites(stops[1].id) // favorite the second stop
         let sorted = manager.sortStopsWithFavoritesFirst(stops)
         XCTAssertTrue(sorted[0].isFavorite)
+    }
+
+    private func makeStops() -> [BusStop] {
+        return [
+            BusStop(id: "1", name: "Test Stop One", code: "1",
+                    latitude: 37.7749, longitude: -122.4194,
+                    routes: ["38"], agency: "SF"),
+            BusStop(id: "2", name: "Test Stop Two", code: "2",
+                    latitude: 37.7849, longitude: -122.4094,
+                    routes: ["14"], agency: "SF"),
+            BusStop(id: "3", name: "Test Stop Three", code: "3",
+                    latitude: 37.7649, longitude: -122.4294,
+                    routes: ["F"], agency: "SF")
+        ]
     }
 
     func testPersistenceAcrossInstances() {
