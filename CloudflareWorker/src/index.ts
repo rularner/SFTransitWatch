@@ -121,8 +121,8 @@ function buildUpstreamUrl(
 	const segments = incoming.pathname.split("/").filter(Boolean);
 	const endpoint = segments[segments.length - 1];
 
-	if (!endpoint || !["StopMonitoring", "StopPlace"].includes(endpoint)) {
-		return { ok: false, error: "Path must end with /StopMonitoring or /StopPlace." };
+	if (!endpoint || !["StopMonitoring", "StopPlace", "Stops"].includes(endpoint)) {
+		return { ok: false, error: "Path must end with /StopMonitoring, /StopPlace, or /Stops." };
 	}
 
 	const upstream = new URL(`${UPSTREAM_BASE_URL}/${endpoint}`);

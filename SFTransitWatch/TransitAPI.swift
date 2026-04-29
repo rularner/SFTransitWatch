@@ -138,12 +138,16 @@ class TransitAPI: ObservableObject {
         }
 
         let agency = agencies.first ?? "SF"
-        let endpoint = "StopPlace"
+        let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
-            URLQueryItem(name: "agency", value: agency),
+            URLQueryItem(name: "operator_id", value: agency),
             URLQueryItem(name: "lat", value: String(latitude)),
             URLQueryItem(name: "lon", value: String(longitude)),
+            // 511.org deployments differ on expected coordinate keys.
+            // Send both forms so geofiltering works consistently.
+            URLQueryItem(name: "latitude", value: String(latitude)),
+            URLQueryItem(name: "longitude", value: String(longitude)),
             URLQueryItem(name: "radius", value: String(radius))
         ]
         if isDirect511Mode {
@@ -199,85 +203,124 @@ class TransitAPI: ObservableObject {
     
     // Parse 511.org XML response for arrivals
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
-        // 511.org returns XML data, so we need to parse it
-        // This is a simplified parser - in production you'd use a proper XML parser
-        
+        // 511 currently serves JSON for StopMonitoring, but we keep XML fallback
+        // for compatibility with worker/legacy responses.
+        if let jsonArrivals = parseJSONArrivals(data: data), !jsonArrivals.isEmpty {
+            return jsonArrivals
+        }
+        return try parseXMLArrivals(data: data)
+    }
+
+    private func parseJSONArrivals(data: Data) -> [BusArrival]? {
+        guard let payload = try? JSONDecoder().decode(StopMonitoringResponse.self, from: data) else {
+            return nil
+        }
+        let formatter = ISO8601DateFormatter()
+        return payload.serviceDelivery.stopMonitoringDelivery.monitoredStopVisit.compactMap { visit in
+            let journey = visit.monitoredVehicleJourney
+            let call = journey.monitoredCall
+            let rawTime =
+                call.expectedArrivalTime ??
+                call.expectedDepartureTime ??
+                call.aimedArrivalTime ??
+                call.aimedDepartureTime
+            guard
+                let rawTime,
+                let arrivalTime = formatter.date(from: rawTime)
+            else { return nil }
+            return BusArrival(
+                route: journey.lineRef,
+                destination: journey.directionRef,
+                arrivalTime: arrivalTime,
+                isRealTime: true
+            )
+        }
+    }
+
+    private func parseXMLArrivals(data: Data) throws -> [BusArrival] {
         let xmlString = String(data: data, encoding: .utf8) ?? ""
-        
-        // Extract arrival times from XML
-        // 511.org format: <MonitoredVehicleJourney><MonitoredCall><ExpectedDepartureTime>...</ExpectedDepartureTime></MonitoredCall></MonitoredVehicleJourney>
-        
         var arrivals: [BusArrival] = []
-        
-        // Simple regex parsing for demonstration
-        // In production, use XMLParser or a proper XML library
-        let pattern = #"<MonitoredVehicleJourney>.*?<LineRef>([^<]+)</LineRef>.*?<DirectionRef>([^<]+)</DirectionRef>.*?<ExpectedDepartureTime>([^<]+)</ExpectedDepartureTime>.*?</MonitoredVehicleJourney>"#
-        
+        let pattern = #"<MonitoredVehicleJourney>.*?<LineRef>([^<]+)</LineRef>.*?<DirectionRef>([^<]+)</DirectionRef>.*?<(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>([^<]+)</(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>.*?</MonitoredVehicleJourney>"#
         let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
         let matches = regex.matches(in: xmlString, options: [], range: NSRange(xmlString.startIndex..., in: xmlString))
-        
+        let formatter = ISO8601DateFormatter()
         for match in matches {
             if let routeRange = Range(match.range(at: 1), in: xmlString),
                let destinationRange = Range(match.range(at: 2), in: xmlString),
                let timeRange = Range(match.range(at: 3), in: xmlString) {
-                
                 let route = String(xmlString[routeRange])
                 let destination = String(xmlString[destinationRange])
                 let timeString = String(xmlString[timeRange])
-                
-                // Parse ISO 8601 date format
-                let formatter = ISO8601DateFormatter()
                 if let arrivalTime = formatter.date(from: timeString) {
-                    let arrival = BusArrival(
+                    arrivals.append(BusArrival(
                         route: route,
                         destination: destination,
                         arrivalTime: arrivalTime,
                         isRealTime: true
-                    )
-                    arrivals.append(arrival)
+                    ))
                 }
             }
         }
-        
         return arrivals
     }
     
     // Parse 511.org XML response for stops
     private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
+        // Direct 511 Stops endpoint returns JSON. Worker/legacy paths may still
+        // return XML StopPlace payloads, so we attempt JSON first then fall back.
+        if let jsonStops = parseJSONStops(data: data, agency: agency), !jsonStops.isEmpty {
+            return jsonStops
+        }
+        return parseXMLStops(data: data, agency: agency)
+    }
+
+    private func parseJSONStops(data: Data, agency: String) -> [BusStop]? {
+        guard let payload = try? JSONDecoder().decode(StopsResponse.self, from: data) else {
+            return nil
+        }
+        return payload.contents.dataObjects.scheduledStopPoints.compactMap { point in
+            guard
+                let latitude = Double(point.location.latitude),
+                let longitude = Double(point.location.longitude)
+            else { return nil }
+            return BusStop(
+                id: point.id,
+                name: point.name,
+                code: point.id,
+                latitude: latitude,
+                longitude: longitude,
+                routes: [],
+                agency: agency
+            )
+        }
+    }
+
+    private func parseXMLStops(data: Data, agency: String) throws -> [BusStop] {
         let xmlString = String(data: data, encoding: .utf8) ?? ""
-        
         var stops: [BusStop] = []
-        
-        // Simple regex parsing for demonstration
         let pattern = #"<StopPlace>.*?<StopPlaceRef>([^<]+)</StopPlaceRef>.*?<StopPlaceName>([^<]+)</StopPlaceName>.*?<Location>.*?<Latitude>([^<]+)</Latitude>.*?<Longitude>([^<]+)</Longitude>.*?</Location>.*?</StopPlace>"#
-        
         let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
         let matches = regex.matches(in: xmlString, options: [], range: NSRange(xmlString.startIndex..., in: xmlString))
-        
         for match in matches {
             if let idRange = Range(match.range(at: 1), in: xmlString),
                let nameRange = Range(match.range(at: 2), in: xmlString),
                let latRange = Range(match.range(at: 3), in: xmlString),
                let lonRange = Range(match.range(at: 4), in: xmlString) {
-                
                 let id = String(xmlString[idRange])
                 let name = String(xmlString[nameRange])
                 let latitude = Double(xmlString[latRange]) ?? 0.0
                 let longitude = Double(xmlString[lonRange]) ?? 0.0
-                
-                let stop = BusStop(
+                stops.append(BusStop(
                     id: id,
                     name: name,
                     code: id,
                     latitude: latitude,
                     longitude: longitude,
-                    routes: [], // Routes would need separate API call
+                    routes: [],
                     agency: agency
-                )
-                stops.append(stop)
+                ))
             }
         }
-        
         return stops
     }
     
@@ -299,4 +342,104 @@ enum APIError: Error {
     case decodingError
     case networkError
     case xmlParsingError
-} 
+}
+
+private struct StopsResponse: Decodable {
+    let contents: StopsContents
+
+    enum CodingKeys: String, CodingKey {
+        case contents = "Contents"
+    }
+}
+
+private struct StopsContents: Decodable {
+    let dataObjects: StopsDataObjects
+}
+
+private struct StopsDataObjects: Decodable {
+    let scheduledStopPoints: [ScheduledStopPoint]
+
+    enum CodingKeys: String, CodingKey {
+        case scheduledStopPoints = "ScheduledStopPoint"
+    }
+}
+
+private struct ScheduledStopPoint: Decodable {
+    let id: String
+    let name: String
+    let location: StopLocation
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name = "Name"
+        case location = "Location"
+    }
+}
+
+private struct StopLocation: Decodable {
+    let longitude: String
+    let latitude: String
+
+    enum CodingKeys: String, CodingKey {
+        case longitude = "Longitude"
+        case latitude = "Latitude"
+    }
+}
+
+private struct StopMonitoringResponse: Decodable {
+    let serviceDelivery: StopMonitoringServiceDelivery
+
+    enum CodingKeys: String, CodingKey {
+        case serviceDelivery = "ServiceDelivery"
+    }
+}
+
+private struct StopMonitoringServiceDelivery: Decodable {
+    let stopMonitoringDelivery: StopMonitoringDelivery
+
+    enum CodingKeys: String, CodingKey {
+        case stopMonitoringDelivery = "StopMonitoringDelivery"
+    }
+}
+
+private struct StopMonitoringDelivery: Decodable {
+    let monitoredStopVisit: [MonitoredStopVisit]
+
+    enum CodingKeys: String, CodingKey {
+        case monitoredStopVisit = "MonitoredStopVisit"
+    }
+}
+
+private struct MonitoredStopVisit: Decodable {
+    let monitoredVehicleJourney: MonitoredVehicleJourney
+
+    enum CodingKeys: String, CodingKey {
+        case monitoredVehicleJourney = "MonitoredVehicleJourney"
+    }
+}
+
+private struct MonitoredVehicleJourney: Decodable {
+    let lineRef: String
+    let directionRef: String
+    let monitoredCall: MonitoredCall
+
+    enum CodingKeys: String, CodingKey {
+        case lineRef = "LineRef"
+        case directionRef = "DirectionRef"
+        case monitoredCall = "MonitoredCall"
+    }
+}
+
+private struct MonitoredCall: Decodable {
+    let expectedArrivalTime: String?
+    let expectedDepartureTime: String?
+    let aimedArrivalTime: String?
+    let aimedDepartureTime: String?
+
+    enum CodingKeys: String, CodingKey {
+        case expectedArrivalTime = "ExpectedArrivalTime"
+        case expectedDepartureTime = "ExpectedDepartureTime"
+        case aimedArrivalTime = "AimedArrivalTime"
+        case aimedDepartureTime = "AimedDepartureTime"
+    }
+}
