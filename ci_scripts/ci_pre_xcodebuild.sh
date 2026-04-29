@@ -33,5 +33,23 @@ fi
 
 sed -i '' "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = ${CI_BUILD_NUMBER}/" "$XCCONFIG"
 
+# Keep CFBundleShortVersionString aligned with release tags in CI.
+# If tags are available, use the latest semver tag (vX.Y.Z) as MARKETING_VERSION.
+if git -C "$CI_PRIMARY_REPOSITORY_PATH" rev-parse --git-dir >/dev/null 2>&1; then
+  git -C "$CI_PRIMARY_REPOSITORY_PATH" fetch --tags origin >/dev/null 2>&1 || true
+  LATEST_TAG="$(git -C "$CI_PRIMARY_REPOSITORY_PATH" tag -l 'v*' --sort=-v:refname | head -n 1)"
+  if [ -n "$LATEST_TAG" ]; then
+    TAG_VERSION="${LATEST_TAG#v}"
+    if echo "$TAG_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+      sed -i '' "s/^MARKETING_VERSION = .*/MARKETING_VERSION = ${TAG_VERSION}/" "$XCCONFIG"
+      echo "Set MARKETING_VERSION from latest tag: ${LATEST_TAG}"
+    else
+      echo "Latest tag '${LATEST_TAG}' is not semver; leaving MARKETING_VERSION unchanged"
+    fi
+  else
+    echo "No v* tags found; leaving MARKETING_VERSION unchanged"
+  fi
+fi
+
 echo "=== Config.xcconfig after build-number injection ==="
 cat "$XCCONFIG"

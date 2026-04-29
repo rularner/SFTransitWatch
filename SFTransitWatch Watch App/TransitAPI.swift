@@ -184,12 +184,16 @@ class TransitAPI: ObservableObject {
     /// telemetry); the caller is expected to merge with other agencies'
     /// results.
     private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async throws -> [BusStop] {
-        let endpoint = "StopPlace"
+        let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
-            URLQueryItem(name: "agency", value: agency),
+            URLQueryItem(name: "operator_id", value: agency),
             URLQueryItem(name: "lat", value: String(latitude)),
             URLQueryItem(name: "lon", value: String(longitude)),
+            // 511.org deployments differ on expected coordinate keys.
+            // Send both forms so geofiltering works consistently.
+            URLQueryItem(name: "latitude", value: String(latitude)),
+            URLQueryItem(name: "longitude", value: String(longitude)),
             URLQueryItem(name: "radius", value: String(radius))
         ]
         if isDirect511Mode {
@@ -228,6 +232,10 @@ class TransitAPI: ObservableObject {
     }
     
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
+        if let jsonArrivals = parseJSONArrivals(data: data), !jsonArrivals.isEmpty {
+            return jsonArrivals
+        }
+
         let formatter = ISO8601DateFormatter()
         let records = SIRIXMLParser.parseRecords(
             data: data,
@@ -250,7 +258,37 @@ class TransitAPI: ObservableObject {
         }
     }
 
+    private func parseJSONArrivals(data: Data) -> [BusArrival]? {
+        guard let payload = try? JSONDecoder().decode(StopMonitoringResponse.self, from: data) else {
+            return nil
+        }
+        let formatter = ISO8601DateFormatter()
+        return payload.serviceDelivery.stopMonitoringDelivery.monitoredStopVisit.compactMap { visit in
+            let journey = visit.monitoredVehicleJourney
+            let call = journey.monitoredCall
+            let rawTime =
+                call.expectedArrivalTime ??
+                call.expectedDepartureTime ??
+                call.aimedArrivalTime ??
+                call.aimedDepartureTime
+            guard
+                let rawTime,
+                let arrivalTime = formatter.date(from: rawTime)
+            else { return nil }
+            return BusArrival(
+                route: journey.lineRef,
+                destination: journey.directionRef,
+                arrivalTime: arrivalTime,
+                isRealTime: true
+            )
+        }
+    }
+
     private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
+        if let jsonStops = parseJSONStops(data: data, agency: agency), !jsonStops.isEmpty {
+            return jsonStops
+        }
+
         let records = SIRIXMLParser.parseRecords(
             data: data,
             entryElement: "StopPlace",
@@ -275,6 +313,27 @@ class TransitAPI: ObservableObject {
         }
     }
 
+    private func parseJSONStops(data: Data, agency: String) -> [BusStop]? {
+        guard let payload = try? JSONDecoder().decode(StopsResponse.self, from: data) else {
+            return nil
+        }
+        return payload.contents.dataObjects.scheduledStopPoints.compactMap { point in
+            guard
+                let latitude = Double(point.location.latitude),
+                let longitude = Double(point.location.longitude)
+            else { return nil }
+            return BusStop(
+                id: point.id,
+                name: point.name,
+                code: point.id,
+                latitude: latitude,
+                longitude: longitude,
+                routes: [],
+                agency: agency
+            )
+        }
+    }
+
     // Helper method to get API key from user
     func setAPIKey(_ key: String) {
         storedAPIKey = key
@@ -291,11 +350,10 @@ class TransitAPI: ObservableObject {
     func fetchStop(code: String, agency: String = "SF") async -> BusStop? {
         if isDirect511Mode && !hasUsableKey { return nil }
 
-        let endpoint = "StopPlace"
+        let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
-            URLQueryItem(name: "agency", value: agency),
-            URLQueryItem(name: "stopCode", value: code)
+            URLQueryItem(name: "operator_id", value: agency)
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
@@ -324,7 +382,7 @@ class TransitAPI: ObservableObject {
             let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
             let stops = try parse511Stops(data: data, agency: agency)
-            return stops.first
+            return stops.first(where: { $0.code == code || $0.id == code })
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
@@ -351,4 +409,104 @@ enum APIError: Error {
     case decodingError
     case networkError
     case xmlParsingError
-} 
+}
+
+private struct StopsResponse: Decodable {
+    let contents: StopsContents
+
+    enum CodingKeys: String, CodingKey {
+        case contents = "Contents"
+    }
+}
+
+private struct StopsContents: Decodable {
+    let dataObjects: StopsDataObjects
+}
+
+private struct StopsDataObjects: Decodable {
+    let scheduledStopPoints: [ScheduledStopPoint]
+
+    enum CodingKeys: String, CodingKey {
+        case scheduledStopPoints = "ScheduledStopPoint"
+    }
+}
+
+private struct ScheduledStopPoint: Decodable {
+    let id: String
+    let name: String
+    let location: StopLocation
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name = "Name"
+        case location = "Location"
+    }
+}
+
+private struct StopLocation: Decodable {
+    let longitude: String
+    let latitude: String
+
+    enum CodingKeys: String, CodingKey {
+        case longitude = "Longitude"
+        case latitude = "Latitude"
+    }
+}
+
+private struct StopMonitoringResponse: Decodable {
+    let serviceDelivery: StopMonitoringServiceDelivery
+
+    enum CodingKeys: String, CodingKey {
+        case serviceDelivery = "ServiceDelivery"
+    }
+}
+
+private struct StopMonitoringServiceDelivery: Decodable {
+    let stopMonitoringDelivery: StopMonitoringDelivery
+
+    enum CodingKeys: String, CodingKey {
+        case stopMonitoringDelivery = "StopMonitoringDelivery"
+    }
+}
+
+private struct StopMonitoringDelivery: Decodable {
+    let monitoredStopVisit: [MonitoredStopVisit]
+
+    enum CodingKeys: String, CodingKey {
+        case monitoredStopVisit = "MonitoredStopVisit"
+    }
+}
+
+private struct MonitoredStopVisit: Decodable {
+    let monitoredVehicleJourney: MonitoredVehicleJourney
+
+    enum CodingKeys: String, CodingKey {
+        case monitoredVehicleJourney = "MonitoredVehicleJourney"
+    }
+}
+
+private struct MonitoredVehicleJourney: Decodable {
+    let lineRef: String
+    let directionRef: String
+    let monitoredCall: MonitoredCall
+
+    enum CodingKeys: String, CodingKey {
+        case lineRef = "LineRef"
+        case directionRef = "DirectionRef"
+        case monitoredCall = "MonitoredCall"
+    }
+}
+
+private struct MonitoredCall: Decodable {
+    let expectedArrivalTime: String?
+    let expectedDepartureTime: String?
+    let aimedArrivalTime: String?
+    let aimedDepartureTime: String?
+
+    enum CodingKeys: String, CodingKey {
+        case expectedArrivalTime = "ExpectedArrivalTime"
+        case expectedDepartureTime = "ExpectedDepartureTime"
+        case aimedArrivalTime = "AimedArrivalTime"
+        case aimedDepartureTime = "AimedDepartureTime"
+    }
+}
