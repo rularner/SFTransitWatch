@@ -271,7 +271,7 @@ class TransitAPI: ObservableObject {
         if let jsonStops = parseJSONStops(data: data, agency: agency), !jsonStops.isEmpty {
             return jsonStops
         }
-        return parseXMLStops(data: data, agency: agency)
+        return try parseXMLStops(data: data, agency: agency)
     }
 
     private func parseJSONStops(data: Data, agency: String) -> [BusStop]? {
