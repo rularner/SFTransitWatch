@@ -6,7 +6,6 @@ struct BusArrivalView: View {
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var siriManager = SiriManager()
     @State private var arrivals: [BusArrival] = []
-    @State private var isLoading = false
     @State private var lastUpdated = Date()
     
     var body: some View {
@@ -55,9 +54,8 @@ struct BusArrivalView: View {
                 .padding(.vertical, 4)
             }
             
-            // Arrivals section
             Section {
-                if isLoading {
+                if transitAPI.isLoading && arrivals.isEmpty {
                     HStack {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle())
@@ -66,15 +64,18 @@ struct BusArrivalView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .listRowBackground(Color.clear)
+                } else if let error = transitAPI.errorMessage, arrivals.isEmpty {
+                    ErrorStateView(message: error) {
+                        Task { await loadArrivals() }
+                    }
+                    .listRowBackground(Color.clear)
                 } else if arrivals.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "bus")
                             .font(.system(size: 30))
                             .foregroundColor(.secondary)
-                        
-                        Text("No arrivals scheduled")
+                        Text("No upcoming arrivals")
                             .font(.headline)
-                        
                         Text("Check back later for updates")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -83,6 +84,17 @@ struct BusArrivalView: View {
                     .padding()
                     .listRowBackground(Color.clear)
                 } else {
+                    if let error = transitAPI.errorMessage {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text(error)
+                                .font(.caption)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Error: \(error)")
+                        .listRowBackground(Color.clear)
+                    }
                     ForEach(arrivals) { arrival in
                         BusArrivalRow(arrival: arrival)
                     }
@@ -91,7 +103,7 @@ struct BusArrivalView: View {
                 HStack {
                     Text("Next Arrivals")
                     Spacer()
-                    if !isLoading {
+                    if !transitAPI.isLoading {
                         Text("Updated \(formatTime(lastUpdated))")
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -125,10 +137,8 @@ struct BusArrivalView: View {
     }
     
     private func loadArrivals() async {
-        isLoading = true
         arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
         lastUpdated = Date()
-        isLoading = false
     }
     
     private func formatTime(_ date: Date) -> String {
@@ -200,6 +210,6 @@ struct BusArrivalRow: View {
 
 #Preview {
     NavigationView {
-        BusArrivalView(stop: BusStop.sampleStops[0])
+        BusArrivalView(stop: BusStop.previewStops[0])
     }
-} 
+}

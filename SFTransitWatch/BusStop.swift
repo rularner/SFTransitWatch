@@ -50,8 +50,9 @@ struct BusStop: Identifiable, Codable {
     }
 }
 
+#if DEBUG
 extension BusStop {
-    static let sampleStops = [
+    static let previewStops: [BusStop] = [
         BusStop(
             id: "1",
             name: "Market St & 4th St",
@@ -62,7 +63,7 @@ extension BusStop {
             isFavorite: true
         ),
         BusStop(
-            id: "2", 
+            id: "2",
             name: "Mission St & 16th St",
             code: "M16",
             latitude: 37.7652,
@@ -73,11 +74,12 @@ extension BusStop {
         BusStop(
             id: "3",
             name: "Geary Blvd & 22nd Ave",
-            code: "G22", 
+            code: "G22",
             latitude: 37.7231,
             longitude: -122.4792,
             routes: ["38", "38R"],
             isFavorite: true
         )
     ]
-} 
+}
+#endif
