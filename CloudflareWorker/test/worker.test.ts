@@ -1,6 +1,7 @@
 /// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
 import { describe, it, expect } from "vitest";
 import { SELF } from "cloudflare:test";
+import { sha256Hex } from "../src/index";
 
 const VALID_TOKEN = "test-token";
 
@@ -110,5 +111,25 @@ describe("POST /log", () => {
         const matched = logs.filter((l) => l.includes('"source":"app-telemetry"'));
         expect(matched.length).toBe(1);
         expect(matched[0]).toContain('"endpoint":"StopMonitoring"');
+    });
+});
+
+describe("sha256Hex", () => {
+    it("hashes the empty string to the known SHA-256 hex digest", async () => {
+        const hash = await sha256Hex("");
+        expect(hash).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    });
+
+    it("hashes 'test-token' deterministically and returns 64 lowercase hex chars", async () => {
+        const a = await sha256Hex("test-token");
+        const b = await sha256Hex("test-token");
+        expect(a).toBe(b);
+        expect(a).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("produces different digests for different inputs", async () => {
+        const a = await sha256Hex("alpha");
+        const b = await sha256Hex("beta");
+        expect(a).not.toBe(b);
     });
 });
