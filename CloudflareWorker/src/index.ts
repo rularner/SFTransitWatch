@@ -7,8 +7,8 @@ const REFRESH_LOCK_KEY = "meta:refresh_lock";
 
 interface Env {
 	API_511_KEY: string;
-	APP_TOKEN: string;
 	TRANSIT_CACHE: KVNamespace;
+	CLIENT_TOKENS: KVNamespace;
 }
 
 type CachedResponse = {
@@ -25,12 +25,17 @@ export default {
 				return new Response(null, { status: 204, headers: corsHeaders() });
 			}
 
-			const providedToken = request.headers.get("X-App-Token");
-			if (!providedToken || providedToken !== env.APP_TOKEN) {
+			const auth = await authorizeClient(request, env);
+			if (!auth.ok) {
 				return jsonError("Missing or invalid X-App-Token.", 401);
 			}
-
 			const url = new URL(request.url);
+			console.log(JSON.stringify({
+				source: "worker-auth",
+				label: auth.client.label,
+				method: request.method,
+				path: url.pathname,
+			}));
 			if (url.pathname === "/log") {
 				return await handleLog(request);
 			}
@@ -289,4 +294,20 @@ export async function sha256Hex(input: string): Promise<string> {
 		out += bytes[i].toString(16).padStart(2, "0");
 	}
 	return out;
+}
+
+type ClientInfo = { label: string };
+
+export async function authorizeClient(
+	request: Request,
+	env: Env,
+): Promise<{ ok: true; client: ClientInfo } | { ok: false }> {
+	const token = request.headers.get("X-App-Token");
+	if (!token) return { ok: false };
+	const hash = await sha256Hex(token);
+	const value = await env.CLIENT_TOKENS.get(hash, "json");
+	if (!value || typeof (value as ClientInfo).label !== "string") {
+		return { ok: false };
+	}
+	return { ok: true, client: { label: (value as ClientInfo).label } };
 }

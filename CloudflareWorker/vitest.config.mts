@@ -7,9 +7,9 @@ export default defineConfig({
 			wrangler: { configPath: "./wrangler.jsonc" },
 			miniflare: {
 				bindings: {
-					APP_TOKEN: "test-token",
 					API_511_KEY: "test-511-key",
 				},
+				kvNamespaces: ["CLIENT_TOKENS", "TRANSIT_CACHE"],
 			},
 		}),
 	],

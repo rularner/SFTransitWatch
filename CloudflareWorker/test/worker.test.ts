@@ -1,9 +1,18 @@
 /// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
-import { describe, it, expect } from "vitest";
-import { SELF } from "cloudflare:test";
+import { describe, it, expect, beforeAll } from "vitest";
+import { SELF, env } from "cloudflare:test";
 import { sha256Hex } from "../src/index";
 
 const VALID_TOKEN = "test-token";
+let VALID_HASH = "";
+
+beforeAll(async () => {
+    VALID_HASH = await sha256Hex(VALID_TOKEN);
+    await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+        VALID_HASH,
+        JSON.stringify({ label: "test", createdAt: "2026-05-03T00:00:00Z" }),
+    );
+});
 
 describe("X-App-Token gate", () => {
     it("rejects requests with no token (401)", async () => {
@@ -41,6 +50,27 @@ describe("X-App-Token gate", () => {
         // Real upstream isn't reachable in tests, so this will be 502 or similar —
         // the point is it's NOT 401.
         expect(res.status).not.toBe(401);
+    });
+
+    it("rejects requests whose token hashes to a value not in CLIENT_TOKENS (401)", async () => {
+        const res = await SELF.fetch("https://example.com/StopMonitoring?stopCode=12345", {
+            headers: { "X-App-Token": "not-in-kv" },
+        });
+        expect(res.status).toBe(401);
+    });
+
+    it("logs the device label on a successful authorization", async () => {
+        const logs: string[] = [];
+        const originalLog = console.log;
+        console.log = (msg: unknown) => logs.push(String(msg));
+        try {
+            await SELF.fetch("https://example.com/StopMonitoring?stopCode=12345", {
+                headers: { "X-App-Token": VALID_TOKEN },
+            });
+        } finally {
+            console.log = originalLog;
+        }
+        expect(logs.some((l) => l.includes('"label":"test"'))).toBe(true);
     });
 });
 
