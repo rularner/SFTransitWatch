@@ -278,8 +278,10 @@ struct BusArrivalRow: View {
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationStack {
         BusArrivalView(stop: BusStop.previewStops[0])
     }
 }
+#endif
