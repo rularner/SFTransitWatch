@@ -105,7 +105,7 @@ class TransitAPI: ObservableObject {
 
             if httpResponse.statusCode == 401, !isDirect511Mode {
                 useDirectFallback = true
-                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "missing_key", httpStatus: 401, latencyMs: latencyMs)
+                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "worker_401_fallback", httpStatus: 401, latencyMs: latencyMs)
                 return await fetchArrivals(for: stopId, agency: agency)
             }
 
@@ -174,7 +174,7 @@ class TransitAPI: ObservableObject {
 
             if httpResponse.statusCode == 401, !isDirect511Mode {
                 useDirectFallback = true
-                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "missing_key", httpStatus: 401, latencyMs: latencyMs)
+                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "worker_401_fallback", httpStatus: 401, latencyMs: latencyMs)
                 return await fetchNearbyStops(latitude: latitude, longitude: longitude, radius: radius, agencies: agencies)
             }
 
