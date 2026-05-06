@@ -12,6 +12,7 @@ class TransitAPI: ObservableObject {
     }
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
+    @AppStorage("WORKER_TOKEN") private var workerToken = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -33,8 +34,7 @@ class TransitAPI: ObservableObject {
     }
 
     private var appToken: String? {
-        let raw = (Bundle.main.object(forInfoDictionaryKey: "APP_TOKEN") as? String) ?? ""
-        return raw.isEmpty ? nil : raw
+        return workerToken.isEmpty ? nil : workerToken
     }
 
     private func makeRequest(url: URL) -> URLRequest? {
