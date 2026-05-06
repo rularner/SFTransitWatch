@@ -42,6 +42,8 @@
 		CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 		CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CAFE0000000000000000E001 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E002 /* ErrorStateView.swift */; };
+		CAFE0000000000000000E003 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E004 /* ErrorStateView.swift */; };
 		CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000P001 /* PinnedStopsManager.swift */; };
 		CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 /* End PBXBuildFile section */
@@ -134,6 +136,8 @@
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Complication.entitlements"; sourceTree = "<group>"; };
+		CAFE0000000000000000E002 /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000E004 /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000P001 /* PinnedStopsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedStopsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000S001 /* CommuteSlotsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
