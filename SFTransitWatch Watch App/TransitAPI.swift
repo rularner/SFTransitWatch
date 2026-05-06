@@ -187,6 +187,7 @@ class TransitAPI: ObservableObject {
     /// Single-agency StopPlace lookup. Throws on any failure (logged to
     /// telemetry); the caller is expected to merge with other agencies'
     /// results.
+    @MainActor
     private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async throws -> [BusStop] {
         let endpoint = "StopPlace"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
