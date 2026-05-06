@@ -6,6 +6,7 @@ struct SettingsView: View {
     @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
+    @AppStorage("WORKER_TOKEN") private var workerToken = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
@@ -54,6 +55,21 @@ struct SettingsView: View {
                         storedAPIKey = ""
                     }
                     .foregroundColor(.red)
+                }
+            }
+
+            Section(
+                header: Text("Worker token"),
+                footer: Text("Optional. Send yourself a Messages link of the form https://rularner.github.io/sftransitwatch/wt?t=YOUR_TOKEN and tap it on the watch to set.")
+            ) {
+                HStack {
+                    Text("Worker token")
+                    Spacer()
+                    Text(workerToken.isEmpty ? "Not set" : "Set")
+                        .foregroundColor(.secondary)
+                }
+                if !workerToken.isEmpty {
+                    Button("Clear", role: .destructive) { workerToken = "" }
                 }
             }
 
