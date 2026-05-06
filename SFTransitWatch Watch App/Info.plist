@@ -47,5 +47,7 @@
 	<string>org.larner.SFTransitWatch</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
