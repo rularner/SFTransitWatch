@@ -35,6 +35,9 @@ sed -i '' "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = ${CI_BUILD_
 
 # Keep CFBundleShortVersionString aligned with release tags in CI.
 # If tags are available, use the latest semver tag (vX.Y.Z) as MARKETING_VERSION.
+# Instead of a simple fetch, get all history and tags
+git fetch --unshallow --tags origin || git fetch --tags origin
+
 if git -C "$CI_PRIMARY_REPOSITORY_PATH" rev-parse --git-dir >/dev/null 2>&1; then
   git -C "$CI_PRIMARY_REPOSITORY_PATH" fetch --tags origin >/dev/null 2>&1 || true
   LATEST_TAG="$(git -C "$CI_PRIMARY_REPOSITORY_PATH" tag -l 'v*' --sort=-v:refname | head -n 1)"
