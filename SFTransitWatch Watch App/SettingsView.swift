@@ -13,6 +13,16 @@ struct SettingsView: View {
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
 
+    init(
+        favoritesManager: FavoritesManager? = nil,
+        pinnedStopsManager: PinnedStopsManager? = nil,
+        commuteSlotsManager: CommuteSlotsManager? = nil
+    ) {
+        _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
+        _pinnedStopsManager = StateObject(wrappedValue: pinnedStopsManager ?? PinnedStopsManager())
+        _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
+    }
+
     var body: some View {
         List {
             Section(header: Text("API Key")) {
