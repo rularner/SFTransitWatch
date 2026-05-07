@@ -7,22 +7,26 @@ This Worker proxies and caches 511.org requests for the iPhone and Apple Watch a
 When using Cloudflare's Git integration, set:
 
 - **Build command**: `cd CloudflareWorker && npm run deploy`
-- **Environment variable**: `TRANSIT_CACHE_KV_ID=<your_kv_namespace_id>`
+- **Environment variables**:
+  - `TRANSIT_CACHE_KV_ID=<your_transit_cache_namespace_id>`
+  - `CLIENT_TOKENS_KV_ID=<your_client_tokens_namespace_id>`
 
-The deploy script generates `.wrangler.generated.jsonc` from `wrangler.jsonc`, replacing the `__TRANSIT_CACHE_KV_ID__` placeholder before running Wrangler deploy.
+The deploy script generates `.wrangler.generated.jsonc` from `wrangler.jsonc`,
+substituting both `__TRANSIT_CACHE_KV_ID__` and `__CLIENT_TOKENS_KV_ID__`
+before running Wrangler deploy.
 
 ## Local Development
 
-Use the same variable locally:
+Use the same variables locally:
 
 - `cd CloudflareWorker`
-- `TRANSIT_CACHE_KV_ID=<your_kv_namespace_id> npm run dev`
+- `TRANSIT_CACHE_KV_ID=<id> CLIENT_TOKENS_KV_ID=<id> npm run dev`
 
-Type generation also needs the variable:
+Type generation also needs both:
 
-- `TRANSIT_CACHE_KV_ID=<your_kv_namespace_id> npm run cf-typegen`
+- `TRANSIT_CACHE_KV_ID=<id> CLIENT_TOKENS_KV_ID=<id> npm run cf-typegen`
 
 ## Notes
 
-- `TRANSIT_CACHE_KV_ID` is required for `npm run deploy`, `npm run dev`, and `npm run cf-typegen`.
+- `TRANSIT_CACHE_KV_ID` and `CLIENT_TOKENS_KV_ID` are required for `npm run deploy`, `npm run dev`, and `npm run cf-typegen`.
 - `.wrangler.generated.jsonc` is generated at runtime and is gitignored.

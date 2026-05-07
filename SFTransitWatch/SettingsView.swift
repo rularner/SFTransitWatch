@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var showingSuccessAlert = false
     @State private var showingClearFavoritesAlert = false
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
+    @AppStorage("WORKER_TOKEN") private var workerToken = ""
     
     var body: some View {
         List {
@@ -40,6 +41,16 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
             }
             
+            Section(
+                header: Text("Worker token (optional)"),
+                footer: Text("Authorizes this device with the SFTransitWatch worker proxy. Family-only — leave blank to use 511.org directly with your own API key.")
+            ) {
+                SecureField("Worker token", text: $workerToken)
+                    .textContentType(.password)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+
             Section(header: Text("Favorites")) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {

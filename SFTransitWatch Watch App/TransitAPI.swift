@@ -12,9 +12,12 @@ class TransitAPI: ObservableObject {
     }
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
+    @AppStorage("WORKER_TOKEN") private var workerToken = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
+
+    private var useDirectFallback = false
 
     private var resolvedKey: String {
         return phoneAPIKey.isEmpty ? storedAPIKey : phoneAPIKey
@@ -25,7 +28,7 @@ class TransitAPI: ObservableObject {
     }
 
     private var isDirect511Mode: Bool {
-        return baseURL.contains("api.511.org")
+        return useDirectFallback || baseURL.contains("api.511.org") || appToken == nil
     }
 
     private var apiKey: String {
@@ -33,14 +36,12 @@ class TransitAPI: ObservableObject {
     }
 
     private var appToken: String? {
-        let raw = (Bundle.main.object(forInfoDictionaryKey: "APP_TOKEN") as? String) ?? ""
-        return raw.isEmpty ? nil : raw
+        return workerToken.isEmpty ? nil : workerToken
     }
 
-    private func makeRequest(url: URL) -> URLRequest? {
+    private func makeRequest(url: URL) -> URLRequest {
         var request = URLRequest(url: url)
-        if !isDirect511Mode {
-            guard let token = appToken else { return nil }
+        if !isDirect511Mode, let token = appToken {
             request.setValue(token, forHTTPHeaderField: "X-App-Token")
         }
         return request
@@ -91,10 +92,7 @@ class TransitAPI: ObservableObject {
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
             return []
         }
-        guard let request = makeRequest(url: url) else {
-            errorMessage = "App token not configured. See README."
-            return []
-        }
+        let request = makeRequest(url: url)
 
         let started = Date()
         do {
@@ -104,6 +102,12 @@ class TransitAPI: ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse else {
                 Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
                 throw APIError.invalidResponse
+            }
+
+            if httpResponse.statusCode == 401, !isDirect511Mode {
+                useDirectFallback = true
+                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "worker_401_fallback", httpStatus: 401, latencyMs: latencyMs)
+                return await fetchArrivals(for: stopId, agency: agency)
             }
 
             if httpResponse.statusCode != 200 {
@@ -183,6 +187,7 @@ class TransitAPI: ObservableObject {
     /// Single-agency StopPlace lookup. Throws on any failure (logged to
     /// telemetry); the caller is expected to merge with other agencies'
     /// results.
+    @MainActor
     private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async throws -> [BusStop] {
         let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
@@ -201,11 +206,11 @@ class TransitAPI: ObservableObject {
         }
         components?.queryItems = queryItems
 
-        guard let url = components?.url,
-              let request = makeRequest(url: url) else {
+        guard let url = components?.url else {
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
             throw APIError.invalidURL
         }
+        let request = makeRequest(url: url)
 
         let started = Date()
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -214,6 +219,12 @@ class TransitAPI: ObservableObject {
         guard let httpResponse = response as? HTTPURLResponse else {
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
             throw APIError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401, !isDirect511Mode {
+            useDirectFallback = true
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "worker_401_fallback", httpStatus: 401, latencyMs: latencyMs)
+            return await fetchNearbyStops(latitude: latitude, longitude: longitude, radius: radius, agencies: [agency])
         }
 
         if httpResponse.statusCode != 200 {
@@ -360,7 +371,7 @@ class TransitAPI: ObservableObject {
         }
         components?.queryItems = queryItems
         guard let url = components?.url else { return nil }
-        guard let request = makeRequest(url: url) else { return nil }
+        let request = makeRequest(url: url)
 
         let started = Date()
         do {
