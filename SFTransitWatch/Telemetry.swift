@@ -59,7 +59,8 @@ final class Telemetry {
 
     convenience init() {
         let info = Bundle.main.infoDictionary ?? [:]
-        let token = (info["APP_TOKEN"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let stored = UserDefaults.standard.string(forKey: "WORKER_TOKEN") ?? ""
+        let token: String? = stored.isEmpty ? nil : stored
         let baseURL = (info["TELEMETRY_BASE_URL"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let appVersion = (info["CFBundleShortVersionString"] as? String) ?? "0"
         let build = (info["CFBundleVersion"] as? String) ?? "0"

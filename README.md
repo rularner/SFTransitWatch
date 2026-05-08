@@ -153,23 +153,22 @@ The app intelligently learns your route preferences:
    without it. Create it only if you want to override signing settings like
    `DEVELOPMENT_TEAM` without editing the project file.
 
-   **App token (for the Cloudflare Worker proxy):** when `TRANSIT_API_BASE_URL`
-   points at the Cloudflare Worker, the worker requires an `X-App-Token` header.
-   Set it up:
+   **Worker token (optional, family-only):** the Cloudflare Worker accepts
+   only requests from devices on its allowlist. If you don't have a worker
+   token, the app uses 511.org directly with the API key you paste — no
+   action needed. To use the worker (faster, cached, telemetry-enabled):
 
-   1. Generate a token: `openssl rand -hex 32`.
-   2. Add it to your local `Developer.xcconfig`:
-      ```
-      APP_TOKEN = <token from step 1>
-      ```
-   3. Set the same value as a worker secret:
+   1. The repo owner generates a token for your device:
       ```bash
       cd CloudflareWorker
-      npx wrangler secret put APP_TOKEN
+      ./scripts/issue-token.sh <your-device-label>
       ```
-
-   If you only build against `api.511.org` directly (i.e. `TRANSIT_API_BASE_URL`
-   is empty), `APP_TOKEN` is not required.
+   2. They share the resulting universal link
+      (`https://rularner.github.io/sftransitwatch/wt?t=<token>`) with you
+      via Messages or Mail. Open the link **on the device that should be
+      authorized** — Settings → Worker token will switch to "Set".
+   3. To revoke later (lost device, leaked token), the repo owner runs
+      `npx wrangler kv key delete --binding CLIENT_TOKENS <hash>`.
 
 3. **Open in Xcode**:
    ```bash

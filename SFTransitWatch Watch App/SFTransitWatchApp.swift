@@ -5,6 +5,7 @@ import WatchKit
 struct SFTransitWatchApp: App {
     @WKApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
+    @AppStorage("WORKER_TOKEN") private var storedWorkerToken = ""
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -17,6 +18,10 @@ struct SFTransitWatchApp: App {
                 .onOpenURL { url in
                     if let key = apiKey(from: url), !key.isEmpty {
                         storedAPIKey = key
+                        return
+                    }
+                    if let token = workerToken(from: url), !token.isEmpty {
+                        storedWorkerToken = token
                     }
                 }
         }
@@ -39,6 +44,22 @@ struct SFTransitWatchApp: App {
            url.path == "/sftransitwatch/key",
            let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
             return components.queryItems?.first { $0.name == "k" }?.value
+        }
+        return nil
+    }
+
+    // Accepts either:
+    //   sftransitwatch://wt/YOUR_TOKEN                              (custom scheme)
+    //   https://rularner.github.io/sftransitwatch/wt?t=YOUR_TOKEN   (universal link)
+    private func workerToken(from url: URL) -> String? {
+        if url.scheme == "sftransitwatch", url.host == "wt" {
+            return String(url.path.dropFirst())
+        }
+        if url.scheme == "https",
+           url.host == "rularner.github.io",
+           url.path == "/sftransitwatch/wt",
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            return components.queryItems?.first { $0.name == "t" }?.value
         }
         return nil
     }

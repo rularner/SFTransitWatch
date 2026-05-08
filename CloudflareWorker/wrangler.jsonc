@@ -18,7 +18,11 @@
 	"kv_namespaces": [
 		{
 			"binding": "TRANSIT_CACHE",
-			"id": "REPLACE_WITH_KV_NAMESPACE_ID"
+			"id": "__TRANSIT_CACHE_KV_ID__"
+		},
+		{
+			"binding": "CLIENT_TOKENS",
+			"id": "__CLIENT_TOKENS_KV_ID__"
 		}
 	],
 	"compatibility_flags": ["nodejs_compat"]
