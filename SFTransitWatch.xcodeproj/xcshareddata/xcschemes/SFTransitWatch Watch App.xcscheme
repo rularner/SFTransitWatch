@@ -55,6 +55,17 @@
                ReferencedContainer = "container:SFTransitWatch.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "84E0253D2FAD714C006B3F47"
+               BuildableName = "SFTransitWatchUITests.xctest"
+               BlueprintName = "SFTransitWatchUITests"
+               ReferencedContainer = "container:SFTransitWatch.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
