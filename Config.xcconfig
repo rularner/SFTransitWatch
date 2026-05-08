@@ -18,7 +18,7 @@ SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 // Shared transit API base URL for iPhone and Watch targets.
 // Leave blank to use direct 511.org calls; set to your Cloudflare Worker URL
 // (for example: https://sftransitwatch.your-subdomain.workers.dev).
-TRANSIT_API_BASE_URL =
+TRANSIT_API_BASE_URL = https://sftransitwatch.rusty-cloudflare.workers.dev
 
 // App-side shared secret presented as X-App-Token to the Cloudflare Worker.
 // Required when TRANSIT_API_BASE_URL points at the worker; ignored in direct-511 mode.
