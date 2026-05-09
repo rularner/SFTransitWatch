@@ -46,7 +46,6 @@
 		CAFE0000000000000000E003 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E004 /* ErrorStateView.swift */; };
 		CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000P001 /* PinnedStopsManager.swift */; };
 		CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
-		CAFE0000000000000000SM01 /* SnapshotMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000SM02 /* SnapshotMode.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -149,7 +148,6 @@
 		CAFE0000000000000000E004 /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000P001 /* PinnedStopsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedStopsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000S001 /* CommuteSlotsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotsManager.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000SM02 /* SnapshotMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotMode.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T002 /* BusStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T003 /* FavoritesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManagerTests.swift; sourceTree = "<group>"; };
@@ -248,7 +246,6 @@
 				CAFE000000000000000015F0 /* SiriShortcutsView.swift */,
 				CAFE0000000000000000P001 /* PinnedStopsManager.swift */,
 				CAFE0000000000000000S001 /* CommuteSlotsManager.swift */,
-				CAFE0000000000000000SM02 /* SnapshotMode.swift */,
 				CAFE0000000000000000C004 /* ComplicationUpdater.swift */,
 				CAFE0000000000000000B001 /* BackgroundRefreshController.swift */,
 				CAFE0000000000000000B003 /* AppDelegate.swift */,
@@ -568,7 +565,6 @@
 				CAFE000000000000000015FA /* SiriShortcutsView.swift in Sources */,
 				CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */,
 				CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */,
-				CAFE0000000000000000SM01 /* SnapshotMode.swift in Sources */,
 				CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */,
 				CAFE0000000000000000B002 /* BackgroundRefreshController.swift in Sources */,
 				CAFE0000000000000000B004 /* AppDelegate.swift in Sources */,

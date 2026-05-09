@@ -7,15 +7,15 @@ import CoreLocation
 /// passed to the watch app's process. Production launches never include this flag, so
 /// the snapshot-mode branches in `TransitAPI`, `LocationManager`, `FavoritesManager`,
 /// and `PinnedStopsManager` are inert in shipped builds.
-enum SnapshotMode {
+public enum SnapshotMode {
 
-    static var isActive: Bool {
+    public static var isActive: Bool {
         ProcessInfo.processInfo.arguments.contains("-SNAPSHOT_MODE")
     }
 
     /// 5 hand-curated SF Muni Metro stops centered around the Castro neighborhood.
     /// Editing these values changes what appears in the App Store screenshots.
-    static let nearbyStops: [BusStop] = [
+    public static let nearbyStops: [BusStop] = [
         BusStop(id: "SF:16992", name: "Castro Station",          code: "16992", latitude: 37.7626, longitude: -122.4350, routes: ["K", "L", "M", "T"],      agency: "SF"),
         BusStop(id: "SF:15184", name: "Market St & Castro St",   code: "15184", latitude: 37.7619, longitude: -122.4351, routes: ["F", "24", "33", "35"],   agency: "SF"),
         BusStop(id: "SF:13338", name: "Church St & Duboce Ave",  code: "13338", latitude: 37.7697, longitude: -122.4290, routes: ["J", "N"],                agency: "SF"),
@@ -24,18 +24,18 @@ enum SnapshotMode {
     ]
 
     /// Castro Station is also pinned (renders the "Pinned" section).
-    static let pinnedStops: [BusStop] = Array(nearbyStops.prefix(1))
+    public static let pinnedStops: [BusStop] = Array(nearbyStops.prefix(1))
 
     /// Market & Castro is favorited (renders the star icon on its row).
-    static let favoriteStopIDs: Set<String> = Set(nearbyStops.dropFirst().prefix(1).map { $0.id })
+    public static let favoriteStopIDs: Set<String> = Set(nearbyStops.dropFirst().prefix(1).map { $0.id })
 
     /// Castro Station — used for `BusArrivalView`'s screenshot.
-    static let sampleStop: BusStop = nearbyStops[0]
+    public static let sampleStop: BusStop = nearbyStops[0]
 
     /// 4 plausible Muni Metro arrivals at Castro Station.
     /// Constructed against a fixed reference time so `BusArrival.minutesAway` is deterministic
     /// regardless of when the snapshot test runs.
-    static func arrivals(for stop: BusStop) -> [BusArrival] {
+    public static func arrivals(for stop: BusStop) -> [BusArrival] {
         let now = referenceNow
         return [
             BusArrival(route: "K", destination: "Ingleside",  arrivalTime: now.addingTimeInterval(2 * 60),  isRealTime: true,  now: now),
@@ -55,5 +55,5 @@ enum SnapshotMode {
     }()
 
     /// Castro Station's coordinates. Used by `LocationManager` when active.
-    static let fixedLocation = CLLocation(latitude: 37.7626, longitude: -122.4350)
+    public static let fixedLocation = CLLocation(latitude: 37.7626, longitude: -122.4350)
 }

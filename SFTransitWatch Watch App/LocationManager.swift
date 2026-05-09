@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import WatchKit
+import SFTransitWatchPackage
 
 @MainActor
 class LocationManager: NSObject, ObservableObject {
