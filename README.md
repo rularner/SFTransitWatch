@@ -365,16 +365,41 @@ For development, the app includes:
 
 Goldens at `Snapshots/AppStore/*.png` are App Store deliverables AND regression baselines. The four watch screens (`BusStopListView`, `BusArrivalView`, `SettingsView`, `StopCodeEntryView`) are captured via `XCUIScreen.main.screenshot()` from `SFTransitWatchUITests`. The watch app launches under a `-SNAPSHOT_MODE` flag that routes data fetches through `SnapshotMode` fixtures — no live 511.org calls.
 
-To re-record after intentional UI changes:
+The diff comparison ignores the top 200 px of every screenshot — that band contains the watchOS system time and the navigation title row, both of which shift between runs. The full PNG is still saved as the golden so the App Store deliverable looks like a real watch screen.
+
+### Running the tests
+
+Use the wrapper script. It wipes the project's DerivedData before invoking `xcodebuild`, which is the only reliable way to avoid the watchOS simulator's `Unknown application display identifier` install failure between runs:
 
 ```bash
-SIMCTL_CHILD_RECORD_SNAPSHOTS=1 xcodebuild test \
-  -scheme "SFTransitWatch Watch App" \
-  -destination 'platform=watchOS Simulator,name=Apple Watch Ultra 3 (49mm)' \
-  -only-testing:SFTransitWatchUITests
+bin/run-watch-snapshot-tests.sh
 ```
 
-The `SIMCTL_CHILD_` prefix is required for `xcodebuild` to propagate env vars into the watch simulator's test process.
+To run a single test:
+
+```bash
+bin/run-watch-snapshot-tests.sh \
+  -only-testing:SFTransitWatchUITests/WatchSnapshotUITests/testSnapshot_StopCodeEntry
+```
+
+Plain `xcodebuild test` from the command line and `Cmd+U` from Xcode both also have a scheme test pre-action that erases the watch simulator first (logged to `/tmp/sftransit-preaction.log`), but `simctl erase` alone is not always enough — when in doubt, use the wrapper.
+
+### When a test fails
+
+On a snapshot diff failure, two artifacts land in `Snapshots/AppStore/`:
+
+- `<name>-failed.png` — the new full-screen render (gitignored).
+- `<name>-diff.png` — magenta-on-dimmed-grayscale visualization of the differing pixels (gitignored).
+
+The failure message also reports the differing-pixel count, the percentage, and the bounding box (in cropped coordinates — `y=0` is row 200 of the original screenshot).
+
+### Re-recording after intentional UI changes
+
+```bash
+RECORD_SNAPSHOTS=1 bin/run-watch-snapshot-tests.sh
+```
+
+The wrapper sets `SIMCTL_CHILD_RECORD_SNAPSHOTS=1` so the env var propagates through `xcodebuild` into the simulator's test process. Review the regenerated PNGs in `Snapshots/AppStore/` and commit them.
 
 ## Rate Limits
 

@@ -25,14 +25,13 @@ echo ">> Wiping project DerivedData: ${DERIVED_DATA_GLOB}"
 # shellcheck disable=SC2086
 rm -rf ${DERIVED_DATA_GLOB}
 
-EXTRA_ENV=()
 if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
     echo ">> RECORD_SNAPSHOTS=1 — goldens will be overwritten"
-    EXTRA_ENV+=(SIMCTL_CHILD_RECORD_SNAPSHOTS=1)
+    export SIMCTL_CHILD_RECORD_SNAPSHOTS=1
 fi
 
 echo ">> xcodebuild test -scheme \"${SCHEME}\""
-exec env "${EXTRA_ENV[@]}" xcodebuild test \
+exec xcodebuild test \
     -scheme "${SCHEME}" \
     -destination "${DESTINATION}" \
     "$@"
