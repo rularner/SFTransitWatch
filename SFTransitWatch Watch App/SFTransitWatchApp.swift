@@ -1,5 +1,6 @@
 import SwiftUI
 import WatchKit
+import SFTransitWatchPackage
 
 @main
 struct SFTransitWatchApp: App {

@@ -1,7 +1,7 @@
 import Foundation
 
-enum SIRIXMLParser {
-    static func parseRecords(
+public enum SIRIXMLParser {
+    public static func parseRecords(
         data: Data,
         entryElement: String,
         fields: Set<String>
@@ -13,7 +13,7 @@ enum SIRIXMLParser {
         return delegate.records
     }
 
-    static func parseRecords(
+    public static func parseRecords(
         data: Data,
         entryElement: String,
         fields: [String]

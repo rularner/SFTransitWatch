@@ -1,18 +1,18 @@
 import Foundation
 
 @MainActor
-class FavoritesManager: ObservableObject {
-    @Published var favoriteStopIds: Set<String> = []
+public class FavoritesManager: ObservableObject {
+    @Published public var favoriteStopIds: Set<String> = []
 
     private let userDefaults: UserDefaults
     private let favoritesKey = "FavoriteStopIds"
 
-    init(userDefaultsSuiteName: String? = nil) {
+    public init(userDefaultsSuiteName: String? = nil) {
         self.userDefaults = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
         loadFavorites()
     }
 
-    func toggleFavorite(for stopId: String) {
+    public func toggleFavorite(for stopId: String) {
         if favoriteStopIds.contains(stopId) {
             favoriteStopIds.remove(stopId)
         } else {
@@ -21,25 +21,25 @@ class FavoritesManager: ObservableObject {
         saveFavorites()
     }
 
-    func isFavorite(_ stopId: String) -> Bool {
+    public func isFavorite(_ stopId: String) -> Bool {
         return favoriteStopIds.contains(stopId)
     }
 
-    func addToFavorites(_ stopId: String) {
+    public func addToFavorites(_ stopId: String) {
         favoriteStopIds.insert(stopId)
         saveFavorites()
     }
 
-    func removeFromFavorites(_ stopId: String) {
+    public func removeFromFavorites(_ stopId: String) {
         favoriteStopIds.remove(stopId)
         saveFavorites()
     }
 
-    func getFavoriteStops(from allStops: [BusStop]) -> [BusStop] {
+    public func getFavoriteStops(from allStops: [BusStop]) -> [BusStop] {
         return allStops.filter { favoriteStopIds.contains($0.id) }
     }
 
-    func sortStopsWithFavoritesFirst(_ stops: [BusStop]) -> [BusStop] {
+    public func sortStopsWithFavoritesFirst(_ stops: [BusStop]) -> [BusStop] {
         var sortedStops = stops
 
         for i in 0..<sortedStops.count {
@@ -67,7 +67,7 @@ class FavoritesManager: ObservableObject {
         }
     }
 
-    func clearAllFavorites() {
+    public func clearAllFavorites() {
         favoriteStopIds.removeAll()
         saveFavorites()
     }

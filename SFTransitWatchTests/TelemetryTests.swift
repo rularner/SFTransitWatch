@@ -1,5 +1,5 @@
 import XCTest
-@testable import SFTransitWatch_Watch_App
+@testable import SFTransitWatchPackage
 
 final class TelemetryTests: XCTestCase {
     private var defaults: UserDefaults!

@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import SFTransitWatchPackage
 
 struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()

@@ -1,5 +1,6 @@
 import SwiftUI
 import WatchKit
+import SFTransitWatchPackage
 
 struct BusArrivalView: View {
     let stop: BusStop

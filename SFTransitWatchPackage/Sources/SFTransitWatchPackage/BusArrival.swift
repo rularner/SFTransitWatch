@@ -1,14 +1,14 @@
 import Foundation
 
-struct BusArrival: Identifiable, Codable {
-    var id = UUID()
-    let route: String
-    let destination: String
-    let arrivalTime: Date
-    let minutesAway: Int
-    let isRealTime: Bool
-    
-    init(route: String, destination: String, arrivalTime: Date, isRealTime: Bool = true, now: Date = Date()) {
+public struct BusArrival: Identifiable, Codable, Sendable {
+    public var id = UUID()
+    public let route: String
+    public let destination: String
+    public let arrivalTime: Date
+    public let minutesAway: Int
+    public let isRealTime: Bool
+
+    public init(route: String, destination: String, arrivalTime: Date, isRealTime: Bool = true, now: Date = Date()) {
         self.route = route
         self.destination = destination
         self.arrivalTime = arrivalTime
@@ -17,14 +17,14 @@ struct BusArrival: Identifiable, Codable {
         let timeInterval = arrivalTime.timeIntervalSince(now)
         self.minutesAway = max(0, Int(timeInterval / 60))
     }
-    
-    var timeString: String {
+
+    public var timeString: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: arrivalTime)
     }
-    
-    var minutesString: String {
+
+    public var minutesString: String {
         if minutesAway == 0 {
             return "Due"
         } else if minutesAway == 1 {
@@ -37,7 +37,7 @@ struct BusArrival: Identifiable, Codable {
 
 #if DEBUG
 extension BusArrival {
-    static let previewArrivals: [BusArrival] = [
+    public static let previewArrivals: [BusArrival] = [
         BusArrival(
             route: "38",
             destination: "Downtown",

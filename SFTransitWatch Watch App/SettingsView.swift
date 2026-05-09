@@ -1,5 +1,6 @@
 import SwiftUI
 import WatchKit
+import SFTransitWatchPackage
 
 struct SettingsView: View {
     @StateObject private var favoritesManager = FavoritesManager()
