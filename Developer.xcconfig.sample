@@ -4,13 +4,7 @@
 
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
 
-// Optional local override for the shared transit API base URL.
-// Example: https://sftransitwatch.your-subdomain.workers.dev
-// TRANSIT_API_BASE_URL = https://example.workers.dev
-
-// Worker tokens are no longer baked into the build. Each device
-// pastes its own token in app Settings, or receives it via a
-// /wt universal link. See README "Worker token" section.
-
-// Optional override for the telemetry/worker URL.
-// TELEMETRY_BASE_URL = https://sftransitwatch-staging.example.workers.dev
+// Worker URLs and tokens are no longer baked into the build. Each device
+// pastes a worker bootstrap link (carries both URL and token) into iOS
+// Settings, or receives it via a /wt universal link on the watch. See the
+// "Worker proxy" section of the README.

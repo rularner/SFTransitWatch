@@ -35,10 +35,6 @@
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to find nearby bus stops.</string>
-	<key>TELEMETRY_BASE_URL</key>
-	<string>$(TELEMETRY_BASE_URL)</string>
-	<key>TRANSIT_API_BASE_URL</key>
-	<string>$(TRANSIT_API_BASE_URL)</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>

@@ -59,9 +59,10 @@ final class Telemetry {
 
     convenience init() {
         let info = Bundle.main.infoDictionary ?? [:]
-        let stored = UserDefaults.standard.string(forKey: "WORKER_TOKEN") ?? ""
-        let token: String? = stored.isEmpty ? nil : stored
-        let baseURL = (info["TELEMETRY_BASE_URL"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let storedToken = UserDefaults.standard.string(forKey: "WORKER_TOKEN") ?? ""
+        let storedBase = UserDefaults.standard.string(forKey: "WORKER_BASE_URL") ?? ""
+        let token: String? = storedToken.isEmpty ? nil : storedToken
+        let baseURL: String? = storedBase.isEmpty ? nil : storedBase
         let appVersion = (info["CFBundleShortVersionString"] as? String) ?? "0"
         let build = (info["CFBundleVersion"] as? String) ?? "0"
         #if os(watchOS)
