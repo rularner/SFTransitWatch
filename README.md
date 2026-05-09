@@ -361,6 +361,21 @@ For development, the app includes:
 - Debug logging in console
 - Graceful error handling
 
+## Snapshot tests for App Store screenshots
+
+Goldens at `Snapshots/AppStore/*.png` are App Store deliverables AND regression baselines. The four watch screens (`BusStopListView`, `BusArrivalView`, `SettingsView`, `StopCodeEntryView`) are captured via `XCUIScreen.main.screenshot()` from `SFTransitWatchUITests`. The watch app launches under a `-SNAPSHOT_MODE` flag that routes data fetches through `SnapshotMode` fixtures — no live 511.org calls.
+
+To re-record after intentional UI changes:
+
+```bash
+SIMCTL_CHILD_RECORD_SNAPSHOTS=1 xcodebuild test \
+  -scheme "SFTransitWatch Watch App" \
+  -destination 'platform=watchOS Simulator,name=Apple Watch Ultra 3 (49mm)' \
+  -only-testing:SFTransitWatchUITests
+```
+
+The `SIMCTL_CHILD_` prefix is required for `xcodebuild` to propagate env vars into the watch simulator's test process.
+
 ## Rate Limits
 
 511.org API has rate limits:
