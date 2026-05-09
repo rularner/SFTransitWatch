@@ -252,7 +252,7 @@ enum XCUISnapshotRunner {
 
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: totalBytes)
         defer { buffer.deallocate() }
-        rgba.copyBytes(to: UnsafeMutableBufferPointer(start: buffer, count: totalBytes))
+        _ = rgba.copyBytes(to: UnsafeMutableBufferPointer(start: buffer, count: totalBytes))
 
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
