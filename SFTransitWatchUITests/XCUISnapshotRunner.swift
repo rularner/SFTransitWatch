@@ -2,21 +2,27 @@ import XCTest
 
 enum XCUISnapshotRunner {
 
-    /// Capture the current screen contents, attach to the test result, and diff against
-    /// `Snapshots/AppStore/<name>.png`.
+    /// Capture the app's element contents (excluding the watchOS system time bar),
+    /// attach to the test result, and diff against `Snapshots/AppStore/<name>.png`.
     ///
     /// - `RECORD_SNAPSHOTS=1` env (propagated via `SIMCTL_CHILD_RECORD_SNAPSHOTS=1` from
     ///   the shell) → overwrite golden, pass.
     /// - Golden missing → write golden + XCTFail "Recorded new snapshot, re-run to verify."
     /// - Bytes equal → pass.
     /// - Bytes differ → write `<output_dir>/<name>-failed.png`, XCTFail with diff message.
+    ///
+    /// Note: we screenshot `app` (the XCUIApplication) rather than `XCUIScreen.main`
+    /// because the watchOS system status bar (which shows the live time) sits outside
+    /// the app's element bounds. Using `XCUIScreen.main.screenshot()` would include the
+    /// time and produce non-deterministic byte diffs across runs.
     static func verify(
+        _ app: XCUIApplication,
         named name: String,
         in testCase: XCTestCase,
         file: StaticString = #file,
         line: UInt = #line
     ) {
-        let screenshot = XCUIScreen.main.screenshot()
+        let screenshot = app.screenshot()
         let pngData = screenshot.pngRepresentation
 
         // Always attach the captured PNG to the test result.

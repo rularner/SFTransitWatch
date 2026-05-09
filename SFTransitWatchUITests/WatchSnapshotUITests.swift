@@ -20,7 +20,7 @@ final class WatchSnapshotUITests: XCTestCase {
         let app = launchSnapshotModeApp()
         XCTAssertTrue(app.staticTexts["Castro Station"].waitForExistence(timeout: 10),
                       "Expected Castro Station to be visible (SnapshotMode should serve it)")
-        XCUISnapshotRunner.verify(named: "BusStopList", in: self)
+        XCUISnapshotRunner.verify(app, named: "BusStopList", in: self)
     }
 
     func testSnapshot_BusArrival() {
@@ -30,7 +30,7 @@ final class WatchSnapshotUITests: XCTestCase {
         castro.firstMatch.tap()
         XCTAssertTrue(app.staticTexts["K"].waitForExistence(timeout: 10),
                       "Expected K-Ingleside arrival row to be visible")
-        XCUISnapshotRunner.verify(named: "BusArrival", in: self)
+        XCUISnapshotRunner.verify(app, named: "BusArrival", in: self)
     }
 
     func testSnapshot_Settings() {
@@ -44,7 +44,7 @@ final class WatchSnapshotUITests: XCTestCase {
         settingsButton.tap()
         XCTAssertTrue(app.staticTexts["API Key"].waitForExistence(timeout: 10),
                       "Expected Settings screen's API Key section header")
-        XCUISnapshotRunner.verify(named: "Settings", in: self)
+        XCUISnapshotRunner.verify(app, named: "Settings", in: self)
     }
 
     func testSnapshot_StopCodeEntry() {
@@ -54,6 +54,6 @@ final class WatchSnapshotUITests: XCTestCase {
                       "Search toolbar button not found — may need accessibilityIdentifier")
         searchButton.tap()
         XCTAssertTrue(app.staticTexts["Find Stop by Code"].waitForExistence(timeout: 10))
-        XCUISnapshotRunner.verify(named: "StopCodeEntry", in: self)
+        XCUISnapshotRunner.verify(app, named: "StopCodeEntry", in: self)
     }
 }
