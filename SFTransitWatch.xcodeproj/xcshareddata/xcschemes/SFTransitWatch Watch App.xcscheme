@@ -43,6 +43,24 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <PreActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Uninstall stale watch test runner"
+               scriptText = "# Drop stale installs of the UI test runner and watch host so xcodebuild&#10;# reinstalls them fresh. Avoids needing to clear DerivedData between runs.&#10;for SIM in &quot;Apple Watch Ultra 3 (49mm)&quot; &quot;Apple Watch Ultra 2 (49mm)&quot; booted; do&#10;    /usr/bin/xcrun simctl uninstall &quot;$SIM&quot; org.larner.SFTransitWatchUITests.xctrunner 2&gt;/dev/null&#10;    /usr/bin/xcrun simctl uninstall &quot;$SIM&quot; org.larner.SFTransitWatch.watchkitapp 2&gt;/dev/null&#10;done&#10;exit 0&#10;">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "CAFE000000000000000001AA"
+                     BuildableName = "SFTransitWatch Watch App.app"
+                     BlueprintName = "SFTransitWatch Watch App"
+                     ReferencedContainer = "container:SFTransitWatch.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PreActions>
       <Testables>
          <TestableReference
             skipped = "NO"
