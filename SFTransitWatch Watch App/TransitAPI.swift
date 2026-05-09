@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import SFTransitWatchPackage
 
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
@@ -241,7 +242,7 @@ class TransitAPI: ObservableObject {
     }
     
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
-        if let jsonArrivals = parseJSONArrivals(data: data), !jsonArrivals.isEmpty {
+        if let jsonArrivals = TransitJSON.decodeArrivals(data), !jsonArrivals.isEmpty {
             return jsonArrivals
         }
 
@@ -267,34 +268,8 @@ class TransitAPI: ObservableObject {
         }
     }
 
-    private func parseJSONArrivals(data: Data) -> [BusArrival]? {
-        guard let payload = try? JSONDecoder().decode(StopMonitoringResponse.self, from: data) else {
-            return nil
-        }
-        let formatter = ISO8601DateFormatter()
-        return payload.serviceDelivery.stopMonitoringDelivery.monitoredStopVisit.compactMap { visit in
-            let journey = visit.monitoredVehicleJourney
-            let call = journey.monitoredCall
-            let rawTime =
-                call.expectedArrivalTime ??
-                call.expectedDepartureTime ??
-                call.aimedArrivalTime ??
-                call.aimedDepartureTime
-            guard
-                let rawTime,
-                let arrivalTime = formatter.date(from: rawTime)
-            else { return nil }
-            return BusArrival(
-                route: journey.lineRef,
-                destination: journey.directionRef,
-                arrivalTime: arrivalTime,
-                isRealTime: true
-            )
-        }
-    }
-
     private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
-        if let jsonStops = parseJSONStops(data: data, agency: agency), !jsonStops.isEmpty {
+        if let jsonStops = TransitJSON.decodeStops(data, agency: agency), !jsonStops.isEmpty {
             return jsonStops
         }
 
@@ -314,27 +289,6 @@ class TransitAPI: ObservableObject {
                 id: id,
                 name: name,
                 code: id,
-                latitude: latitude,
-                longitude: longitude,
-                routes: [],
-                agency: agency
-            )
-        }
-    }
-
-    private func parseJSONStops(data: Data, agency: String) -> [BusStop]? {
-        guard let payload = try? JSONDecoder().decode(StopsResponse.self, from: data) else {
-            return nil
-        }
-        return payload.contents.dataObjects.scheduledStopPoints.compactMap { point in
-            guard
-                let latitude = Double(point.location.latitude),
-                let longitude = Double(point.location.longitude)
-            else { return nil }
-            return BusStop(
-                id: point.id,
-                name: point.name,
-                code: point.id,
                 latitude: latitude,
                 longitude: longitude,
                 routes: [],
@@ -409,152 +363,5 @@ extension TransitAPI {
 
     func parseStopsForTesting(data: Data) throws -> [BusStop] {
         return try parse511Stops(data: data)
-    }
-}
-
-enum APIError: Error {
-    case invalidURL
-    case invalidResponse
-    case decodingError
-    case networkError
-    case xmlParsingError
-}
-
-private struct StopsResponse: Decodable {
-    let contents: StopsContents
-
-    enum CodingKeys: String, CodingKey {
-        case contents = "Contents"
-    }
-}
-
-private struct StopsContents: Decodable {
-    let dataObjects: StopsDataObjects
-}
-
-private struct StopsDataObjects: Decodable {
-    let scheduledStopPoints: [ScheduledStopPoint]
-
-    enum CodingKeys: String, CodingKey {
-        case scheduledStopPoints = "ScheduledStopPoint"
-    }
-}
-
-private struct ScheduledStopPoint: Decodable {
-    let id: String
-    let name: String
-    let location: StopLocation
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name = "Name"
-        case location = "Location"
-    }
-}
-
-private struct StopLocation: Decodable {
-    let longitude: String
-    let latitude: String
-
-    enum CodingKeys: String, CodingKey {
-        case longitude = "Longitude"
-        case latitude = "Latitude"
-    }
-}
-
-private struct StopMonitoringResponse: Decodable {
-    let serviceDelivery: StopMonitoringServiceDelivery
-
-    enum CodingKeys: String, CodingKey {
-        case serviceDelivery = "ServiceDelivery"
-    }
-}
-
-private struct StopMonitoringServiceDelivery: Decodable {
-    let stopMonitoringDelivery: StopMonitoringDelivery
-
-    enum CodingKeys: String, CodingKey {
-        case stopMonitoringDelivery = "StopMonitoringDelivery"
-    }
-}
-
-private struct StopMonitoringDelivery: Decodable {
-    let monitoredStopVisit: [MonitoredStopVisit]
-
-    enum CodingKeys: String, CodingKey {
-        case monitoredStopVisit = "MonitoredStopVisit"
-    }
-}
-
-private struct MonitoredStopVisit: Decodable {
-    let monitoredVehicleJourney: MonitoredVehicleJourney
-
-    enum CodingKeys: String, CodingKey {
-        case monitoredVehicleJourney = "MonitoredVehicleJourney"
-    }
-}
-
-private struct MonitoredVehicleJourney: Decodable {
-    let lineRef: String
-    let directionRef: String
-    let monitoredCall: MonitoredCall
-
-    enum CodingKeys: String, CodingKey {
-        case lineRef = "LineRef"
-        case directionRef = "DirectionRef"
-        case monitoredCall = "MonitoredCall"
-    }
-}
-
-private struct MonitoredCall: Decodable {
-    let expectedArrivalTime: String?
-    let expectedDepartureTime: String?
-    let aimedArrivalTime: String?
-    let aimedDepartureTime: String?
-
-    enum CodingKeys: String, CodingKey {
-        case expectedArrivalTime = "ExpectedArrivalTime"
-        case expectedDepartureTime = "ExpectedDepartureTime"
-        case aimedArrivalTime = "AimedArrivalTime"
-        case aimedDepartureTime = "AimedDepartureTime"
-    }
-}
-
-// MARK: - Bootstrap link parsing
-
-enum WorkerConfigLink {
-    static func apiKey(from url: URL) -> String? {
-        // sftransitwatch://key/YOUR_API_KEY
-        if url.scheme == "sftransitwatch", url.host == "key" {
-            return String(url.path.dropFirst())
-        }
-        // https://rularner.github.io/sftransitwatch/key?k=YOUR_KEY
-        if url.scheme == "https",
-           url.host == "rularner.github.io",
-           url.path == "/sftransitwatch/key",
-           let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            return components.queryItems?.first { $0.name == "k" }?.value
-        }
-        return nil
-    }
-
-    /// Parses a worker bootstrap link in either form:
-    ///   sftransitwatch://wt?u=<encoded-worker-url>&t=<token>
-    ///   https://rularner.github.io/sftransitwatch/wt?u=<encoded-worker-url>&t=<token>
-    /// Returns nil if either parameter is missing or empty. Worker URLs without
-    /// an https scheme are rejected to keep tokens off the wire in cleartext.
-    static func workerConfig(from url: URL) -> (url: String, token: String)? {
-        let isCustomScheme = url.scheme == "sftransitwatch" && url.host == "wt"
-        let isUniversal = url.scheme == "https"
-            && url.host == "rularner.github.io"
-            && url.path == "/sftransitwatch/wt"
-        guard isCustomScheme || isUniversal else { return nil }
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let items = components.queryItems else { return nil }
-        guard let workerURL = items.first(where: { $0.name == "u" })?.value, !workerURL.isEmpty,
-              let token = items.first(where: { $0.name == "t" })?.value, !token.isEmpty,
-              let parsed = URL(string: workerURL),
-              parsed.scheme == "https" else { return nil }
-        return (url: workerURL, token: token)
     }
 }

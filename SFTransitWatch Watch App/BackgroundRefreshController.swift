@@ -2,6 +2,7 @@ import Foundation
 import WatchKit
 import UserNotifications
 import WidgetKit
+import SFTransitWatchPackage
 
 /// Drives periodic background work for the watch app:
 /// - keeps the complication's per-slot snapshot fresh while the app is asleep

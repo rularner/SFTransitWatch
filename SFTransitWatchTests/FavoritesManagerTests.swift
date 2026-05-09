@@ -1,5 +1,5 @@
 import XCTest
-@testable import SFTransitWatch_Watch_App
+import SFTransitWatchPackage
 
 @MainActor
 final class FavoritesManagerTests: XCTestCase {

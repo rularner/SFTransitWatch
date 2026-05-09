@@ -1,4 +1,5 @@
 import Foundation
+import SFTransitWatchPackage
 
 @MainActor
 class PinnedStopsManager: ObservableObject {

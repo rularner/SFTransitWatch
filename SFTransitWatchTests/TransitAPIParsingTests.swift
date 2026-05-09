@@ -1,4 +1,5 @@
 import XCTest
+import SFTransitWatchPackage
 @testable import SFTransitWatch_Watch_App
 
 final class TransitAPIParsingTests: XCTestCase {

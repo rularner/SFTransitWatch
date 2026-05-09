@@ -1,4 +1,5 @@
 import SwiftUI
+import SFTransitWatchPackage
 
 @main
 struct SFTransitWatchApp: App {

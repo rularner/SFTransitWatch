@@ -1,27 +1,27 @@
 import Foundation
 import CoreLocation
 
-struct BusStop: Identifiable, Codable {
-    let id: String
-    let name: String
-    let code: String
-    let latitude: Double
-    let longitude: Double
-    let routes: [String]
-    var isFavorite: Bool
+public struct BusStop: Identifiable, Codable, Sendable {
+    public let id: String
+    public let name: String
+    public let code: String
+    public let latitude: Double
+    public let longitude: Double
+    public let routes: [String]
+    public var isFavorite: Bool
     /// 511.org agency code (e.g. "SF" for Muni, "BA" for BART).
     /// Stop codes are scoped per-agency, so this is needed for arrival fetches.
-    let agency: String
+    public let agency: String
 
-    var coordinate: CLLocationCoordinate2D {
+    public var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
-    var location: CLLocation {
+    public var location: CLLocation {
         CLLocation(latitude: latitude, longitude: longitude)
     }
 
-    init(id: String, name: String, code: String, latitude: Double, longitude: Double, routes: [String] = [], isFavorite: Bool = false, agency: String = "SF") {
+    public init(id: String, name: String, code: String, latitude: Double, longitude: Double, routes: [String] = [], isFavorite: Bool = false, agency: String = "SF") {
         self.id = id
         self.name = name
         self.code = code
@@ -32,7 +32,7 @@ struct BusStop: Identifiable, Codable {
         self.agency = agency
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decode(String.self, forKey: .id)
         self.name = try c.decode(String.self, forKey: .name)
@@ -45,14 +45,14 @@ struct BusStop: Identifiable, Codable {
         self.agency = try c.decodeIfPresent(String.self, forKey: .agency) ?? "SF"
     }
 
-    func distance(to location: CLLocation) -> CLLocationDistance {
+    public func distance(to location: CLLocation) -> CLLocationDistance {
         return self.location.distance(from: location)
     }
 }
 
 #if DEBUG
 extension BusStop {
-    static let previewStops: [BusStop] = [
+    public static let previewStops: [BusStop] = [
         BusStop(
             id: "1",
             name: "Market St & 4th St",

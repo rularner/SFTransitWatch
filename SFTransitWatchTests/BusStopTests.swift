@@ -1,6 +1,6 @@
 import XCTest
 import CoreLocation
-@testable import SFTransitWatch_Watch_App
+import SFTransitWatchPackage
 
 final class BusStopTests: XCTestCase {
 

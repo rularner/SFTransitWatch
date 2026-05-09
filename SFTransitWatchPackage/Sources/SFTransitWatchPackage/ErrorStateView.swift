@@ -1,10 +1,15 @@
 import SwiftUI
 
-struct ErrorStateView: View {
+public struct ErrorStateView: View {
     let message: String
     let onRetry: () -> Void
 
-    var body: some View {
+    public init(message: String, onRetry: @escaping () -> Void) {
+        self.message = message
+        self.onRetry = onRetry
+    }
+
+    public var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 40))

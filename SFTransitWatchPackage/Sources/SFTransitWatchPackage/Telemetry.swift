@@ -1,20 +1,20 @@
 import Foundation
 import os
 
-struct TelemetryEvent: Codable, Equatable {
-    let ts: String
-    let installId: String
-    let platform: String
-    let appVersion: String
-    let build: String
-    let kind: String
-    let endpoint: String
-    let httpStatus: Int?
-    let latencyMs: Int
-    let errorKind: String?
-    let cacheStatus: String?
+public struct TelemetryEvent: Codable, Equatable, Sendable {
+    public let ts: String
+    public let installId: String
+    public let platform: String
+    public let appVersion: String
+    public let build: String
+    public let kind: String
+    public let endpoint: String
+    public let httpStatus: Int?
+    public let latencyMs: Int
+    public let errorKind: String?
+    public let cacheStatus: String?
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case ts
         case installId = "install_id"
         case platform
@@ -29,8 +29,8 @@ struct TelemetryEvent: Codable, Equatable {
     }
 }
 
-final class Telemetry {
-    static let shared = Telemetry()
+public final class Telemetry: @unchecked Sendable {
+    public static let shared = Telemetry()
 
     private static let installIdKey = "telemetry.install_id"
     private static let bufferCap = 50
@@ -50,14 +50,14 @@ final class Telemetry {
     private var debounceWorkItem: DispatchWorkItem?
     private var flushInFlight = false
 
-    let installId: String
+    public let installId: String
 
-    var isEnabled: Bool {
+    public var isEnabled: Bool {
         guard let token, !token.isEmpty, let baseURL, !baseURL.isEmpty else { return false }
         return true
     }
 
-    convenience init() {
+    public convenience init() {
         let info = Bundle.main.infoDictionary ?? [:]
         let storedToken = UserDefaults.standard.string(forKey: "WORKER_TOKEN") ?? ""
         let storedBase = UserDefaults.standard.string(forKey: "WORKER_BASE_URL") ?? ""
@@ -81,7 +81,7 @@ final class Telemetry {
         )
     }
 
-    init(
+    public init(
         defaults: UserDefaults,
         token: String?,
         baseURL: String?,
@@ -107,7 +107,7 @@ final class Telemetry {
         }
     }
 
-    func logFetchOutcome(endpoint: String, httpStatus: Int, latencyMs: Int, cacheStatus: String?) {
+    public func logFetchOutcome(endpoint: String, httpStatus: Int, latencyMs: Int, cacheStatus: String?) {
         let event = TelemetryEvent(
             ts: Self.isoNow(),
             installId: installId,
@@ -125,7 +125,7 @@ final class Telemetry {
         enqueue(event)
     }
 
-    func logFetchError(endpoint: String, errorKind: String, httpStatus: Int?, latencyMs: Int) {
+    public func logFetchError(endpoint: String, errorKind: String, httpStatus: Int?, latencyMs: Int) {
         let event = TelemetryEvent(
             ts: Self.isoNow(),
             installId: installId,
@@ -143,7 +143,7 @@ final class Telemetry {
         enqueue(event)
     }
 
-    func flush() {
+    public func flush() {
         queue.async { [weak self] in self?.flushLocked() }
     }
 

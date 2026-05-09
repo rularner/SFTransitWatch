@@ -1,4 +1,5 @@
 import SwiftUI
+import SFTransitWatchPackage
 
 struct BusArrivalView: View {
     let stop: BusStop
