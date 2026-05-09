@@ -42,8 +42,6 @@
 		CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 		CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		CAFE0000000000000000E001 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E002 /* ErrorStateView.swift */; };
-		CAFE0000000000000000E003 /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E004 /* ErrorStateView.swift */; };
 		CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000P001 /* PinnedStopsManager.swift */; };
 		CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 /* End PBXBuildFile section */
@@ -144,8 +142,6 @@
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Complication.entitlements"; sourceTree = "<group>"; };
-		CAFE0000000000000000E002 /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000E004 /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000P001 /* PinnedStopsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedStopsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000S001 /* CommuteSlotsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
@@ -376,7 +372,7 @@
 			);
 			productName = SFTransitWatchUITests;
 			productReference = 84E0253E2FAD714C006B3F47 /* SFTransitWatchUITests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		CAFE000000000000000001AA /* SFTransitWatch Watch App */ = {
 			isa = PBXNativeTarget;
@@ -673,7 +669,6 @@
 		84E025442FAD714C006B3F47 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
@@ -687,7 +682,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SFTransitWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SFTransitWatch Watch App";
+				TEST_TARGET_NAME = "SFTransitWatch Watch App";
 				WATCHOS_DEPLOYMENT_TARGET = 26.4;
 			};
 			name = Debug;
@@ -695,7 +690,6 @@
 		84E025452FAD714C006B3F47 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
@@ -709,7 +703,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SFTransitWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SFTransitWatch Watch App";
+				TEST_TARGET_NAME = "SFTransitWatch Watch App";
 				VALIDATE_PRODUCT = YES;
 				WATCHOS_DEPLOYMENT_TARGET = 26.4;
 			};
