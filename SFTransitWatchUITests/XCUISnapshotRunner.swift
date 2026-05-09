@@ -1,20 +1,26 @@
 import XCTest
+import ImageIO
+import CoreGraphics
+import UniformTypeIdentifiers
 
 enum XCUISnapshotRunner {
 
-    /// Capture the app's element contents (excluding the watchOS system time bar),
-    /// attach to the test result, and diff against `Snapshots/AppStore/<name>.png`.
+    /// Pixels at the top of the captured screenshot to ignore when diffing.
+    /// The watchOS system overlay (current time) sits in this band; including it
+    /// would make every run produce different bytes. Goldens still include the band
+    /// so the App Store deliverable PNG looks like a real watch screen — only the
+    /// byte-comparison ignores it.
+    private static let topBarPixelsToIgnore: Int = 40
+
+    /// Capture `app`, attach the full PNG to the test result, save the full PNG as
+    /// the golden, and diff against the saved golden — ignoring the top-of-screen
+    /// band where the watchOS time lives.
     ///
-    /// - `RECORD_SNAPSHOTS=1` env (propagated via `SIMCTL_CHILD_RECORD_SNAPSHOTS=1` from
-    ///   the shell) → overwrite golden, pass.
+    /// - `RECORD_SNAPSHOTS=1` env (propagated via `SIMCTL_CHILD_RECORD_SNAPSHOTS=1`
+    ///   from the shell) → overwrite golden, pass.
     /// - Golden missing → write golden + XCTFail "Recorded new snapshot, re-run to verify."
-    /// - Bytes equal → pass.
-    /// - Bytes differ → write `<output_dir>/<name>-failed.png`, XCTFail with diff message.
-    ///
-    /// Note: we screenshot `app` (the XCUIApplication) rather than `XCUIScreen.main`
-    /// because the watchOS system status bar (which shows the live time) sits outside
-    /// the app's element bounds. Using `XCUIScreen.main.screenshot()` would include the
-    /// time and produce non-deterministic byte diffs across runs.
+    /// - Cropped pixel buffers equal → pass.
+    /// - Cropped pixel buffers differ → write `<output_dir>/<name>-failed.png`, XCTFail.
     static func verify(
         _ app: XCUIApplication,
         named name: String,
@@ -26,7 +32,7 @@ enum XCUISnapshotRunner {
         let pngData = screenshot.pngRepresentation
 
         // Always attach the captured PNG to the test result.
-        let attachment = XCTAttachment(data: pngData, uniformTypeIdentifier: "public.png")
+        let attachment = XCTAttachment(data: pngData, uniformTypeIdentifier: UTType.png.identifier)
         attachment.name = "\(name).png"
         attachment.lifetime = .keepAlways
         testCase.add(attachment)
@@ -65,7 +71,16 @@ enum XCUISnapshotRunner {
             return
         }
 
-        if pngData == goldenData {
+        guard let newPixels = pixelBytesIgnoringTopBar(pngData) else {
+            XCTFail("Could not decode captured screenshot for diffing", file: file, line: line)
+            return
+        }
+        guard let goldenPixels = pixelBytesIgnoringTopBar(goldenData) else {
+            XCTFail("Could not decode golden for diffing: \(goldenURL.path)", file: file, line: line)
+            return
+        }
+
+        if newPixels == goldenPixels {
             return
         }
 
@@ -76,11 +91,54 @@ enum XCUISnapshotRunner {
             NSLog("[XCUISnapshotRunner] Could not write failed render: \(error)")
         }
         XCTFail(
-            "Snapshot \(name) differs from golden. Failed render: \(failedURL.path). " +
+            "Snapshot \(name) differs from golden (top \(topBarPixelsToIgnore)px ignored). " +
+            "Failed render: \(failedURL.path). " +
             "If this change is intentional, re-record with SIMCTL_CHILD_RECORD_SNAPSHOTS=1.",
             file: file,
             line: line
         )
+    }
+
+    // MARK: - Pixel comparison
+
+    /// Decode `pngData` and return raw RGBA bytes for the image with the top
+    /// `topBarPixelsToIgnore` rows of pixels excluded. Returning identical bytes
+    /// from this function is the diff criterion.
+    private static func pixelBytesIgnoringTopBar(_ pngData: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(pngData as CFData, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return nil
+        }
+        let width = cgImage.width
+        let height = cgImage.height
+        guard height > topBarPixelsToIgnore else { return nil }
+
+        let croppedHeight = height - topBarPixelsToIgnore
+        let bytesPerRow = width * 4
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: croppedHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+
+        // Draw the source image so that the bottom (croppedHeight) rows are visible
+        // in the smaller context. CG coordinates have origin at bottom-left, so we
+        // draw the full-height image at y = -topBarPixelsToIgnore: that places the
+        // image's "top band" off the top of the context (cropped away) and the rest
+        // of the image inside the context.
+        context.draw(
+            cgImage,
+            in: CGRect(x: 0, y: -topBarPixelsToIgnore, width: width, height: height)
+        )
+
+        guard let pixelDataPointer = context.data else { return nil }
+        return Data(bytes: pixelDataPointer, count: bytesPerRow * croppedHeight)
     }
 
     // MARK: - Path resolution
