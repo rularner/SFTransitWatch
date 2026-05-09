@@ -1,5 +1,5 @@
 import XCTest
-@testable import SFTransitWatch_Watch_App
+import SFTransitWatchPackage
 
 final class BusArrivalTests: XCTestCase {
 
