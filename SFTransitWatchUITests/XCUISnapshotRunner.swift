@@ -6,11 +6,11 @@ import UniformTypeIdentifiers
 enum XCUISnapshotRunner {
 
     /// Pixels at the top of the captured screenshot to ignore when diffing.
-    /// The watchOS system overlay (current time) sits in this band; including it
-    /// would make every run produce different bytes. Goldens still include the band
-    /// so the App Store deliverable PNG looks like a real watch screen — only the
-    /// byte-comparison ignores it.
-    private static let topBarPixelsToIgnore: Int = 40
+    /// The watchOS system overlay (current time, sheet close button, etc.) sits in
+    /// this band; including it would make every run produce different bytes (the
+    /// time changes). Goldens still include the band so the App Store deliverable
+    /// PNG looks like a real watch screen — only the byte-comparison ignores it.
+    private static let topBarPixelsToIgnore: Int = 80
 
     /// Capture `app`, attach the full PNG to the test result, save the full PNG as
     /// the golden, and diff against the saved golden — ignoring the top-of-screen
@@ -127,14 +127,18 @@ enum XCUISnapshotRunner {
             bitmapInfo: bitmapInfo
         ) else { return nil }
 
-        // Draw the source image so that the bottom (croppedHeight) rows are visible
-        // in the smaller context. CG coordinates have origin at bottom-left, so we
-        // draw the full-height image at y = -topBarPixelsToIgnore: that places the
-        // image's "top band" off the top of the context (cropped away) and the rest
-        // of the image inside the context.
+        // Draw the source image so that the image's TOP `topBarPixelsToIgnore` rows
+        // are clipped away and the bottom `croppedHeight` rows are kept.
+        //
+        // Quartz draws images such that the image's top maps to the rect's
+        // higher-y edge in CG coords (origin bottom-left). Drawing the full-height
+        // image into a rect at `y: 0` places the image's bottom at the context's
+        // bottom and the image's top above the context (rect top = height >
+        // context top = croppedHeight) — so the top band is clipped, which is
+        // what we want.
         context.draw(
             cgImage,
-            in: CGRect(x: 0, y: -topBarPixelsToIgnore, width: width, height: height)
+            in: CGRect(x: 0, y: 0, width: width, height: height)
         )
 
         guard let pixelDataPointer = context.data else { return nil }
