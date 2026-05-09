@@ -7,6 +7,7 @@ struct SettingsView: View {
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("WORKER_TOKEN") private var workerToken = ""
+    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
@@ -59,17 +60,22 @@ struct SettingsView: View {
             }
 
             Section(
-                header: Text("Worker token"),
-                footer: Text("Optional. Send yourself a Messages link of the form https://rularner.github.io/sftransitwatch/wt?t=YOUR_TOKEN and tap it on the watch to set.")
+                header: Text("Worker proxy"),
+                footer: Text("Optional. Send yourself a Messages link of the form https://rularner.github.io/sftransitwatch/wt?u=YOUR_WORKER_URL&t=YOUR_TOKEN and tap it on the watch to set.")
             ) {
                 HStack {
-                    Text("Worker token")
+                    Text("Worker")
                     Spacer()
-                    Text(workerToken.isEmpty ? "Not set" : "Set")
+                    Text(workerConfigured ? (URL(string: workerBaseURL)?.host ?? "Set") : "Not set")
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
-                if !workerToken.isEmpty {
-                    Button("Clear", role: .destructive) { workerToken = "" }
+                if workerConfigured {
+                    Button("Clear", role: .destructive) {
+                        workerToken = ""
+                        workerBaseURL = ""
+                    }
                 }
             }
 
@@ -182,6 +188,10 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAPIKeyEntry) {
             APIKeyEntryView(storedAPIKey: $storedAPIKey)
         }
+    }
+
+    private var workerConfigured: Bool {
+        return !workerToken.isEmpty && !workerBaseURL.isEmpty
     }
 
     private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {

@@ -153,21 +153,24 @@ The app intelligently learns your route preferences:
    without it. Create it only if you want to override signing settings like
    `DEVELOPMENT_TEAM` without editing the project file.
 
-   **Worker token (optional, family-only):** the Cloudflare Worker accepts
-   only requests from devices on its allowlist. If you don't have a worker
-   token, the app uses 511.org directly with the API key you paste — no
-   action needed. To use the worker (faster, cached, telemetry-enabled):
+   **Worker proxy (optional):** by default the app calls 511.org directly
+   with the API key you paste — no further setup needed. If you (or a
+   family member) run a Cloudflare Worker proxy, you can route through
+   it for caching and telemetry. The worker URL and per-device token are
+   bundled into a single bootstrap link:
 
-   1. The repo owner generates a token for your device:
+   1. The worker operator mints a link for your device:
       ```bash
       cd CloudflareWorker
-      ./scripts/issue-token.sh <your-device-label>
+      WORKER_URL=https://your-worker.workers.dev ./scripts/issue-token.sh <your-device-label>
       ```
-   2. They share the resulting universal link
-      (`https://rularner.github.io/sftransitwatch/wt?t=<token>`) with you
-      via Messages or Mail. Open the link **on the device that should be
-      authorized** — Settings → Worker token will switch to "Set".
-   3. To revoke later (lost device, leaked token), the repo owner runs
+      The script prints a link of the form
+      `https://rularner.github.io/sftransitwatch/wt?u=<worker-url>&t=<token>`.
+   2. They share the link via Messages or Mail. **On iOS**: paste it into
+      Settings → Worker proxy and tap Save. **On the watch**: open the
+      message and tap the link — the watch app handles it directly.
+      Settings will then show the worker host instead of "Not set".
+   3. To revoke later (lost device, leaked token), the operator runs
       `npx wrangler kv key delete --binding CLIENT_TOKENS <hash>`.
 
 3. **Open in Xcode**:

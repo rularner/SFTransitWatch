@@ -14,12 +14,3 @@ CURRENT_PROJECT_VERSION = 1
 // Promote Swift warnings to errors so unused vars, deprecations, etc. fail
 // the build instead of accumulating. Applies to all targets via project base.
 SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
-
-// Shared transit API base URL for iPhone and Watch targets.
-// Leave blank to use direct 511.org calls; set to your Cloudflare Worker URL
-// (for example: https://sftransitwatch.your-subdomain.workers.dev).
-TRANSIT_API_BASE_URL = https://sftransitwatch.rusty-cloudflare.workers.dev
-
-// Base URL of the worker that accepts POST /log telemetry events.
-// Defaults to the production worker; override in Developer.xcconfig for local testing.
-TELEMETRY_BASE_URL = https://sftransitwatch.rusty-cloudflare.workers.dev

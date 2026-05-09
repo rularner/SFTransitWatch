@@ -3,16 +3,10 @@ import SwiftUI
 
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
-    private var baseURL: String {
-        if let configured = Bundle.main.object(forInfoDictionaryKey: "TRANSIT_API_BASE_URL") as? String,
-           !configured.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return configured
-        }
-        return defaultBaseURL
-    }
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
     @AppStorage("WORKER_TOKEN") private var workerToken = ""
+    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -28,7 +22,11 @@ class TransitAPI: ObservableObject {
     }
 
     private var isDirect511Mode: Bool {
-        return useDirectFallback || baseURL.contains("api.511.org") || appToken == nil
+        return useDirectFallback || workerToken.isEmpty || workerBaseURL.isEmpty
+    }
+
+    private var baseURL: String {
+        return isDirect511Mode ? defaultBaseURL : workerBaseURL
     }
 
     private var apiKey: String {
@@ -36,7 +34,7 @@ class TransitAPI: ObservableObject {
     }
 
     private var appToken: String? {
-        return workerToken.isEmpty ? nil : workerToken
+        return isDirect511Mode ? nil : workerToken
     }
 
     private func makeRequest(url: URL) -> URLRequest {
@@ -519,5 +517,44 @@ private struct MonitoredCall: Decodable {
         case expectedDepartureTime = "ExpectedDepartureTime"
         case aimedArrivalTime = "AimedArrivalTime"
         case aimedDepartureTime = "AimedDepartureTime"
+    }
+}
+
+// MARK: - Bootstrap link parsing
+
+enum WorkerConfigLink {
+    static func apiKey(from url: URL) -> String? {
+        // sftransitwatch://key/YOUR_API_KEY
+        if url.scheme == "sftransitwatch", url.host == "key" {
+            return String(url.path.dropFirst())
+        }
+        // https://rularner.github.io/sftransitwatch/key?k=YOUR_KEY
+        if url.scheme == "https",
+           url.host == "rularner.github.io",
+           url.path == "/sftransitwatch/key",
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            return components.queryItems?.first { $0.name == "k" }?.value
+        }
+        return nil
+    }
+
+    /// Parses a worker bootstrap link in either form:
+    ///   sftransitwatch://wt?u=<encoded-worker-url>&t=<token>
+    ///   https://rularner.github.io/sftransitwatch/wt?u=<encoded-worker-url>&t=<token>
+    /// Returns nil if either parameter is missing or empty. Worker URLs without
+    /// an https scheme are rejected to keep tokens off the wire in cleartext.
+    static func workerConfig(from url: URL) -> (url: String, token: String)? {
+        let isCustomScheme = url.scheme == "sftransitwatch" && url.host == "wt"
+        let isUniversal = url.scheme == "https"
+            && url.host == "rularner.github.io"
+            && url.path == "/sftransitwatch/wt"
+        guard isCustomScheme || isUniversal else { return nil }
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let items = components.queryItems else { return nil }
+        guard let workerURL = items.first(where: { $0.name == "u" })?.value, !workerURL.isEmpty,
+              let token = items.first(where: { $0.name == "t" })?.value, !token.isEmpty,
+              let parsed = URL(string: workerURL),
+              parsed.scheme == "https" else { return nil }
+        return (url: workerURL, token: token)
     }
 }

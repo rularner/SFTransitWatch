@@ -26,6 +26,27 @@ Type generation also needs both:
 
 - `TRANSIT_CACHE_KV_ID=<id> CLIENT_TOKENS_KV_ID=<id> npm run cf-typegen`
 
+## Issuing client tokens
+
+Each device on the allowlist gets its own random token. The worker stores
+only the SHA-256 hash, so the raw token never touches disk on the worker
+side. The issuer script bundles the worker's public URL into the same
+link, so a single paste/tap configures both URL and token on the device:
+
+```bash
+WORKER_URL=https://your-worker.workers.dev ./scripts/issue-token.sh <label>
+```
+
+The printed bootstrap link goes to the device via Messages/Mail.
+- **iOS**: paste it into Settings → Worker proxy.
+- **watchOS**: tap the link in the message — the watch app accepts it via
+  the `/wt` universal link handler.
+
+Revoke a token by deleting its hash from KV:
+```bash
+npx wrangler kv key delete --binding CLIENT_TOKENS <hash>
+```
+
 ## Notes
 
 - `TRANSIT_CACHE_KV_ID` and `CLIENT_TOKENS_KV_ID` are required for `npm run deploy`, `npm run dev`, and `npm run cf-typegen`.

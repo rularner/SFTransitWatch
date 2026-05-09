@@ -10,6 +10,9 @@ struct SettingsView: View {
     @State private var showingClearFavoritesAlert = false
     @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("WORKER_TOKEN") private var workerToken = ""
+    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
+    @State private var workerLinkDraft = ""
+    @State private var workerLinkError: String?
     
     var body: some View {
         List {
@@ -42,13 +45,36 @@ struct SettingsView: View {
             }
             
             Section(
-                header: Text("Worker token (optional)"),
-                footer: Text("Authorizes this device with the SFTransitWatch worker proxy. Family-only — leave blank to use 511.org directly with your own API key.")
+                header: Text("Worker proxy (optional)"),
+                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by pasting a worker bootstrap link of the form https://rularner.github.io/sftransitwatch/wt?u=…&t=…. Leave blank to call 511.org directly with your own API key.")
             ) {
-                SecureField("Worker token", text: $workerToken)
-                    .textContentType(.password)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                if workerConfigured {
+                    HStack {
+                        Text("Worker")
+                        Spacer()
+                        Text(workerHostDisplay)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Button("Clear", role: .destructive) {
+                        workerToken = ""
+                        workerBaseURL = ""
+                    }
+                } else {
+                    TextField("Paste worker bootstrap link", text: $workerLinkDraft)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    if let workerLinkError {
+                        Text(workerLinkError)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    Button("Save") { saveWorkerLink() }
+                        .buttonStyle(.bordered)
+                        .disabled(workerLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
 
             Section(header: Text("Favorites")) {
@@ -162,6 +188,27 @@ struct SettingsView: View {
         }
     }
     
+    private var workerConfigured: Bool {
+        return !workerToken.isEmpty && !workerBaseURL.isEmpty
+    }
+
+    private var workerHostDisplay: String {
+        return URL(string: workerBaseURL)?.host ?? workerBaseURL
+    }
+
+    private func saveWorkerLink() {
+        let trimmed = workerLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed),
+              let config = WorkerConfigLink.workerConfig(from: url) else {
+            workerLinkError = "Couldn't parse that link. Expected a /wt link with both u= and t= parameters."
+            return
+        }
+        workerBaseURL = config.url
+        workerToken = config.token
+        workerLinkDraft = ""
+        workerLinkError = nil
+    }
+
     private func saveAPIKey() {
         guard !apiKey.isEmpty else {
             showingAPIKeyAlert = true
