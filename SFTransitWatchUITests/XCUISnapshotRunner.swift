@@ -6,14 +6,16 @@ import UniformTypeIdentifiers
 enum XCUISnapshotRunner {
 
     /// Pixels at the top of the captured screenshot to ignore when diffing.
-    /// The watchOS system overlay (current time, sheet close button, navigation
-    /// title bar) sits in this band; including it would make every run produce
-    /// different bytes (the time changes). Pushed sub-views fit in 80px, but the
-    /// home-screen views (BusStopList) and sheets (StopCodeEntry) put the time
-    /// at a position that needs more headroom. 150 covers all four observed
-    /// layouts on Apple Watch Ultra 49mm at 422x514. Goldens still include the
-    /// band so the App Store deliverable PNG looks like a real watch screen.
-    private static let topBarPixelsToIgnore: Int = 150
+    /// Above this band are: (1) the watchOS system time (changes every run),
+    /// (2) the sheet close-X / chevron back button, and (3) the navigation
+    /// title row. The nav title shifts ~1px when the time width changes
+    /// (e.g. "3:57" -> "10:43"), so even though the title text is identical,
+    /// pixel comparison sees it as different. Excluding the full title row
+    /// keeps the diff focused on body content. 200 covers all four observed
+    /// layouts on Apple Watch Ultra 49mm at 422x514. Goldens still include
+    /// this band so the App Store deliverable PNG looks like a real watch
+    /// screen.
+    private static let topBarPixelsToIgnore: Int = 200
 
     /// Capture `app`, attach the full PNG to the test result, save the full PNG as
     /// the golden, and diff against the saved golden — ignoring the top-of-screen
