@@ -201,6 +201,3 @@ CloudflareWorker/.nyc_output/
 CloudflareWorker/*.tsbuildinfo
 CloudflareWorker/.wrangler.generated.jsonc
 
-# Snapshot test failure artifacts (golden PNGs in Snapshots/AppStore/ ARE committed)
-Snapshots/AppStore/*-failed.png
-Snapshots/AppStore/*-diff.png

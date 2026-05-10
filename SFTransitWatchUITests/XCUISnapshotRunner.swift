@@ -17,21 +17,28 @@ enum XCUISnapshotRunner {
     /// screen.
     private static let topBarPixelsToIgnore: Int = 200
 
-    /// Capture `app`, attach the full PNG to the test result, save the full PNG as
-    /// the golden, and diff against the saved golden — ignoring the top-of-screen
-    /// band where the watchOS time lives.
+    /// Capture `app`, attach the full PNG to the test result, and diff against
+    /// the bundled golden — ignoring the top-of-screen band where the watchOS
+    /// time lives.
+    ///
+    /// Goldens live at `SFTransitWatchUITests/Goldens/<name>.png` in the source
+    /// tree and ride inside the test bundle as resources, so the test process
+    /// finds them via `Bundle(for:)` regardless of host filesystem layout. This
+    /// is what makes the tests work on Xcode Cloud, where the build step's
+    /// source paths and env vars don't propagate to the test step.
     ///
     /// - `RECORD_SNAPSHOTS=1` env (propagated via `SIMCTL_CHILD_RECORD_SNAPSHOTS=1`
-    ///   from the shell) → overwrite golden, pass.
-    /// - Golden missing → write golden + XCTFail "Recorded new snapshot, re-run to verify."
+    ///   from the shell) → write golden to the source tree, pass. Local-only;
+    ///   on Xcode Cloud the source tree isn't reachable.
+    /// - Bundled golden missing → XCTFail telling the user to record locally.
     /// - Cropped pixel buffers equal → pass.
-    /// - Cropped pixel buffers differ → write `<name>-failed.png` and `<name>-diff.png`,
-    ///   attach both, fail with pixel count + bounding box.
+    /// - Cropped pixel buffers differ → write `<name>-failed.png` and `<name>-diff.png`
+    ///   to a temp dir, attach both, fail with pixel count + bounding box.
     static func verify(
         _ app: XCUIApplication,
         named name: String,
         in testCase: XCTestCase,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         line: UInt = #line
     ) {
         let screenshot = app.screenshot()
@@ -42,37 +49,39 @@ enum XCUISnapshotRunner {
         attachment.lifetime = .keepAlways
         testCase.add(attachment)
 
-        let goldenURL = goldenURL(for: name, file: file)
-        let outputDir = outputDirectory(file: file)
-        try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
-
         let recording = ProcessInfo.processInfo.environment["RECORD_SNAPSHOTS"] == "1"
 
         if recording {
-            try? FileManager.default.createDirectory(at: goldenURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let recordURL = sourceGoldenURL(for: name, file: file)
+            try? FileManager.default.createDirectory(
+                at: recordURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             do {
-                try pngData.write(to: goldenURL)
-                NSLog("[XCUISnapshotRunner] Recorded golden: \(goldenURL.path)")
+                try pngData.write(to: recordURL)
+                NSLog("[XCUISnapshotRunner] Recorded golden: \(recordURL.path)")
             } catch {
-                XCTFail("Recording golden failed: \(error)", file: file, line: line)
+                XCTFail("Recording golden to \(recordURL.path) failed: \(error)", file: file, line: line)
             }
             return
         }
 
-        guard FileManager.default.fileExists(atPath: goldenURL.path) else {
-            try? FileManager.default.createDirectory(at: goldenURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            do {
-                try pngData.write(to: goldenURL)
-            } catch {
-                XCTFail("Writing initial golden failed: \(error)", file: file, line: line)
-                return
-            }
-            XCTFail("Recorded new snapshot at \(goldenURL.path). Re-run to verify.", file: file, line: line)
+        guard let goldenURL = bundledGoldenURL(for: name, testCase: testCase) else {
+            XCTFail(
+                """
+                No bundled golden for \(name).png. Goldens live at \
+                SFTransitWatchUITests/Goldens/<name>.png and ride in the test bundle. \
+                Record locally with `RECORD_SNAPSHOTS=1 bin/run-watch-snapshot-tests.sh`, \
+                then commit the regenerated PNGs.
+                """,
+                file: file,
+                line: line
+            )
             return
         }
 
         guard let goldenData = try? Data(contentsOf: goldenURL) else {
-            XCTFail("Could not read golden at \(goldenURL.path)", file: file, line: line)
+            XCTFail("Could not read bundled golden at \(goldenURL.path)", file: file, line: line)
             return
         }
 
@@ -81,7 +90,7 @@ enum XCUISnapshotRunner {
             return
         }
         guard let golden = decodeAndCropTopBar(goldenData) else {
-            XCTFail("Could not decode golden for diffing: \(goldenURL.path)", file: file, line: line)
+            XCTFail("Could not decode bundled golden for diffing: \(goldenURL.path)", file: file, line: line)
             return
         }
 
@@ -99,6 +108,9 @@ enum XCUISnapshotRunner {
         }
 
         let diff = computeDiff(new: new.pixels, golden: golden.pixels, width: new.width, height: new.height)
+
+        let outputDir = outputDirectory()
+        try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
         let failedURL = outputDir.appendingPathComponent("\(name)-failed.png")
         try? pngData.write(to: failedURL)
@@ -282,39 +294,45 @@ enum XCUISnapshotRunner {
 
     // MARK: - Path resolution
 
-    private static func goldenURL(for name: String, file: StaticString) -> URL {
+    /// Locate the golden inside the test bundle. Synced groups can flatten
+    /// resource subdirs or preserve them depending on Xcode behavior, so try
+    /// both shapes.
+    private static func bundledGoldenURL(for name: String, testCase: XCTestCase) -> URL? {
+        let bundle = Bundle(for: type(of: testCase))
+        if let url = bundle.url(forResource: name, withExtension: "png") {
+            return url
+        }
+        return bundle.url(forResource: name, withExtension: "png", subdirectory: "Goldens")
+    }
+
+    /// Source-tree path for golden recording. Only meaningful locally —
+    /// `RECORD_SNAPSHOTS=1` is the only caller and Xcode Cloud doesn't record.
+    private static func sourceGoldenURL(for name: String, file: StaticString) -> URL {
         repoRoot(file: file)
-            .appendingPathComponent("Snapshots", isDirectory: true)
-            .appendingPathComponent("AppStore", isDirectory: true)
+            .appendingPathComponent("SFTransitWatchUITests", isDirectory: true)
+            .appendingPathComponent("Goldens", isDirectory: true)
             .appendingPathComponent("\(name).png")
     }
 
-    private static func outputDirectory(file: StaticString) -> URL {
+    /// Where to drop diagnostic `*-failed.png` / `*-diff.png` artifacts. The
+    /// canonical copy is the XCTAttachment; the on-disk write is for local
+    /// inspection. Temp dir is writable everywhere (host, simulator, CI).
+    private static func outputDirectory() -> URL {
         if let custom = ProcessInfo.processInfo.environment["SNAPSHOT_OUTPUT_DIR"] {
-            return URL(fileURLWithPath: custom)
+            return URL(fileURLWithPath: custom, isDirectory: true)
         }
-        return repoRoot(file: file)
-            .appendingPathComponent("Snapshots", isDirectory: true)
-            .appendingPathComponent("AppStore", isDirectory: true)
+        return URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("SFTransitWatchSnapshots", isDirectory: true)
     }
 
-    /// Resolve the project's repo root.
+    /// Resolve the project's repo root for golden *recording* (write side).
+    /// Read side uses `Bundle(for:)` and never calls this.
     ///
-    /// Resolution order, most reliable first:
-    /// 1. Walk up from `#file` looking for `SFTransitWatch.xcodeproj`. This is
-    ///    the strongest signal because it confirms what it found.
-    /// 2. `CI_PRIMARY_REPOSITORY_PATH` (Xcode Cloud workspace root). Used when
-    ///    the walk can't find the marker — e.g. the build path baked into
-    ///    `#file` no longer exists at test time.
-    /// 3. `SRCROOT`. **Last resort** because on Xcode Cloud `SRCROOT` is set
-    ///    to the test target's source subdirectory (`.../SFTransitWatchUITests`)
-    ///    rather than the project root, so trusting it first produces the
-    ///    wrong goldens path.
-    /// 4. The directory containing `#file`, as a final fallback.
+    /// Walks up from `#filePath` (the literal compile-time path) looking for
+    /// `SFTransitWatch.xcodeproj`. Locally this succeeds; on Xcode Cloud it
+    /// may not — but recording isn't done there.
     private static func repoRoot(file: StaticString) -> URL {
-        let env = ProcessInfo.processInfo.environment
         let fm = FileManager.default
-
         var dir = URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
         for _ in 0..<10 {
             let marker = dir.appendingPathComponent("SFTransitWatch.xcodeproj")
@@ -324,13 +342,6 @@ enum XCUISnapshotRunner {
             let parent = dir.deletingLastPathComponent()
             if parent == dir { break }
             dir = parent
-        }
-
-        if let ciRepo = env["CI_PRIMARY_REPOSITORY_PATH"] {
-            return URL(fileURLWithPath: ciRepo)
-        }
-        if let srcroot = env["SRCROOT"] {
-            return URL(fileURLWithPath: srcroot)
         }
         return URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
     }
