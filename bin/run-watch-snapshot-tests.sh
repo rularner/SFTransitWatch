@@ -18,7 +18,7 @@
 set -euo pipefail
 
 SCHEME="SFTransitWatch Watch App"
-DESTINATION='platform=watchOS Simulator,name=Apple Watch Ultra 3 (49mm)'
+DESTINATION='platform=watchOS Simulator,name=Apple Watch SE 3 (44mm)'
 DERIVED_DATA_GLOB="${HOME}/Library/Developer/Xcode/DerivedData/SFTransitWatch-*"
 
 echo ">> Wiping project DerivedData: ${DERIVED_DATA_GLOB}"
@@ -27,7 +27,11 @@ rm -rf ${DERIVED_DATA_GLOB}
 
 if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
     echo ">> RECORD_SNAPSHOTS=1 — goldens will be overwritten"
-    export SIMCTL_CHILD_RECORD_SNAPSHOTS=1
+    # `TEST_RUNNER_<VAR>` is the documented xcodebuild knob (see `man xcodebuild`)
+    # that forwards the variable into the UI test runner process with the prefix
+    # stripped — i.e. RECORD_SNAPSHOTS=1 inside the test bundle.
+    # `SIMCTL_CHILD_*` does not propagate to XCTRunner.app reliably, so don't use it.
+    export TEST_RUNNER_RECORD_SNAPSHOTS=1
 fi
 
 echo ">> xcodebuild test -scheme \"${SCHEME}\""
