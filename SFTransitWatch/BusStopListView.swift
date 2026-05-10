@@ -6,7 +6,6 @@ struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var siriManager = SiriManager()
     @State private var nearbyStops: [BusStop] = []
     @State private var showingSettingsAlert = false
 
@@ -56,7 +55,6 @@ struct BusStopListView: View {
         }
         .onAppear {
             locationManager.startLocationUpdates()
-            siriManager.setupSiriShortcuts()
             Task {
                 await loadNearbyStops()
             }
@@ -141,8 +139,7 @@ struct BusStopListView: View {
                         BusStopRow(
                             stop: stop,
                             currentLocation: locationManager.currentLocation,
-                            favoritesManager: favoritesManager,
-                            siriManager: siriManager
+                            favoritesManager: favoritesManager
                         )
                     }
                 }
@@ -155,8 +152,7 @@ struct BusStopListView: View {
                     BusStopRow(
                         stop: stop,
                         currentLocation: locationManager.currentLocation,
-                        favoritesManager: favoritesManager,
-                        siriManager: siriManager
+                        favoritesManager: favoritesManager
                     )
                 }
             }
@@ -180,8 +176,6 @@ struct BusStopListView: View {
         }
 
         nearbyStops = favoritesManager.sortStopsWithFavoritesFirst(nearbyStops)
-
-        siriManager.donateNearbyStopsIntent()
     }
 }
 
@@ -189,7 +183,6 @@ struct BusStopRow: View {
     let stop: BusStop
     let currentLocation: CLLocation?
     let favoritesManager: FavoritesManager
-    let siriManager: SiriManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -224,7 +217,6 @@ struct BusStopRow: View {
 
                     Button(action: {
                         favoritesManager.toggleFavorite(for: stop.id)
-                        siriManager.donateBusArrivalIntent(stopId: stop.id, stopName: stop.name)
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
                             .foregroundColor(stop.isFavorite ? .yellow : .gray)
