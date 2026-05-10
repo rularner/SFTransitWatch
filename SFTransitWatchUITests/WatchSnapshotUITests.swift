@@ -16,24 +16,24 @@ final class WatchSnapshotUITests: XCTestCase {
         return app
     }
 
-    func testSnapshot_BusStopList() {
+    func testSnapshot_BusStopList() throws {
         let app = launchSnapshotModeApp()
         XCTAssertTrue(app.staticTexts["Castro Station"].waitForExistence(timeout: 10),
                       "Expected Castro Station to be visible (SnapshotMode should serve it)")
-        XCUISnapshotRunner.verify(app, named: "BusStopList", in: self)
+        try XCUISnapshotRunner.verify(app, named: "BusStopList", in: self)
     }
 
-    func testSnapshot_BusArrival() {
+    func testSnapshot_BusArrival() throws {
         let app = launchSnapshotModeApp()
         let castro = app.staticTexts["Castro Station"]
         XCTAssertTrue(castro.waitForExistence(timeout: 10))
         castro.firstMatch.tap()
         XCTAssertTrue(app.staticTexts["K"].waitForExistence(timeout: 10),
                       "Expected K-Ingleside arrival row to be visible")
-        XCUISnapshotRunner.verify(app, named: "BusArrival", in: self)
+        try XCUISnapshotRunner.verify(app, named: "BusArrival", in: self)
     }
 
-    func testSnapshot_Settings() {
+    func testSnapshot_Settings() throws {
         let app = launchSnapshotModeApp()
         // Toolbar gear icon. If `app.buttons["gearshape"]` doesn't match, the view may need
         // an explicit `.accessibilityIdentifier("Settings")` modifier in BusStopListView.swift
@@ -44,16 +44,16 @@ final class WatchSnapshotUITests: XCTestCase {
         settingsButton.tap()
         XCTAssertTrue(app.staticTexts["API Key"].waitForExistence(timeout: 10),
                       "Expected Settings screen's API Key section header")
-        XCUISnapshotRunner.verify(app, named: "Settings", in: self)
+        try XCUISnapshotRunner.verify(app, named: "Settings", in: self)
     }
 
-    func testSnapshot_StopCodeEntry() {
+    func testSnapshot_StopCodeEntry() throws {
         let app = launchSnapshotModeApp()
         let searchButton = app.buttons.matching(identifier: "magnifyingglass").firstMatch
         XCTAssertTrue(searchButton.waitForExistence(timeout: 10),
                       "Search toolbar button not found — may need accessibilityIdentifier")
         searchButton.tap()
         XCTAssertTrue(app.staticTexts["Find Stop by Code"].waitForExistence(timeout: 10))
-        XCUISnapshotRunner.verify(app, named: "StopCodeEntry", in: self)
+        try XCUISnapshotRunner.verify(app, named: "StopCodeEntry", in: self)
     }
 }
