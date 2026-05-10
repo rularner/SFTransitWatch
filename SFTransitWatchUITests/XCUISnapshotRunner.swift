@@ -290,33 +290,32 @@ enum XCUISnapshotRunner {
     }
 
     private static func outputDirectory(file: StaticString) -> URL {
-        let env = ProcessInfo.processInfo.environment
-        if let custom = env["SNAPSHOT_OUTPUT_DIR"] {
+        if let custom = ProcessInfo.processInfo.environment["SNAPSHOT_OUTPUT_DIR"] {
             return URL(fileURLWithPath: custom)
-        }
-        if let ciRepo = env["CI_PRIMARY_REPOSITORY_PATH"] {
-            return URL(fileURLWithPath: ciRepo)
-                .appendingPathComponent("Snapshots", isDirectory: true)
-                .appendingPathComponent("AppStore", isDirectory: true)
-        }
-        if let srcroot = env["SRCROOT"] {
-            return URL(fileURLWithPath: srcroot)
-                .appendingPathComponent("Snapshots", isDirectory: true)
-                .appendingPathComponent("AppStore", isDirectory: true)
         }
         return repoRoot(file: file)
             .appendingPathComponent("Snapshots", isDirectory: true)
             .appendingPathComponent("AppStore", isDirectory: true)
     }
 
-    /// Walk up from this source file's path until we find a directory containing
-    /// `SFTransitWatch.xcodeproj`. Used when `SRCROOT` isn't set.
+    /// Resolve the project's repo root.
+    ///
+    /// Resolution order, most reliable first:
+    /// 1. Walk up from `#file` looking for `SFTransitWatch.xcodeproj`. This is
+    ///    the strongest signal because it confirms what it found.
+    /// 2. `CI_PRIMARY_REPOSITORY_PATH` (Xcode Cloud workspace root). Used when
+    ///    the walk can't find the marker — e.g. the build path baked into
+    ///    `#file` no longer exists at test time.
+    /// 3. `SRCROOT`. **Last resort** because on Xcode Cloud `SRCROOT` is set
+    ///    to the test target's source subdirectory (`.../SFTransitWatchUITests`)
+    ///    rather than the project root, so trusting it first produces the
+    ///    wrong goldens path.
+    /// 4. The directory containing `#file`, as a final fallback.
     private static func repoRoot(file: StaticString) -> URL {
-        if let srcroot = ProcessInfo.processInfo.environment["SRCROOT"] {
-            return URL(fileURLWithPath: srcroot)
-        }
-        var dir = URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
+        let env = ProcessInfo.processInfo.environment
         let fm = FileManager.default
+
+        var dir = URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
         for _ in 0..<10 {
             let marker = dir.appendingPathComponent("SFTransitWatch.xcodeproj")
             if fm.fileExists(atPath: marker.path) {
@@ -325,6 +324,13 @@ enum XCUISnapshotRunner {
             let parent = dir.deletingLastPathComponent()
             if parent == dir { break }
             dir = parent
+        }
+
+        if let ciRepo = env["CI_PRIMARY_REPOSITORY_PATH"] {
+            return URL(fileURLWithPath: ciRepo)
+        }
+        if let srcroot = env["SRCROOT"] {
+            return URL(fileURLWithPath: srcroot)
         }
         return URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
     }
