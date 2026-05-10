@@ -34,6 +34,11 @@ public struct Agency: Hashable, Codable, Identifiable, Sendable {
     public static func named(_ code: String) -> Agency? {
         known.first { $0.code == code }
     }
+
+    /// UserDefault key for the single-agency filter set by voice intents and
+    /// cleared from the in-app banner. Empty string means "no filter — use
+    /// `enabled_agencies` as normal."
+    public static let selectedAgencyKey = "selected_agency"
 }
 
 /// Parsing/formatting for the `enabled_agencies` UserDefault, which stores a

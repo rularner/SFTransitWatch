@@ -8,6 +8,7 @@ struct BusStopListView: View {
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
+    @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
@@ -29,12 +30,23 @@ struct BusStopListView: View {
     private var enabledAgencies: [String] {
         EnabledAgencies.parse(enabledAgenciesRaw)
     }
+    private var activeAgencyFilter: Agency? {
+        guard !selectedAgencyRaw.isEmpty else { return nil }
+        return Agency.named(selectedAgencyRaw)
+    }
+    private var queryAgencies: [String] {
+        if let filter = activeAgencyFilter {
+            return [filter.code]
+        }
+        return enabledAgencies
+    }
     private var showAgencyBadges: Bool {
-        enabledAgencies.count > 1
+        queryAgencies.count > 1
     }
 
     var body: some View {
         List {
+            filterBanner
             if !transitAPI.isAPIKeyConfigured {
                 apiKeyPromptSection
             } else if transitAPI.isLoading && nearbyStops.isEmpty {
@@ -106,6 +118,32 @@ struct BusStopListView: View {
         .onChange(of: transitAPI.isAPIKeyConfigured) {
             Task {
                 await loadNearbyStops()
+            }
+        }
+        .onChange(of: selectedAgencyRaw) {
+            Task {
+                await loadNearbyStops()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var filterBanner: some View {
+        if let agency = activeAgencyFilter {
+            Section {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .foregroundColor(.blue)
+                    Text("Showing \(agency.displayName) only")
+                        .font(.caption)
+                    Spacer()
+                    Button(action: { selectedAgencyRaw = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("Clear agency filter")
+                }
             }
         }
     }
@@ -219,7 +257,7 @@ struct BusStopListView: View {
             nearbyStops = await transitAPI.fetchNearbyStops(
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
-                agencies: enabledAgencies
+                agencies: queryAgencies
             )
         } else {
             nearbyStops = []
