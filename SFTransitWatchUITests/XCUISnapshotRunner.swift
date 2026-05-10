@@ -12,7 +12,7 @@ enum XCUISnapshotRunner {
     /// (e.g. "3:57" -> "10:43"), so even though the title text is identical,
     /// pixel comparison sees it as different. Excluding the full title row
     /// keeps the diff focused on body content. 200 covers all four observed
-    /// layouts on Apple Watch Ultra 49mm at 422x514. Goldens still include
+    /// layouts on Apple Watch SE 3 44mm at 368x448. Goldens still include
     /// this band so the App Store deliverable PNG looks like a real watch
     /// screen.
     private static let topBarPixelsToIgnore: Int = 200
