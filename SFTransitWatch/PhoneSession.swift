@@ -1,5 +1,6 @@
 import Foundation
 import WatchConnectivity
+import SFTransitWatchPackage
 
 final class PhoneSession: NSObject, WCSessionDelegate {
     static let shared = PhoneSession()
@@ -20,12 +21,22 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         guard WCSession.default.activationState == .activated,
               WCSession.default.isPaired,
               WCSession.default.isWatchAppInstalled else { return }
-        let key = UserDefaults.standard.string(forKey: "511_API_KEY") ?? ""
+
+        // SnapshotMode: skip WCSession calls during snapshot runs.
+        if SnapshotMode.isActive { return }
+
+        let key = UserDefaults.standard.string(forKey: "511_API_KEY")
+        let payload = Self.payload(forKey: key)
         do {
-            try WCSession.default.updateApplicationContext(["transitKey": key])
+            try WCSession.default.updateApplicationContext(payload)
         } catch {
             print("WCSession updateApplicationContext error: \(error.localizedDescription)")
         }
+    }
+
+    static func payload(forKey key: String?) -> [String: Any] {
+        let transitKey = key?.trimmingCharacters(in: .whitespaces) ?? ""
+        return ["transitKey": transitKey]
     }
 
     private func startObservingDefaults() {
