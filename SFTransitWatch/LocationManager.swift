@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import SFTransitWatchPackage
 
 @MainActor
 class LocationManager: NSObject, ObservableObject {
@@ -14,18 +15,31 @@ class LocationManager: NSObject, ObservableObject {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 10 // Update every 10 meters
+
+        // SnapshotMode: serve a fixed Castro Station location instead of any real CL request.
+        if SnapshotMode.isActive {
+            currentLocation = SnapshotMode.fixedLocation
+        }
     }
     
     func requestLocationPermission() {
+        // SnapshotMode: don't trigger a permission prompt — we have a fixed location.
+        if SnapshotMode.isActive { return }
         locationManager.requestWhenInUseAuthorization()
     }
     
     func startLocationUpdates() {
+        // SnapshotMode: avoid kicking off any real Core Location authorization or updates.
+        if SnapshotMode.isActive {
+            currentLocation = SnapshotMode.fixedLocation
+            return
+        }
+
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             requestLocationPermission()
             return
         }
-        
+
         locationManager.startUpdatingLocation()
         isLocationEnabled = true
     }
