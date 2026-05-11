@@ -19,6 +19,9 @@ class TransitAPI: ObservableObject {
     }
 
     private var hasUsableKey: Bool {
+        // SnapshotMode: pretend the key is configured so settings/onboarding views render normally.
+        if SnapshotMode.isActive { return true }
+
         return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
     }
 
@@ -65,6 +68,11 @@ class TransitAPI: ObservableObject {
     }
 
     func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
+        // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
+        if SnapshotMode.isActive {
+            return SnapshotMode.arrivals(for: SnapshotMode.sampleStop)
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -131,6 +139,11 @@ class TransitAPI: ObservableObject {
     }
     
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
+        // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
+        if SnapshotMode.isActive {
+            return SnapshotMode.nearbyStops
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
