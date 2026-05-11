@@ -57,6 +57,30 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8477FCC32FB16F9000C98E73"
+               BuildableName = "SFTransitWatchPhoneTests.xctest"
+               BlueprintName = "SFTransitWatchPhoneTests"
+               ReferencedContainer = "container:SFTransitWatch.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8477FCD02FB16F9E00C98E73"
+               BuildableName = "SFTransitWatchPhoneUITests.xctest"
+               BlueprintName = "SFTransitWatchPhoneUITests"
+               ReferencedContainer = "container:SFTransitWatch.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

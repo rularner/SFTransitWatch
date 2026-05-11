@@ -48,7 +48,7 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Reset watch sim before tests"
-               scriptText = "# Pre-test sim reset. Without this, watchOS UI test runs intermittently&#10;# fail with &quot;Unknown application display identifier&quot; from a stale install&#10;# registry on the cloned simulator. simctl erase wipes the registry.&#10;#&#10;# NOTE: We deliberately do NOT delete DerivedData here, even though that&#10;# is the other half of the manual-recovery dance. xcodebuild allocates&#10;# its result-bundle path inside DerivedData *before* this pre-action&#10;# fires, and wiping the directory mid-run produces&#10;# &quot;mkstemp: No such file or directory&quot;. If sim-erase alone proves&#10;# insufficient, run `bin/run-watch-snapshot-tests.sh` (which wipes&#10;# DerivedData first, then invokes xcodebuild) instead.&#10;#&#10;# Logs go to /tmp/sftransit-preaction.log so we can verify the action&#10;# actually fires under xcodebuild (not just Xcode UI).&#10;LOG=/tmp/sftransit-preaction.log&#10;echo &quot;[$(date)] sftransit watch test pre-action firing&quot; &gt;&gt; &quot;$LOG&quot;&#10;&#10;/usr/bin/xcrun simctl shutdown all &gt;&gt; &quot;$LOG&quot; 2&gt;&amp;1 || true&#10;&#10;for SIM in &quot;Apple Watch SE 3 (44mm)&quot;; do&#10;    /usr/bin/xcrun simctl erase &quot;$SIM&quot; &gt;&gt; &quot;$LOG&quot; 2&gt;&amp;1 || true&#10;done&#10;&#10;echo &quot;[$(date)] sftransit watch test pre-action done&quot; &gt;&gt; &quot;$LOG&quot;&#10;exit 0&#10;">
+               scriptText = "# Pre-test sim reset. Without this, watchOS UI test runs intermittently&#10;# fail with &quot;Unknown application display identifier&quot; from a stale install&#10;# registry on the cloned simulator. simctl erase wipes the registry.&#10;#&#10;# NOTE: We deliberately do NOT delete DerivedData here, even though that&#10;# is the other half of the manual-recovery dance. xcodebuild allocates&#10;# its result-bundle path inside DerivedData *before* this pre-action&#10;# fires, and wiping the directory mid-run produces&#10;# &quot;mkstemp: No such file or directory&quot;. If sim-erase alone proves&#10;# insufficient, run `bin/run-watch-snapshot-tests.sh` (which wipes&#10;# DerivedData first, then invokes xcodebuild) instead.&#10;#&#10;# Logs go to /tmp/sftransit-preaction.log so we can verify the action&#10;# actually fires under xcodebuild (not just Xcode UI).&#10;LOG=/tmp/sftransit-preaction.log&#10;echo &quot;[$(date)] sftransit watch test pre-action firing&quot; &gt;&gt; &quot;$LOG&quot;&#10;&#10;/usr/bin/xcrun simctl shutdown all &gt;&gt; &quot;$LOG&quot; 2&gt;&amp;1 || true&#10;&#10;for SIM in &quot;Apple Watch Ultra (49mm)&quot;; do&#10;    /usr/bin/xcrun simctl erase &quot;$SIM&quot; &gt;&gt; &quot;$LOG&quot; 2&gt;&amp;1 || true&#10;done&#10;&#10;echo &quot;[$(date)] sftransit watch test pre-action done&quot; &gt;&gt; &quot;$LOG&quot;&#10;exit 0&#10;">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"
@@ -81,6 +81,28 @@
                BlueprintIdentifier = "84E0253D2FAD714C006B3F47"
                BuildableName = "SFTransitWatchUITests.xctest"
                BlueprintName = "SFTransitWatchUITests"
+               ReferencedContainer = "container:SFTransitWatch.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8477FCC32FB16F9000C98E73"
+               BuildableName = "SFTransitWatchPhoneTests.xctest"
+               BlueprintName = "SFTransitWatchPhoneTests"
+               ReferencedContainer = "container:SFTransitWatch.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8477FCD02FB16F9E00C98E73"
+               BuildableName = "SFTransitWatchPhoneUITests.xctest"
+               BlueprintName = "SFTransitWatchPhoneUITests"
                ReferencedContainer = "container:SFTransitWatch.xcodeproj">
             </BuildableReference>
          </TestableReference>
