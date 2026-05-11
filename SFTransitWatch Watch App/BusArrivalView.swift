@@ -14,6 +14,20 @@ struct BusArrivalView: View {
     @State private var notifiedArrivalIDs: Set<UUID> = []
     @State private var selectedRoute: String? = nil  // nil = show all
 
+    init(
+        stop: BusStop,
+        transitAPI: TransitAPI? = nil,
+        favoritesManager: FavoritesManager? = nil,
+        commuteSlotsManager: CommuteSlotsManager? = nil,
+        initialArrivals: [BusArrival] = []
+    ) {
+        self.stop = stop
+        _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
+        _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
+        _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
+        _arrivals = State(initialValue: initialArrivals)
+    }
+
     private let refreshInterval = 30
 
     var filteredArrivals: [BusArrival] {

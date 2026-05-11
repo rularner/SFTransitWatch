@@ -361,6 +361,50 @@ For development, the app includes:
 - Debug logging in console
 - Graceful error handling
 
+## Snapshot tests for App Store screenshots
+
+Goldens at `SFTransitWatchUITests/Goldens/*.png` are App Store deliverables AND regression baselines. The four watch screens (`BusStopListView`, `BusArrivalView`, `SettingsView`, `StopCodeEntryView`) are captured via `XCUIScreen.main.screenshot()` from `SFTransitWatchUITests`. The watch app launches under a `-SNAPSHOT_MODE` flag that routes data fetches through `SnapshotMode` fixtures — no live 511.org calls.
+
+Goldens live alongside the test source so they ride inside the `.xctest` bundle as resources. The test process loads them via `Bundle(for:)`, which is the only path that works on Xcode Cloud — the build step's source tree and env vars don't propagate to the test step there.
+
+The diff comparison ignores the top 200 px of every screenshot — that band contains the watchOS system time and the navigation title row, both of which shift between runs. The full PNG is still saved as the golden so the App Store deliverable looks like a real watch screen.
+
+### Running the tests
+
+Use the wrapper script. It wipes the project's DerivedData before invoking `xcodebuild`, which is the only reliable way to avoid the watchOS simulator's `Unknown application display identifier` install failure between runs:
+
+```bash
+bin/run-watch-snapshot-tests.sh
+```
+
+To run a single test:
+
+```bash
+bin/run-watch-snapshot-tests.sh \
+  -only-testing:SFTransitWatchUITests/WatchSnapshotUITests/testSnapshot_StopCodeEntry
+```
+
+Plain `xcodebuild test` from the command line and `Cmd+U` from Xcode both also have a scheme test pre-action that erases the watch simulator first (logged to `/tmp/sftransit-preaction.log`), but `simctl erase` alone is not always enough — when in doubt, use the wrapper.
+
+### When a test fails
+
+On a snapshot diff failure, two artifacts land in `$TMPDIR/SFTransitWatchSnapshots/`:
+
+- `<name>-failed.png` — the new full-screen render.
+- `<name>-diff.png` — magenta-on-dimmed-grayscale visualization of the differing pixels.
+
+Both are also attached to the test result via `XCTAttachment` (durable across CI), so on Xcode Cloud you can open them from the build's test results view.
+
+The failure message reports the differing-pixel count, the percentage, the bounding box (in cropped coordinates — `y=0` is row 200 of the original screenshot), and the on-disk paths.
+
+### Re-recording after intentional UI changes
+
+```bash
+RECORD_SNAPSHOTS=1 bin/run-watch-snapshot-tests.sh
+```
+
+The wrapper sets `SIMCTL_CHILD_RECORD_SNAPSHOTS=1` so the env var propagates through `xcodebuild` into the simulator's test process. Review the regenerated PNGs in `SFTransitWatchUITests/Goldens/` and commit them. The next test build picks them up as bundle resources automatically.
+
 ## Rate Limits
 
 511.org API has rate limits:

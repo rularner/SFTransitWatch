@@ -10,6 +10,11 @@ public class FavoritesManager: ObservableObject {
     public init(userDefaultsSuiteName: String? = nil) {
         self.userDefaults = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
         loadFavorites()
+
+        // SnapshotMode: seed favorites in-memory so the screenshot shows the Favorites section.
+        if SnapshotMode.isActive {
+            favoriteStopIds = SnapshotMode.favoriteStopIDs
+        }
     }
 
     public func toggleFavorite(for stopId: String) {

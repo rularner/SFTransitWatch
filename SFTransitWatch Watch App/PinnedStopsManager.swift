@@ -11,6 +11,11 @@ class PinnedStopsManager: ObservableObject {
     init(userDefaultsSuiteName: String? = nil) {
         self.userDefaults = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
         load()
+
+        // SnapshotMode: seed pinned stops in-memory so the screenshot shows the Pinned section.
+        if SnapshotMode.isActive {
+            pinned = SnapshotMode.pinnedStops
+        }
     }
 
     func pin(_ stop: BusStop) {

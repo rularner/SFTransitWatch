@@ -12,6 +12,20 @@ struct BusStopListView: View {
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
 
+    init(
+        transitAPI: TransitAPI? = nil,
+        favoritesManager: FavoritesManager? = nil,
+        pinnedStopsManager: PinnedStopsManager? = nil,
+        locationManager: LocationManager? = nil,
+        initialNearbyStops: [BusStop] = []
+    ) {
+        _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
+        _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
+        _pinnedStopsManager = StateObject(wrappedValue: pinnedStopsManager ?? PinnedStopsManager())
+        _locationManager = StateObject(wrappedValue: locationManager ?? LocationManager())
+        _nearbyStops = State(initialValue: initialNearbyStops)
+    }
+
     private var enabledAgencies: [String] {
         EnabledAgencies.parse(enabledAgenciesRaw)
     }
