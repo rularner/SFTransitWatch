@@ -5,7 +5,6 @@ struct BusArrivalView: View {
     let stop: BusStop
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var siriManager = SiriManager()
     @State private var arrivals: [BusArrival] = []
     @State private var lastUpdated = Date()
     
@@ -28,8 +27,6 @@ struct BusArrivalView: View {
                         
                         Button(action: {
                             favoritesManager.toggleFavorite(for: stop.id)
-                            // Donate Siri intent when user favorites a stop
-                            siriManager.donateBusArrivalIntent(stopId: stop.id, stopName: stop.name)
                         }) {
                             Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
                                 .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)
@@ -117,15 +114,6 @@ struct BusArrivalView: View {
             await loadArrivals()
         }
         .onAppear {
-            siriManager.setupSiriShortcuts()
-            // Donate Siri intent when user views arrivals
-            siriManager.donateBusArrivalIntent(stopId: stop.id, stopName: stop.name)
-            
-            // Donate route-specific intents for each route at this stop
-            for route in stop.routes {
-                siriManager.donateRouteSpecificIntent(route: route)
-            }
-            
             Task {
                 await loadArrivals()
             }

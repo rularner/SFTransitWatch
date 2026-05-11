@@ -6,12 +6,18 @@ struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var siriManager = SiriManager()
+    @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
     @State private var showingSettingsAlert = false
 
+    private var activeAgencyFilter: Agency? {
+        guard !selectedAgencyRaw.isEmpty else { return nil }
+        return Agency.named(selectedAgencyRaw)
+    }
+
     var body: some View {
         List {
+            filterBanner
             if !transitAPI.isAPIKeyConfigured {
                 apiKeyPromptSection
             } else if transitAPI.isLoading && nearbyStops.isEmpty {
@@ -56,7 +62,6 @@ struct BusStopListView: View {
         }
         .onAppear {
             locationManager.startLocationUpdates()
-            siriManager.setupSiriShortcuts()
             Task {
                 await loadNearbyStops()
             }
@@ -69,6 +74,32 @@ struct BusStopListView: View {
         .onChange(of: transitAPI.isAPIKeyConfigured) {
             Task {
                 await loadNearbyStops()
+            }
+        }
+        .onChange(of: selectedAgencyRaw) {
+            Task {
+                await loadNearbyStops()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var filterBanner: some View {
+        if let agency = activeAgencyFilter {
+            Section {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .foregroundColor(.blue)
+                    Text("Showing \(agency.displayName) only")
+                        .font(.caption)
+                    Spacer()
+                    Button(action: { selectedAgencyRaw = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("Clear agency filter")
+                }
             }
         }
     }
@@ -141,8 +172,7 @@ struct BusStopListView: View {
                         BusStopRow(
                             stop: stop,
                             currentLocation: locationManager.currentLocation,
-                            favoritesManager: favoritesManager,
-                            siriManager: siriManager
+                            favoritesManager: favoritesManager
                         )
                     }
                 }
@@ -155,8 +185,7 @@ struct BusStopListView: View {
                     BusStopRow(
                         stop: stop,
                         currentLocation: locationManager.currentLocation,
-                        favoritesManager: favoritesManager,
-                        siriManager: siriManager
+                        favoritesManager: favoritesManager
                     )
                 }
             }
@@ -165,9 +194,11 @@ struct BusStopListView: View {
 
     private func loadNearbyStops() async {
         if let location = locationManager.currentLocation {
+            let agencies = activeAgencyFilter.map { [$0.code] } ?? ["SF"]
             nearbyStops = await transitAPI.fetchNearbyStops(
                 latitude: location.coordinate.latitude,
-                longitude: location.coordinate.longitude
+                longitude: location.coordinate.longitude,
+                agencies: agencies
             )
         } else {
             nearbyStops = []
@@ -180,8 +211,6 @@ struct BusStopListView: View {
         }
 
         nearbyStops = favoritesManager.sortStopsWithFavoritesFirst(nearbyStops)
-
-        siriManager.donateNearbyStopsIntent()
     }
 }
 
@@ -189,7 +218,6 @@ struct BusStopRow: View {
     let stop: BusStop
     let currentLocation: CLLocation?
     let favoritesManager: FavoritesManager
-    let siriManager: SiriManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -224,7 +252,6 @@ struct BusStopRow: View {
 
                     Button(action: {
                         favoritesManager.toggleFavorite(for: stop.id)
-                        siriManager.donateBusArrivalIntent(stopId: stop.id, stopName: stop.name)
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
                             .foregroundColor(stop.isFavorite ? .yellow : .gray)
