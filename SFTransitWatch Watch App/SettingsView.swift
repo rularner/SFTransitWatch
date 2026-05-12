@@ -6,9 +6,7 @@ struct SettingsView: View {
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
-    @AppStorage("511_API_KEY") private var storedAPIKey = ""
-    @AppStorage("WORKER_TOKEN") private var workerToken = ""
-    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
+    @State private var apiKey = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
@@ -30,7 +28,7 @@ struct SettingsView: View {
                     Text("511.org API Key")
                         .font(.headline)
 
-                    if storedAPIKey.isEmpty {
+                    if apiKey.isEmpty {
                         Text("Not configured")
                             .font(.caption)
                             .foregroundColor(.red)
@@ -42,7 +40,7 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 4)
 
-                Button(storedAPIKey.isEmpty ? "Enter API Key" : "Change API Key") {
+                Button(apiKey.isEmpty ? "Enter API Key" : "Change API Key") {
                     showingAPIKeyEntry = true
                 }
 
@@ -62,9 +60,9 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 4)
 
-                if !storedAPIKey.isEmpty {
+                if !apiKey.isEmpty {
                     Button("Clear API Key") {
-                        storedAPIKey = ""
+                        ConfigurationManager.shared.apiKey = ""
                     }
                     .foregroundColor(.red)
                 }
@@ -77,15 +75,14 @@ struct SettingsView: View {
                 HStack {
                     Text("Worker")
                     Spacer()
-                    Text(workerConfigured ? (URL(string: workerBaseURL)?.host ?? "Set") : "Not set")
+                    Text(workerHostDisplay)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                if workerConfigured {
+                if ConfigurationManager.shared.isWorkerConfigured {
                     Button("Clear", role: .destructive) {
-                        workerToken = ""
-                        workerBaseURL = ""
+                        ConfigurationManager.shared.clearWorkerConfig()
                     }
                 }
             }
@@ -196,13 +193,16 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        .onAppear {
+            apiKey = ConfigurationManager.shared.apiKey
+        }
         .sheet(isPresented: $showingAPIKeyEntry) {
-            APIKeyEntryView(storedAPIKey: $storedAPIKey)
+            APIKeyEntryView(apiKey: $apiKey)
         }
     }
 
-    private var workerConfigured: Bool {
-        return !workerToken.isEmpty && !workerBaseURL.isEmpty
+    private var workerHostDisplay: String {
+        return URL(string: ConfigurationManager.shared.workerBaseURL)?.host ?? ConfigurationManager.shared.workerBaseURL
     }
 
     private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {
@@ -284,7 +284,7 @@ struct CommuteSlotPickerView: View {
 }
 
 struct APIKeyEntryView: View {
-    @Binding var storedAPIKey: String
+    @Binding var apiKey: String
     @Environment(\.dismiss) private var dismiss
     @State private var draftKey: String = ""
 
@@ -296,7 +296,7 @@ struct APIKeyEntryView: View {
             TextField("Paste or dictate key", text: $draftKey)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .onAppear { draftKey = storedAPIKey }
+                .onAppear { draftKey = apiKey }
 
             HStack(spacing: 8) {
                 Button("Cancel") {
@@ -305,7 +305,9 @@ struct APIKeyEntryView: View {
                 .foregroundColor(.secondary)
 
                 Button("Save") {
-                    storedAPIKey = draftKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmed = draftKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    apiKey = trimmed
+                    ConfigurationManager.shared.apiKey = trimmed
                     dismiss()
                 }
                 .disabled(draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
