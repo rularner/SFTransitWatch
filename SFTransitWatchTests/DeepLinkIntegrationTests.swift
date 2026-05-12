@@ -1,6 +1,7 @@
 import XCTest
 import SFTransitWatchPackage
 
+@MainActor
 class DeepLinkIntegrationTests: XCTestCase {
 
     override func tearDown() {
