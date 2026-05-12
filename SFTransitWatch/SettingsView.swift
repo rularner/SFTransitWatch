@@ -9,9 +9,6 @@ struct SettingsView: View {
     @State private var showingAPIKeyAlert = false
     @State private var showingSuccessAlert = false
     @State private var showingClearFavoritesAlert = false
-    @AppStorage("511_API_KEY") private var storedAPIKey = ""
-    @AppStorage("WORKER_TOKEN") private var workerToken = ""
-    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
     @State private var workerLinkDraft = ""
     @State private var workerLinkError: String?
     
@@ -47,9 +44,9 @@ struct SettingsView: View {
             
             Section(
                 header: Text("Worker proxy (optional)"),
-                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by pasting a worker bootstrap link of the form https://rularner.github.io/sftransitwatch/wt?u=…&t=…. Leave blank to call 511.org directly with your own API key.")
+                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by clicking a worker bootstrap link of the form https://rularner.github.io/sftransitwatch/wt?u=…&t=…. Leave blank to call 511.org directly with your own API key.")
             ) {
-                if workerConfigured {
+                if ConfigurationManager.shared.isWorkerConfigured {
                     HStack {
                         Text("Worker")
                         Spacer()
@@ -59,8 +56,7 @@ struct SettingsView: View {
                             .truncationMode(.middle)
                     }
                     Button("Clear", role: .destructive) {
-                        workerToken = ""
-                        workerBaseURL = ""
+                        ConfigurationManager.shared.clearWorkerConfig()
                     }
                 } else {
                     TextField("Paste worker bootstrap link", text: $workerLinkDraft)
@@ -167,7 +163,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .onAppear {
-            apiKey = storedAPIKey
+            apiKey = ConfigurationManager.shared.apiKey
         }
         .alert("API Key Required", isPresented: $showingAPIKeyAlert) {
             Button("OK") { }
@@ -189,12 +185,8 @@ struct SettingsView: View {
         }
     }
     
-    private var workerConfigured: Bool {
-        return !workerToken.isEmpty && !workerBaseURL.isEmpty
-    }
-
     private var workerHostDisplay: String {
-        return URL(string: workerBaseURL)?.host ?? workerBaseURL
+        return URL(string: ConfigurationManager.shared.workerBaseURL)?.host ?? ConfigurationManager.shared.workerBaseURL
     }
 
     private func saveWorkerLink() {
@@ -204,8 +196,7 @@ struct SettingsView: View {
             workerLinkError = "Couldn't parse that link. Expected a /wt link with both u= and t= parameters."
             return
         }
-        workerBaseURL = config.url
-        workerToken = config.token
+        ConfigurationManager.shared.setWorkerConfig(url: config.url, token: config.token)
         workerLinkDraft = ""
         workerLinkError = nil
     }
@@ -215,8 +206,8 @@ struct SettingsView: View {
             showingAPIKeyAlert = true
             return
         }
-        
-        storedAPIKey = apiKey
+
+        ConfigurationManager.shared.setAPIKey(apiKey)
         transitAPI.setAPIKey(apiKey)
         showingSuccessAlert = true
     }
