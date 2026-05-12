@@ -3,9 +3,6 @@ import SFTransitWatchPackage
 
 @main
 struct SFTransitWatchApp: App {
-    @AppStorage("511_API_KEY") private var storedAPIKey = ""
-    @AppStorage("WORKER_TOKEN") private var storedWorkerToken = ""
-    @AppStorage("WORKER_BASE_URL") private var storedWorkerBaseURL = ""
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -17,12 +14,11 @@ struct SFTransitWatchApp: App {
             ContentView()
                 .onOpenURL { url in
                     if let key = WorkerConfigLink.apiKey(from: url), !key.isEmpty {
-                        storedAPIKey = key
+                        ConfigurationManager.shared.setAPIKey(key)
                         return
                     }
                     if let config = WorkerConfigLink.workerConfig(from: url) {
-                        storedWorkerBaseURL = config.url
-                        storedWorkerToken = config.token
+                        ConfigurationManager.shared.setWorkerConfig(url: config.url, token: config.token)
                     }
                 }
         }
