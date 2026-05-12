@@ -14,7 +14,7 @@ struct SFTransitWatchApp: App {
             ContentView()
                 .onOpenURL { url in
                     if let key = WorkerConfigLink.apiKey(from: url), !key.isEmpty {
-                        ConfigurationManager.shared.setAPIKey(key)
+                        ConfigurationManager.shared.apiKey = key
                         return
                     }
                     if let config = WorkerConfigLink.workerConfig(from: url) {
