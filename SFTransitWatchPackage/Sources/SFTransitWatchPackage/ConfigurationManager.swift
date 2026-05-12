@@ -3,21 +3,24 @@ import Foundation
 public class ConfigurationManager {
     public static let shared = ConfigurationManager()
 
-    private let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch")!
+    private let userDefaults: UserDefaults
 
     private let apiKeyKey = "511_API_KEY"
     private let workerTokenKey = "WORKER_TOKEN"
     private let workerBaseURLKey = "WORKER_BASE_URL"
+
+    private init() {
+        guard let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") else {
+            fatalError("Failed to initialize UserDefaults with app group. Verify app group entitlements are configured correctly.")
+        }
+        self.userDefaults = userDefaults
+    }
 
     // MARK: - API Key
 
     public var apiKey: String {
         get { userDefaults.string(forKey: apiKeyKey) ?? "" }
         set { userDefaults.set(newValue, forKey: apiKeyKey) }
-    }
-
-    public func setAPIKey(_ key: String) {
-        apiKey = key
     }
 
     // MARK: - Worker Configuration
