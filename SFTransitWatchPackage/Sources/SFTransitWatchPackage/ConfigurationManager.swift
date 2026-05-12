@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 public class ConfigurationManager {
     public static let shared = ConfigurationManager()
 
