@@ -207,7 +207,7 @@ struct SettingsView: View {
             return
         }
 
-        ConfigurationManager.shared.setAPIKey(apiKey)
+        ConfigurationManager.shared.apiKey = apiKey
         transitAPI.setAPIKey(apiKey)
         showingSuccessAlert = true
     }
