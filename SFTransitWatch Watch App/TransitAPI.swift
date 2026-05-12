@@ -4,10 +4,7 @@ import SFTransitWatchPackage
 
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
-    @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
-    @AppStorage("WORKER_TOKEN") private var workerToken = ""
-    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -15,19 +12,19 @@ class TransitAPI: ObservableObject {
     private var useDirectFallback = false
 
     private var resolvedKey: String {
-        return phoneAPIKey.isEmpty ? storedAPIKey : phoneAPIKey
+        return phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
     }
 
     private var hasUsableKey: Bool {
-        return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
+        return !phoneAPIKey.isEmpty || !ConfigurationManager.shared.apiKey.isEmpty
     }
 
     private var isDirect511Mode: Bool {
-        return useDirectFallback || workerToken.isEmpty || workerBaseURL.isEmpty
+        return useDirectFallback || ConfigurationManager.shared.workerToken.isEmpty || ConfigurationManager.shared.workerBaseURL.isEmpty
     }
 
     private var baseURL: String {
-        return isDirect511Mode ? defaultBaseURL : workerBaseURL
+        return isDirect511Mode ? defaultBaseURL : ConfigurationManager.shared.workerBaseURL
     }
 
     private var apiKey: String {
@@ -35,7 +32,7 @@ class TransitAPI: ObservableObject {
     }
 
     private var appToken: String? {
-        return isDirect511Mode ? nil : workerToken
+        return isDirect511Mode ? nil : ConfigurationManager.shared.workerToken
     }
 
     private func makeRequest(url: URL) -> URLRequest {
@@ -309,9 +306,9 @@ class TransitAPI: ObservableObject {
         }
     }
 
-    // Helper method to get API key from user
+    // Helper method to set API key
     func setAPIKey(_ key: String) {
-        storedAPIKey = key
+        ConfigurationManager.shared.apiKey = key
         print("API key updated")
     }
     
