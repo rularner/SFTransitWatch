@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import SFTransitWatchPackage
 
+@MainActor
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
@@ -61,7 +62,6 @@ class TransitAPI: ObservableObject {
         return "network"
     }
 
-    @MainActor
     func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
         // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
         // SnapshotMode.arrivals(for:) currently always returns Castro Station's 4 arrivals
@@ -138,7 +138,6 @@ class TransitAPI: ObservableObject {
     /// Fans out the StopPlace lookup across each enabled agency in parallel
     /// and merges the results, tagging every returned stop with its agency.
     /// Sets errorMessage when all agencies fail or some are degraded.
-    @MainActor
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
         // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
         if SnapshotMode.isActive {
@@ -195,7 +194,6 @@ class TransitAPI: ObservableObject {
     /// Single-agency StopPlace lookup. Throws on any failure (logged to
     /// telemetry); the caller is expected to merge with other agencies'
     /// results.
-    @MainActor
     private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async throws -> [BusStop] {
         let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
