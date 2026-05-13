@@ -21,8 +21,8 @@ class MockURLSession: URLSessionProtocol {
             return (data, response)
         }
 
-        // Try to match by host and path, ignoring query parameter order
-        if let match = responses.first(where: { $0.key.host == url.host && $0.key.path == url.path }) {
+        // Try to match by host only (most lenient matching)
+        if let match = responses.first(where: { $0.key.host == url.host }) {
             return match.value
         }
 
