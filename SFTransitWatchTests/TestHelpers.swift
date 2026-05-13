@@ -21,6 +21,11 @@ class MockURLSession: URLSessionProtocol {
             return (data, response)
         }
 
+        // Try to match by host and path, ignoring query parameter order
+        if let match = responses.first(where: { $0.key.host == url.host && $0.key.path == url.path }) {
+            return match.value
+        }
+
         // Default 404 if not configured
         let response = HTTPURLResponse(url: url, statusCode: 404, httpVersion: nil, headerFields: nil)!
         return (Data(), response)
