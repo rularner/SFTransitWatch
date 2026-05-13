@@ -2,32 +2,41 @@ import Foundation
 import SwiftUI
 import SFTransitWatchPackage
 
+protocol URLSessionProtocol {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse)
+}
+
+extension URLSession: URLSessionProtocol {}
+
+
+@MainActor
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
-    @AppStorage("511_API_KEY") private var storedAPIKey = ""
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
-    @AppStorage("WORKER_TOKEN") private var workerToken = ""
-    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
+    var urlSession: URLSessionProtocol = URLSession.shared
+
 
     private var useDirectFallback = false
 
+    init() {}
+
     private var resolvedKey: String {
-        return phoneAPIKey.isEmpty ? storedAPIKey : phoneAPIKey
+        return phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
     }
 
     private var hasUsableKey: Bool {
-        return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
+        return !phoneAPIKey.isEmpty || !ConfigurationManager.shared.apiKey.isEmpty
     }
 
     private var isDirect511Mode: Bool {
-        return useDirectFallback || workerToken.isEmpty || workerBaseURL.isEmpty
+        return useDirectFallback || ConfigurationManager.shared.workerToken.isEmpty || ConfigurationManager.shared.workerBaseURL.isEmpty
     }
 
     private var baseURL: String {
-        return isDirect511Mode ? defaultBaseURL : workerBaseURL
+        return isDirect511Mode ? defaultBaseURL : ConfigurationManager.shared.workerBaseURL
     }
 
     private var apiKey: String {
@@ -35,7 +44,7 @@ class TransitAPI: ObservableObject {
     }
 
     private var appToken: String? {
-        return isDirect511Mode ? nil : workerToken
+        return isDirect511Mode ? nil : ConfigurationManager.shared.workerToken
     }
 
     private func makeRequest(url: URL) -> URLRequest {
@@ -64,7 +73,6 @@ class TransitAPI: ObservableObject {
         return "network"
     }
 
-    @MainActor
     func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
         // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
         // SnapshotMode.arrivals(for:) currently always returns Castro Station's 4 arrivals
@@ -102,7 +110,7 @@ class TransitAPI: ObservableObject {
 
         let started = Date()
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await self.urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -141,7 +149,6 @@ class TransitAPI: ObservableObject {
     /// Fans out the StopPlace lookup across each enabled agency in parallel
     /// and merges the results, tagging every returned stop with its agency.
     /// Sets errorMessage when all agencies fail or some are degraded.
-    @MainActor
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
         // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
         if SnapshotMode.isActive {
@@ -198,7 +205,6 @@ class TransitAPI: ObservableObject {
     /// Single-agency StopPlace lookup. Throws on any failure (logged to
     /// telemetry); the caller is expected to merge with other agencies'
     /// results.
-    @MainActor
     private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async throws -> [BusStop] {
         let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
@@ -224,7 +230,7 @@ class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
 
         let started = Date()
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await self.urlSession.data(for: request)
         let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -309,9 +315,9 @@ class TransitAPI: ObservableObject {
         }
     }
 
-    // Helper method to get API key from user
+    // Helper method to set API key
     func setAPIKey(_ key: String) {
-        storedAPIKey = key
+        ConfigurationManager.shared.apiKey = key
         print("API key updated")
     }
     
@@ -345,7 +351,7 @@ class TransitAPI: ObservableObject {
 
         let started = Date()
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await self.urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             guard let http = response as? HTTPURLResponse else {
                 Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
@@ -369,17 +375,5 @@ class TransitAPI: ObservableObject {
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
             return nil
         }
-    }
-}
-
-// MARK: - Testing helpers (internal access for unit tests)
-
-extension TransitAPI {
-    func parseArrivalsForTesting(data: Data) throws -> [BusArrival] {
-        return try parse511Arrivals(data: data)
-    }
-
-    func parseStopsForTesting(data: Data) throws -> [BusStop] {
-        return try parse511Stops(data: data)
     }
 }
