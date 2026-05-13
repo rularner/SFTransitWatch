@@ -45,7 +45,7 @@ final class TransitAPIFallbackTests: XCTestCase {
         let directResponse = HTTPURLResponse(url: directURL, statusCode: 200, httpVersion: nil, headerFields: nil)!
         mockSession.responses[directURL] = (xmlData, directResponse)
 
-        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         // Should have made 2 requests: worker then direct
         XCTAssertEqual(mockSession.requestCount(), 2, "Should retry after 401")
