@@ -12,6 +12,9 @@ class TransitAPI: ObservableObject {
 
     private var useDirectFallback = false
 
+    nonisolated init() {}
+
+
     private var resolvedKey: String {
         return phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
     }
@@ -370,11 +373,39 @@ class TransitAPI: ObservableObject {
 // MARK: - Testing helpers (internal access for unit tests)
 
 extension TransitAPI {
-    func parseArrivalsForTesting(data: Data) throws -> [BusArrival] {
+    nonisolated(unsafe) var apiKeyForTesting: String {
+        return apiKey
+    }
+
+    nonisolated(unsafe) var baseURLForTesting: String {
+        return baseURL
+    }
+
+    nonisolated(unsafe) var hasUsableKeyForTesting: Bool {
+        return hasUsableKey
+    }
+
+    nonisolated(unsafe) var isDirect511ModeForTesting: Bool {
+        return isDirect511Mode
+    }
+
+    nonisolated(unsafe) var resolvedKeyForTesting: String {
+        return resolvedKey
+    }
+
+    nonisolated(unsafe) var appTokenForTesting: String? {
+        return appToken
+    }
+
+    nonisolated(unsafe) func makeRequestForTesting(url: URL) -> URLRequest {
+        return makeRequest(url: url)
+    }
+
+    nonisolated(unsafe) func parseArrivalsForTesting(data: Data) throws -> [BusArrival] {
         return try parse511Arrivals(data: data)
     }
 
-    func parseStopsForTesting(data: Data) throws -> [BusStop] {
+    nonisolated(unsafe) func parseStopsForTesting(data: Data) throws -> [BusStop] {
         return try parse511Stops(data: data)
     }
 }
