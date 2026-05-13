@@ -377,6 +377,3 @@ class TransitAPI: ObservableObject {
         }
     }
 }
-
-
-}

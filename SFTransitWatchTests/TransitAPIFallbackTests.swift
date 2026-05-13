@@ -7,6 +7,7 @@ final class TransitAPIFallbackTests: XCTestCase {
     var api: TransitAPI!
     var mockSession: MockURLSession!
 
+    @MainActor
     override func setUp() {
         super.setUp()
         api = TransitAPI()
@@ -20,6 +21,7 @@ final class TransitAPIFallbackTests: XCTestCase {
         UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
     }
 
+    @MainActor
     override func tearDown() {
         super.tearDown()
         UserDefaults.standard.removeObject(forKey: "511_API_KEY")
@@ -30,6 +32,7 @@ final class TransitAPIFallbackTests: XCTestCase {
 
     // MARK: - 401 Fallback Scenario Tests
 
+    @MainActor
     func testInitiallyInWorkerMode() async {
         let workerURL = "https://api.example.com"
         UserDefaults.standard.set(workerURL, forKey: "WORKER_BASE_URL")
@@ -44,12 +47,13 @@ final class TransitAPIFallbackTests: XCTestCase {
         let workerRequestURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
         mockSession.setMockResponse(for: workerRequestURL, data: Data(), statusCode: 401)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         // Should have made two requests: first to worker, then to direct
         XCTAssertEqual(mockSession.requestCount(), 2, "Should make two requests: worker then fallback to direct")
     }
 
+    @MainActor
     func testWorkerRequest401WithTokenSet() async {
         let workerURL = "https://api.example.com"
         UserDefaults.standard.set(workerURL, forKey: "WORKER_BASE_URL")
@@ -62,7 +66,7 @@ final class TransitAPIFallbackTests: XCTestCase {
         let workerRequestURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
         mockSession.setMockResponse(for: workerRequestURL, data: Data(), statusCode: 401)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         // First request should be to worker URL
         let firstRequest = mockSession.requests.first
@@ -71,6 +75,7 @@ final class TransitAPIFallbackTests: XCTestCase {
 
     // MARK: - Error Message Tests
 
+    @MainActor
     func testErrorMessageWhenMissingAPIKeyInDirectMode() async {
         // Don't set API key
         UserDefaults.standard.removeObject(forKey: "511_API_KEY")
@@ -81,6 +86,7 @@ final class TransitAPIFallbackTests: XCTestCase {
         XCTAssertEqual(api.errorMessage, "Please configure your 511.org API key in Settings", "Should show API key configuration error")
     }
 
+    @MainActor
     func testPhoneAPIKeyFallbackScenario() async {
         UserDefaults.standard.set("watch-local-key", forKey: "511_API_KEY")
         UserDefaults.standard.set("phone-shared-key", forKey: "511_API_KEY_FROM_PHONE")
@@ -89,7 +95,7 @@ final class TransitAPIFallbackTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=phone-shared-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.absoluteString.contains("api_key=phone-shared-key") ?? false, "Should resolve to phone's key")
@@ -97,6 +103,7 @@ final class TransitAPIFallbackTests: XCTestCase {
 
     // MARK: - Partial Configuration Tests
 
+    @MainActor
     func testPartialWorkerConfigWithURLOnly() async {
         UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
 
@@ -104,12 +111,13 @@ final class TransitAPIFallbackTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when token is missing")
     }
 
+    @MainActor
     func testPartialWorkerConfigWithTokenOnly() async {
         UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
 
@@ -117,12 +125,13 @@ final class TransitAPIFallbackTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when URL is missing")
     }
 
+    @MainActor
     func testErrorMessageOnNetworkFailure() async {
         let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         mockSession.setMockError(for: url, error: URLError(.networkConnectionLost))
@@ -133,6 +142,7 @@ final class TransitAPIFallbackTests: XCTestCase {
         XCTAssertNotNil(api.errorMessage, "Should set error message on network failure")
     }
 
+    @MainActor
     func testErrorMessageOn4xxResponse() async {
         let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         let response = HTTPURLResponse(url: url, statusCode: 400, httpVersion: nil, headerFields: nil)!
@@ -144,6 +154,7 @@ final class TransitAPIFallbackTests: XCTestCase {
         XCTAssertEqual(api.errorMessage, "511.org returned HTTP 400", "Should report HTTP error code")
     }
 
+    @MainActor
     func testErrorMessageOn5xxResponse() async {
         let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         let response = HTTPURLResponse(url: url, statusCode: 503, httpVersion: nil, headerFields: nil)!

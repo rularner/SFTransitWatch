@@ -7,6 +7,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
     var api: TransitAPI!
     var mockSession: MockURLSession!
 
+    @MainActor
     override func setUp() {
         super.setUp()
         api = TransitAPI()
@@ -19,6 +20,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
     }
 
+    @MainActor
     override func tearDown() {
         super.tearDown()
         UserDefaults.standard.removeObject(forKey: "511_API_KEY")
@@ -29,6 +31,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
 
     // MARK: - Configuration Mode Tests
 
+    @MainActor
     func testDirectModeWhenWorkerConfigMissing() async {
         UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
 
@@ -36,7 +39,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         // Verify it called the direct 511 URL, not a worker URL
         let request = mockSession.lastRequest()
@@ -44,6 +47,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
         XCTAssertTrue(request?.url?.host == "api.511.org", "Should use 511.org in direct mode")
     }
 
+    @MainActor
     func testDirectModeWhenWorkerTokenMissing() async {
         UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
         UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
@@ -52,13 +56,14 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         // Without token, should fall back to direct mode
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when token is missing")
     }
 
+    @MainActor
     func testDirectModeWhenWorkerURLMissing() async {
         UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
         UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
@@ -67,13 +72,14 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         // Without URL, should fall back to direct mode
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when URL is missing")
     }
 
+    @MainActor
     func testWorkerModeWhenFullyConfigured() async {
         let workerURL = "https://api.example.com"
         UserDefaults.standard.set(workerURL, forKey: "WORKER_BASE_URL")
@@ -84,7 +90,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         // Should use worker URL
         let request = mockSession.lastRequest()
@@ -94,6 +100,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
 
     // MARK: - API Key Resolution Tests
 
+    @MainActor
     func testAPIKeyResolvesFromStoredKey() async {
         UserDefaults.standard.set("stored-key-123", forKey: "511_API_KEY")
 
@@ -101,12 +108,13 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=stored-key-123")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.absoluteString.contains("api_key=stored-key-123") ?? false, "Should resolve API key from stored key")
     }
 
+    @MainActor
     func testAPIKeyPrefersPhonesKeyWhenAvailable() async {
         UserDefaults.standard.set("stored-key-123", forKey: "511_API_KEY")
         UserDefaults.standard.set("phone-key-456", forKey: "511_API_KEY_FROM_PHONE")
@@ -115,12 +123,13 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=phone-key-456")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.absoluteString.contains("api_key=phone-key-456") ?? false, "Should prefer phone API key over stored key")
     }
 
+    @MainActor
     func testMissingAPIKeyShowsError() async {
         let result = await api.fetchArrivals(for: "15552", agency: "SF")
 
@@ -130,6 +139,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
 
     // MARK: - Query Parameter Tests
 
+    @MainActor
     func testDirectModeIncludesAPIKeyInQueryParams() async {
         UserDefaults.standard.set("test-api-key", forKey: "511_API_KEY")
 
@@ -137,12 +147,13 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-api-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertTrue(request?.url?.absoluteString.contains("api_key=test-api-key") ?? false, "Direct mode should include api_key query parameter")
     }
 
+    @MainActor
     func testWorkerModeExcludesAPIKeyFromQueryParams() async {
         UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
         UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
@@ -152,7 +163,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertFalse(request?.url?.absoluteString.contains("api_key=") ?? true, "Worker mode should not include api_key query parameter")
@@ -160,6 +171,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
 
     // MARK: - HTTP Header Tests
 
+    @MainActor
     func testDirectModeRequestDoesNotHaveAppTokenHeader() async {
         UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
 
@@ -167,12 +179,13 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertNil(request?.value(forHTTPHeaderField: "X-App-Token"), "Direct mode request should not have X-App-Token header")
     }
 
+    @MainActor
     func testWorkerModeRequestIncludesAppTokenHeader() async {
         let testToken = "worker-token-xyz"
         UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
@@ -183,7 +196,7 @@ final class TransitAPIConfigurationTests: XCTestCase {
         let expectedURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
         mockSession.setMockResponse(for: expectedURL, data: mockData)
 
-        await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
 
         let request = mockSession.lastRequest()
         XCTAssertEqual(request?.value(forHTTPHeaderField: "X-App-Token"), testToken, "Worker mode request should have X-App-Token header")

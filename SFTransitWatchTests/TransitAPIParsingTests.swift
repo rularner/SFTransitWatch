@@ -7,6 +7,7 @@ final class TransitAPIParsingTests: XCTestCase {
     var api: TransitAPI!
     var mockSession: MockURLSession!
 
+    @MainActor
     override func setUp() {
         super.setUp()
         api = TransitAPI()
@@ -20,6 +21,7 @@ final class TransitAPIParsingTests: XCTestCase {
         UserDefaults.standard.set("test-key-123", forKey: "511_API_KEY")
     }
 
+    @MainActor
     override func tearDown() {
         super.tearDown()
         UserDefaults.standard.removeObject(forKey: "511_API_KEY")
@@ -28,6 +30,7 @@ final class TransitAPIParsingTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
     }
 
+    @MainActor
     func testParseArrivalsExtractsRouteAndTime() async throws {
         let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
         let xml = """
@@ -57,6 +60,7 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertGreaterThan(arrivals[0].minutesAway, 0)
     }
 
+    @MainActor
     func testParseArrivalsEmptyXMLReturnsEmpty() async throws {
         let xml = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
         let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key-123")!
@@ -66,6 +70,7 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertTrue(arrivals.isEmpty)
     }
 
+    @MainActor
     func testParseStopsExtractsNameAndCoordinates() async throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -92,6 +97,7 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(stops[0].longitude, -122.4064, accuracy: 0.0001)
     }
 
+    @MainActor
     func testParseStopsEmptyXMLReturnsEmpty() async throws {
         let xml = "<StopPlaces></StopPlaces>".data(using: .utf8)!
         let url = URL(string: "https://api.511.org/transit/Stops?operator_id=SF&lat=37.7858&lon=-122.4064&latitude=37.7858&longitude=-122.4064&radius=1000&api_key=test-key-123")!
@@ -101,6 +107,7 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertTrue(stops.isEmpty)
     }
 
+    @MainActor
     func testParseArrivalsIgnoresUTF8BOM() async throws {
         let iso = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
         let body = """
