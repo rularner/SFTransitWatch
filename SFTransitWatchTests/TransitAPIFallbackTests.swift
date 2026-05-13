@@ -15,16 +15,16 @@ final class TransitAPIFallbackTests: XCTestCase {
         mockSession = MockURLSession()
         api.urlSession = mockSession
 
-        UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
+        // Set API key via ConfigurationManager (not UserDefaults)
+        ConfigurationManager.shared.apiKey = "test-key"
     }
 
     @MainActor
     override func tearDown() {
         super.tearDown()
-        UserDefaults.standard.removeObject(forKey: "511_API_KEY")
-        UserDefaults.standard.removeObject(forKey: "511_API_KEY_FROM_PHONE")
-        UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
-        UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
+        ConfigurationManager.shared.apiKey = ""
+        ConfigurationManager.shared.workerToken = ""
+        ConfigurationManager.shared.workerBaseURL = ""
     }
 
     /// When worker returns 401, API should retry with direct mode
@@ -33,8 +33,8 @@ final class TransitAPIFallbackTests: XCTestCase {
         let workerURL = URL(string: "https://worker.example.com/")!
         let directURL = URL(string: "https://api.511.org/")!
 
-        UserDefaults.standard.set("https://worker.example.com", forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.set("worker-token", forKey: "WORKER_TOKEN")
+        ConfigurationManager.shared.workerBaseURL = "https://worker.example.com"
+        ConfigurationManager.shared.workerToken = "worker-token"
 
         // Worker returns 401
         let workerResponse = HTTPURLResponse(url: workerURL, statusCode: 401, httpVersion: nil, headerFields: nil)!
@@ -54,7 +54,7 @@ final class TransitAPIFallbackTests: XCTestCase {
     /// Missing API key shows proper error
     @MainActor
     func testMissingAPIKeyShowsError() async {
-        UserDefaults.standard.removeObject(forKey: "511_API_KEY")
+        ConfigurationManager.shared.apiKey = ""
 
         let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
 

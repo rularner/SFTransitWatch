@@ -16,16 +16,16 @@ final class TransitAPIParsingTests: XCTestCase {
         mockSession = MockURLSession()
         api.urlSession = mockSession
 
-        UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
+        // Set API key via ConfigurationManager (not UserDefaults)
+        ConfigurationManager.shared.apiKey = "test-key"
     }
 
     @MainActor
     override func tearDown() {
         super.tearDown()
-        UserDefaults.standard.removeObject(forKey: "511_API_KEY")
-        UserDefaults.standard.removeObject(forKey: "511_API_KEY_FROM_PHONE")
-        UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
-        UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
+        ConfigurationManager.shared.apiKey = ""
+        ConfigurationManager.shared.workerToken = ""
+        ConfigurationManager.shared.workerBaseURL = ""
     }
 
     @MainActor
