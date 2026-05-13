@@ -2,6 +2,13 @@ import Foundation
 import SwiftUI
 import SFTransitWatchPackage
 
+protocol URLSessionProtocol {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse)
+}
+
+extension URLSession: URLSessionProtocol {}
+
+
 @MainActor
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
@@ -9,11 +16,12 @@ class TransitAPI: ObservableObject {
 
     @Published var isLoading = false
     @Published var errorMessage: String?
+    var urlSession: URLSessionProtocol = URLSession.shared
+
 
     private var useDirectFallback = false
 
-    nonisolated init() {}
-
+    init() {}
 
     private var resolvedKey: String {
         return phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
@@ -102,7 +110,7 @@ class TransitAPI: ObservableObject {
 
         let started = Date()
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await self.urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -222,7 +230,7 @@ class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
 
         let started = Date()
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await self.urlSession.data(for: request)
         let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -343,7 +351,7 @@ class TransitAPI: ObservableObject {
 
         let started = Date()
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await self.urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             guard let http = response as? HTTPURLResponse else {
                 Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
@@ -370,42 +378,5 @@ class TransitAPI: ObservableObject {
     }
 }
 
-// MARK: - Testing helpers (internal access for unit tests)
 
-extension TransitAPI {
-    nonisolated(unsafe) var apiKeyForTesting: String {
-        return apiKey
-    }
-
-    nonisolated(unsafe) var baseURLForTesting: String {
-        return baseURL
-    }
-
-    nonisolated(unsafe) var hasUsableKeyForTesting: Bool {
-        return hasUsableKey
-    }
-
-    nonisolated(unsafe) var isDirect511ModeForTesting: Bool {
-        return isDirect511Mode
-    }
-
-    nonisolated(unsafe) var resolvedKeyForTesting: String {
-        return resolvedKey
-    }
-
-    nonisolated(unsafe) var appTokenForTesting: String? {
-        return appToken
-    }
-
-    nonisolated(unsafe) func makeRequestForTesting(url: URL) -> URLRequest {
-        return makeRequest(url: url)
-    }
-
-    nonisolated(unsafe) func parseArrivalsForTesting(data: Data) throws -> [BusArrival] {
-        return try parse511Arrivals(data: data)
-    }
-
-    nonisolated(unsafe) func parseStopsForTesting(data: Data) throws -> [BusStop] {
-        return try parse511Stops(data: data)
-    }
 }

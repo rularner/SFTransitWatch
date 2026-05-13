@@ -4,9 +4,31 @@ import SFTransitWatchPackage
 
 final class TransitAPIParsingTests: XCTestCase {
 
-    // MARK: - Arrivals XML parsing
+    var api: TransitAPI!
+    var mockSession: MockURLSession!
 
-    func testParseArrivalsExtractsRouteAndTime() throws {
+    override func setUp() {
+        super.setUp()
+        api = TransitAPI()
+        mockSession = MockURLSession()
+        api.urlSession = mockSession
+
+        UserDefaults.standard.removeObject(forKey: "511_API_KEY")
+        UserDefaults.standard.removeObject(forKey: "511_API_KEY_FROM_PHONE")
+        UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
+        UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
+        UserDefaults.standard.set("test-key-123", forKey: "511_API_KEY")
+    }
+
+    override func tearDown() {
+        super.tearDown()
+        UserDefaults.standard.removeObject(forKey: "511_API_KEY")
+        UserDefaults.standard.removeObject(forKey: "511_API_KEY_FROM_PHONE")
+        UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
+        UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
+    }
+
+    func testParseArrivalsExtractsRouteAndTime() async throws {
         let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -25,23 +47,26 @@ final class TransitAPIParsingTests: XCTestCase {
         </ServiceDelivery>
         """.data(using: .utf8)!
 
-        let api = TransitAPI()
-        let arrivals = try api.parseArrivalsForTesting(data: xml)
+        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key-123")!
+        mockSession.setMockResponse(for: url, data: xml)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
         XCTAssertFalse(arrivals.isEmpty, "Should parse at least one arrival")
         XCTAssertEqual(arrivals[0].route, "38")
         XCTAssertGreaterThan(arrivals[0].minutesAway, 0)
     }
 
-    func testParseArrivalsEmptyXMLReturnsEmpty() throws {
+    func testParseArrivalsEmptyXMLReturnsEmpty() async throws {
         let xml = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
-        let api = TransitAPI()
-        let arrivals = try api.parseArrivalsForTesting(data: xml)
+        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key-123")!
+        mockSession.setMockResponse(for: url, data: xml)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
         XCTAssertTrue(arrivals.isEmpty)
     }
 
-    // MARK: - Stops XML parsing
-
-    func testParseStopsExtractsNameAndCoordinates() throws {
+    func testParseStopsExtractsNameAndCoordinates() async throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <StopPlaces>
@@ -56,22 +81,27 @@ final class TransitAPIParsingTests: XCTestCase {
         </StopPlaces>
         """.data(using: .utf8)!
 
-        let api = TransitAPI()
-        let stops = try api.parseStopsForTesting(data: xml)
+        let url = URL(string: "https://api.511.org/transit/Stops?operator_id=SF&lat=37.7858&lon=-122.4064&latitude=37.7858&longitude=-122.4064&radius=1000&api_key=test-key-123")!
+        mockSession.setMockResponse(for: url, data: xml)
+
+        let stops = await api.fetchNearbyStops(latitude: 37.7858, longitude: -122.4064)
+
         XCTAssertFalse(stops.isEmpty, "Should parse at least one stop")
         XCTAssertEqual(stops[0].id, "15552")
         XCTAssertEqual(stops[0].latitude, 37.7858, accuracy: 0.0001)
         XCTAssertEqual(stops[0].longitude, -122.4064, accuracy: 0.0001)
     }
 
-    func testParseStopsEmptyXMLReturnsEmpty() throws {
+    func testParseStopsEmptyXMLReturnsEmpty() async throws {
         let xml = "<StopPlaces></StopPlaces>".data(using: .utf8)!
-        let api = TransitAPI()
-        let stops = try api.parseStopsForTesting(data: xml)
+        let url = URL(string: "https://api.511.org/transit/Stops?operator_id=SF&lat=37.7858&lon=-122.4064&latitude=37.7858&longitude=-122.4064&radius=1000&api_key=test-key-123")!
+        mockSession.setMockResponse(for: url, data: xml)
+
+        let stops = await api.fetchNearbyStops(latitude: 37.7858, longitude: -122.4064)
         XCTAssertTrue(stops.isEmpty)
     }
 
-    func testParseArrivalsIgnoresUTF8BOM() throws {
+    func testParseArrivalsIgnoresUTF8BOM() async throws {
         let iso = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
         let body = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -92,8 +122,10 @@ final class TransitAPIParsingTests: XCTestCase {
         var data = Data([0xEF, 0xBB, 0xBF])
         data.append(body.data(using: .utf8)!)
 
-        let api = TransitAPI()
-        let arrivals = try api.parseArrivalsForTesting(data: data)
+        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key-123")!
+        mockSession.setMockResponse(for: url, data: data)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
         XCTAssertEqual(arrivals.first?.route, "14")
     }
 }

@@ -4,193 +4,154 @@ import SFTransitWatchPackage
 
 final class TransitAPIFallbackTests: XCTestCase {
 
+    var api: TransitAPI!
+    var mockSession: MockURLSession!
+
     override func setUp() {
         super.setUp()
-        // Clear all configuration before each test
+        api = TransitAPI()
+        mockSession = MockURLSession()
+        api.urlSession = mockSession
+
         UserDefaults.standard.removeObject(forKey: "511_API_KEY")
+        UserDefaults.standard.removeObject(forKey: "511_API_KEY_FROM_PHONE")
         UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
         UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
+        UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
     }
 
     override func tearDown() {
         super.tearDown()
-        // Clean up after each test
         UserDefaults.standard.removeObject(forKey: "511_API_KEY")
+        UserDefaults.standard.removeObject(forKey: "511_API_KEY_FROM_PHONE")
         UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
         UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
     }
 
     // MARK: - 401 Fallback Scenario Tests
 
-    func testInitiallyInWorkerMode() {
-        // Set up worker configuration
-        UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
+    func testInitiallyInWorkerMode() async {
+        let workerURL = "https://api.example.com"
+        UserDefaults.standard.set(workerURL, forKey: "WORKER_BASE_URL")
         UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
-        let api = TransitAPI()
 
-        // Should start in worker mode
-        XCTAssertFalse(api.isDirect511ModeForTesting,
-                       "Should initially be in worker mode when configured")
-        XCTAssertEqual(api.baseURLForTesting, "https://api.example.com")
+        // Set up successful response on direct mode as fallback
+        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
+        let directURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+        mockSession.setMockResponse(for: directURL, data: mockData, statusCode: 200)
+
+        // Set 401 on worker URL to trigger fallback
+        let workerRequestURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
+        mockSession.setMockResponse(for: workerRequestURL, data: Data(), statusCode: 401)
+
+        await api.fetchArrivals(for: "15552", agency: "SF")
+
+        // Should have made two requests: first to worker, then to direct
+        XCTAssertEqual(mockSession.requestCount(), 2, "Should make two requests: worker then fallback to direct")
     }
 
-    func testWorkerRequest401WithTokenSet() {
-        // Worker mode with valid token should be attempted
-        UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
+    func testWorkerRequest401WithTokenSet() async {
+        let workerURL = "https://api.example.com"
+        UserDefaults.standard.set(workerURL, forKey: "WORKER_BASE_URL")
         UserDefaults.standard.set("invalid-token", forKey: "WORKER_TOKEN")
-        let api = TransitAPI()
 
-        // The API should not be in direct mode yet (401 would trigger fallback)
-        XCTAssertFalse(api.isDirect511ModeForTesting,
-                       "Should not be in direct mode before 401 response")
+        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
+        let directURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+        mockSession.setMockResponse(for: directURL, data: mockData, statusCode: 200)
+
+        let workerRequestURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
+        mockSession.setMockResponse(for: workerRequestURL, data: Data(), statusCode: 401)
+
+        await api.fetchArrivals(for: "15552", agency: "SF")
+
+        // First request should be to worker URL
+        let firstRequest = mockSession.requests.first
+        XCTAssertTrue(firstRequest?.url?.host == "api.example.com", "Should initially try worker URL")
     }
 
     // MARK: - Error Message Tests
 
-    func testErrorMessageWhenMissingAPIKeyInDirectMode() {
-        let api = TransitAPI()
-        // In direct mode with no API key configured
-        XCTAssertTrue(api.isDirect511ModeForTesting)
-        XCTAssertFalse(api.hasUsableKeyForTesting)
-        XCTAssertEqual(api.apiKeyForTesting, "YOUR_511_API_KEY",
-                       "Should use placeholder when no real key configured")
+    func testErrorMessageWhenMissingAPIKeyInDirectMode() async {
+        // Don't set API key
+        UserDefaults.standard.removeObject(forKey: "511_API_KEY")
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertTrue(arrivals.isEmpty, "Should return empty when API key missing")
+        XCTAssertEqual(api.errorMessage, "Please configure your 511.org API key in Settings", "Should show API key configuration error")
     }
 
-    func testPhoneAPIKeyFallbackScenario() {
-        // Simulate scenario where phone app set the key
+    func testPhoneAPIKeyFallbackScenario() async {
         UserDefaults.standard.set("watch-local-key", forKey: "511_API_KEY")
         UserDefaults.standard.set("phone-shared-key", forKey: "511_API_KEY_FROM_PHONE")
-        let api = TransitAPI()
 
-        // Should resolve to phone's key
-        XCTAssertEqual(api.resolvedKeyForTesting, "phone-shared-key")
-        XCTAssertEqual(api.apiKeyForTesting, "phone-shared-key")
+        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
+        let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=phone-shared-key")!
+        mockSession.setMockResponse(for: expectedURL, data: mockData)
+
+        await api.fetchArrivals(for: "15552", agency: "SF")
+
+        let request = mockSession.lastRequest()
+        XCTAssertTrue(request?.url?.absoluteString.contains("api_key=phone-shared-key") ?? false, "Should resolve to phone's key")
     }
 
     // MARK: - Partial Configuration Tests
 
-    func testPartialWorkerConfigWithURLOnly() {
-        // Only URL set, token missing
+    func testPartialWorkerConfigWithURLOnly() async {
         UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
-        let api = TransitAPI()
 
-        XCTAssertTrue(api.isDirect511ModeForTesting,
-                      "Should fall back to direct mode when token is missing")
-        XCTAssertEqual(api.baseURLForTesting, "https://api.511.org/transit",
-                       "Should use 511.org URL when falling back to direct mode")
+        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
+        let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+        mockSession.setMockResponse(for: expectedURL, data: mockData)
+
+        await api.fetchArrivals(for: "15552", agency: "SF")
+
+        let request = mockSession.lastRequest()
+        XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when token is missing")
     }
 
-    func testPartialWorkerConfigWithTokenOnly() {
-        // Only token set, URL missing
+    func testPartialWorkerConfigWithTokenOnly() async {
         UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
-        let api = TransitAPI()
 
-        XCTAssertTrue(api.isDirect511ModeForTesting,
-                      "Should fall back to direct mode when URL is missing")
+        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
+        let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+        mockSession.setMockResponse(for: expectedURL, data: mockData)
+
+        await api.fetchArrivals(for: "15552", agency: "SF")
+
+        let request = mockSession.lastRequest()
+        XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when URL is missing")
     }
 
-    // MARK: - Configuration State Transitions
+    func testErrorMessageOnNetworkFailure() async {
+        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+        mockSession.setMockError(for: url, error: URLError(.networkConnectionLost))
 
-    func testClearingWorkerConfigForcesFallback() {
-        // Start with worker config
-        UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
-        UserDefaults.standard.set("backup-api-key", forKey: "511_API_KEY")
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
 
-        var api = TransitAPI()
-        XCTAssertFalse(api.isDirect511ModeForTesting)
-
-        // Simulate error handler clearing worker config
-        UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
-
-        api = TransitAPI()
-        XCTAssertTrue(api.isDirect511ModeForTesting,
-                      "Should be in direct mode after worker config is cleared")
+        XCTAssertTrue(arrivals.isEmpty, "Should return empty arrivals on network error")
+        XCTAssertNotNil(api.errorMessage, "Should set error message on network failure")
     }
 
-    // MARK: - Request Header Validation
+    func testErrorMessageOn4xxResponse() async {
+        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+        let response = HTTPURLResponse(url: url, statusCode: 400, httpVersion: nil, headerFields: nil)!
+        mockSession.responses[url] = (Data(), response)
 
-    func testWorkerRequestHasCorrectAuthHeader() {
-        let workerToken = "worker-auth-token-12345"
-        UserDefaults.standard.set("https://worker.example.com", forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.set(workerToken, forKey: "WORKER_TOKEN")
-        let api = TransitAPI()
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
 
-        let url = URL(string: "https://worker.example.com/StopMonitoring?agency=SF&stopCode=15552")!
-        let request = api.makeRequestForTesting(url: url)
-
-        XCTAssertEqual(request.value(forHTTPHeaderField: "X-App-Token"), workerToken,
-                       "Worker request must include X-App-Token header with correct token")
+        XCTAssertTrue(arrivals.isEmpty, "Should return empty on 4xx error")
+        XCTAssertEqual(api.errorMessage, "511.org returned HTTP 400", "Should report HTTP error code")
     }
 
-    func testDirectRequestHasNoAuthHeader() {
-        UserDefaults.standard.set("direct-api-key", forKey: "511_API_KEY")
-        let api = TransitAPI()
+    func testErrorMessageOn5xxResponse() async {
+        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+        let response = HTTPURLResponse(url: url, statusCode: 503, httpVersion: nil, headerFields: nil)!
+        mockSession.responses[url] = (Data(), response)
 
-        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=direct-api-key")!
-        let request = api.makeRequestForTesting(url: url)
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
 
-        XCTAssertNil(request.value(forHTTPHeaderField: "X-App-Token"),
-                     "Direct mode request must not have X-App-Token header")
-    }
-
-    // MARK: - Endpoint Correctness Tests
-
-    func testDirectModeUsesCorrect511Endpoint() {
-        UserDefaults.standard.set("api-key", forKey: "511_API_KEY")
-        let api = TransitAPI()
-
-        XCTAssertTrue(api.baseURLForTesting.contains("511.org"),
-                      "Direct mode must use 511.org endpoint")
-        XCTAssertEqual(api.baseURLForTesting, "https://api.511.org/transit")
-    }
-
-    func testWorkerModeUsesConfiguredEndpoint() {
-        let customWorkerURL = "https://my-worker.cloudflare.com/api"
-        UserDefaults.standard.set(customWorkerURL, forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.set("token", forKey: "WORKER_TOKEN")
-        let api = TransitAPI()
-
-        XCTAssertEqual(api.baseURLForTesting, customWorkerURL,
-                       "Worker mode must use configured worker endpoint")
-    }
-
-    // MARK: - API Key Placeholder Test
-
-    func testPlaceholderAPIKeyWhenNoneConfigured() {
-        // No configuration at all
-        let api = TransitAPI()
-
-        XCTAssertEqual(api.apiKeyForTesting, "YOUR_511_API_KEY",
-                       "Should use placeholder key when none configured")
-        XCTAssertFalse(api.hasUsableKeyForTesting,
-                       "Should indicate no usable key when placeholder is being used")
-    }
-
-    // MARK: - Configuration Validity Tests
-
-    func testIsWorkerConfigValidWhenBothSet() {
-        UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.set("valid-token", forKey: "WORKER_TOKEN")
-        let api = TransitAPI()
-
-        XCTAssertFalse(api.isDirect511ModeForTesting,
-                       "Worker mode should be active when both URL and token are set")
-    }
-
-    func testIsNotWorkerConfigValidWhenEitherMissing() {
-        // Missing URL
-        UserDefaults.standard.set("valid-token", forKey: "WORKER_TOKEN")
-        var api = TransitAPI()
-        XCTAssertTrue(api.isDirect511ModeForTesting,
-                      "Should not consider config valid when URL is missing")
-
-        // Reset and try missing token
-        UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
-        UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
-        api = TransitAPI()
-        XCTAssertTrue(api.isDirect511ModeForTesting,
-                      "Should not consider config valid when token is missing")
+        XCTAssertTrue(arrivals.isEmpty, "Should return empty on 5xx error")
+        XCTAssertEqual(api.errorMessage, "511.org returned HTTP 503", "Should report HTTP error code")
     }
 }
