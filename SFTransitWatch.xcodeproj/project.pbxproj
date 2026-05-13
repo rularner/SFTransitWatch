@@ -158,6 +158,7 @@
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Complication.entitlements"; sourceTree = "<group>"; };
+		CAFE0000000000000000ENT0 /* SFTransitWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SFTransitWatch.entitlements; sourceTree = "<group>"; };
 		CAFE0000000000000000P001 /* PinnedStopsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedStopsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000S001 /* CommuteSlotsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
@@ -325,6 +326,7 @@
 				CAFE000000000000000020FB /* PhoneSession.swift */,
 				CAFE000000000000000020BC /* Assets.xcassets */,
 				CAFE000000000000000020BE /* Info.plist */,
+				CAFE0000000000000000ENT0 /* SFTransitWatch.entitlements */,
 				CAFE000000000000000020C1 /* Preview Content */,
 			);
 			path = SFTransitWatch;
@@ -847,6 +849,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
@@ -854,6 +857,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatchTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -869,6 +873,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
@@ -876,6 +881,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatchTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -1116,8 +1122,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SFTransitWatch/SFTransitWatch.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"SFTransitWatch/Preview Content\"";
+				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SFTransitWatch/Info.plist;
@@ -1135,6 +1144,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -1147,8 +1157,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SFTransitWatch/SFTransitWatch.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"SFTransitWatch/Preview Content\"";
+				DEVELOPMENT_TEAM = 7W4U5RR9QZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SFTransitWatch/Info.plist;
@@ -1166,6 +1179,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.larner.SFTransitWatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
