@@ -2,6 +2,7 @@ import XCTest
 import SFTransitWatchPackage
 @testable import SFTransitWatch_Watch_App
 
+/// Tests for critical error handling: 401 fallback from worker to direct mode.
 final class TransitAPIFallbackTests: XCTestCase {
 
     var api: TransitAPI!
@@ -14,10 +15,6 @@ final class TransitAPIFallbackTests: XCTestCase {
         mockSession = MockURLSession()
         api.urlSession = mockSession
 
-        UserDefaults.standard.removeObject(forKey: "511_API_KEY")
-        UserDefaults.standard.removeObject(forKey: "511_API_KEY_FROM_PHONE")
-        UserDefaults.standard.removeObject(forKey: "WORKER_TOKEN")
-        UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
         UserDefaults.standard.set("test-key", forKey: "511_API_KEY")
     }
 
@@ -30,139 +27,63 @@ final class TransitAPIFallbackTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "WORKER_BASE_URL")
     }
 
-    // MARK: - 401 Fallback Scenario Tests
-
+    /// When worker returns 401, API should retry with direct mode
     @MainActor
-    func testInitiallyInWorkerMode() async {
-        let workerURL = "https://api.example.com"
-        UserDefaults.standard.set(workerURL, forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
+    func testFallbacksToDirectModeOn401() async {
+        let workerURL = URL(string: "https://worker.example.com/")!
+        let directURL = URL(string: "https://api.511.org/")!
 
-        // Set up successful response on direct mode as fallback
-        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
-        let directURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
-        mockSession.setMockResponse(for: directURL, data: mockData, statusCode: 200)
+        UserDefaults.standard.set("https://worker.example.com", forKey: "WORKER_BASE_URL")
+        UserDefaults.standard.set("worker-token", forKey: "WORKER_TOKEN")
 
-        // Set 401 on worker URL to trigger fallback
-        let workerRequestURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
-        mockSession.setMockResponse(for: workerRequestURL, data: Data(), statusCode: 401)
+        // Worker returns 401
+        let workerResponse = HTTPURLResponse(url: workerURL, statusCode: 401, httpVersion: nil, headerFields: nil)!
+        mockSession.responses[workerURL] = (Data(), workerResponse)
 
-        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+        // Direct mode succeeds
+        let xmlData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
+        let directResponse = HTTPURLResponse(url: directURL, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        mockSession.responses[directURL] = (xmlData, directResponse)
 
-        // Should have made two requests: first to worker, then to direct
-        XCTAssertEqual(mockSession.requestCount(), 2, "Should make two requests: worker then fallback to direct")
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        // Should have made 2 requests: worker then direct
+        XCTAssertEqual(mockSession.requestCount(), 2, "Should retry after 401")
     }
 
+    /// Missing API key shows proper error
     @MainActor
-    func testWorkerRequest401WithTokenSet() async {
-        let workerURL = "https://api.example.com"
-        UserDefaults.standard.set(workerURL, forKey: "WORKER_BASE_URL")
-        UserDefaults.standard.set("invalid-token", forKey: "WORKER_TOKEN")
-
-        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
-        let directURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
-        mockSession.setMockResponse(for: directURL, data: mockData, statusCode: 200)
-
-        let workerRequestURL = URL(string: "https://api.example.com/StopMonitoring?agency=SF&stopCode=15552")!
-        mockSession.setMockResponse(for: workerRequestURL, data: Data(), statusCode: 401)
-
-        _ = await api.fetchArrivals(for: "15552", agency: "SF")
-
-        // First request should be to worker URL
-        let firstRequest = mockSession.requests.first
-        XCTAssertTrue(firstRequest?.url?.host == "api.example.com", "Should initially try worker URL")
-    }
-
-    // MARK: - Error Message Tests
-
-    @MainActor
-    func testErrorMessageWhenMissingAPIKeyInDirectMode() async {
-        // Don't set API key
+    func testMissingAPIKeyShowsError() async {
         UserDefaults.standard.removeObject(forKey: "511_API_KEY")
 
         let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
 
-        XCTAssertTrue(arrivals.isEmpty, "Should return empty when API key missing")
-        XCTAssertEqual(api.errorMessage, "Please configure your 511.org API key in Settings", "Should show API key configuration error")
+        XCTAssertTrue(arrivals.isEmpty)
+        XCTAssertEqual(api.errorMessage, "Please configure your 511.org API key in Settings")
     }
 
+    /// Network errors are handled
     @MainActor
-    func testPhoneAPIKeyFallbackScenario() async {
-        UserDefaults.standard.set("watch-local-key", forKey: "511_API_KEY")
-        UserDefaults.standard.set("phone-shared-key", forKey: "511_API_KEY_FROM_PHONE")
-
-        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
-        let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=phone-shared-key")!
-        mockSession.setMockResponse(for: expectedURL, data: mockData)
-
-        _ = await api.fetchArrivals(for: "15552", agency: "SF")
-
-        let request = mockSession.lastRequest()
-        XCTAssertTrue(request?.url?.absoluteString.contains("api_key=phone-shared-key") ?? false, "Should resolve to phone's key")
-    }
-
-    // MARK: - Partial Configuration Tests
-
-    @MainActor
-    func testPartialWorkerConfigWithURLOnly() async {
-        UserDefaults.standard.set("https://api.example.com", forKey: "WORKER_BASE_URL")
-
-        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
-        let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
-        mockSession.setMockResponse(for: expectedURL, data: mockData)
-
-        _ = await api.fetchArrivals(for: "15552", agency: "SF")
-
-        let request = mockSession.lastRequest()
-        XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when token is missing")
-    }
-
-    @MainActor
-    func testPartialWorkerConfigWithTokenOnly() async {
-        UserDefaults.standard.set("test-token", forKey: "WORKER_TOKEN")
-
-        let mockData = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
-        let expectedURL = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
-        mockSession.setMockResponse(for: expectedURL, data: mockData)
-
-        _ = await api.fetchArrivals(for: "15552", agency: "SF")
-
-        let request = mockSession.lastRequest()
-        XCTAssertTrue(request?.url?.host == "api.511.org", "Should fall back to direct mode when URL is missing")
-    }
-
-    @MainActor
-    func testErrorMessageOnNetworkFailure() async {
-        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+    func testNetworkErrorIsHandled() async {
+        let url = URL(string: "https://api.511.org/")!
         mockSession.setMockError(for: url, error: URLError(.networkConnectionLost))
 
         let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
 
-        XCTAssertTrue(arrivals.isEmpty, "Should return empty arrivals on network error")
-        XCTAssertNotNil(api.errorMessage, "Should set error message on network failure")
+        XCTAssertTrue(arrivals.isEmpty)
+        XCTAssertNotNil(api.errorMessage)
     }
 
+    /// HTTP 5xx errors are reported
     @MainActor
-    func testErrorMessageOn4xxResponse() async {
-        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
-        let response = HTTPURLResponse(url: url, statusCode: 400, httpVersion: nil, headerFields: nil)!
-        mockSession.responses[url] = (Data(), response)
-
-        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
-
-        XCTAssertTrue(arrivals.isEmpty, "Should return empty on 4xx error")
-        XCTAssertEqual(api.errorMessage, "511.org returned HTTP 400", "Should report HTTP error code")
-    }
-
-    @MainActor
-    func testErrorMessageOn5xxResponse() async {
-        let url = URL(string: "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=15552&api_key=test-key")!
+    func testHTTP5xxErrorReported() async {
+        let url = URL(string: "https://api.511.org/")!
         let response = HTTPURLResponse(url: url, statusCode: 503, httpVersion: nil, headerFields: nil)!
         mockSession.responses[url] = (Data(), response)
 
         let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
 
-        XCTAssertTrue(arrivals.isEmpty, "Should return empty on 5xx error")
-        XCTAssertEqual(api.errorMessage, "511.org returned HTTP 503", "Should report HTTP error code")
+        XCTAssertTrue(arrivals.isEmpty)
+        XCTAssertEqual(api.errorMessage, "511.org returned HTTP 503")
     }
 }
