@@ -1,4 +1,5 @@
-  - Get registration link working on watch
+  - Make deep link for worker reg, should include one-time code. Worker takes one-time code once and returns back token
+  - Remove github reg links, only use deep lins
   - Add stop code entry to iPhone views
   - Stop direction not obvious in list, not easy using voice
   - tag only works on comments, not PR names. But we only validate PR names. Fix that.
