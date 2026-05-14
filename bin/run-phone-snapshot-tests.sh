@@ -13,6 +13,7 @@ set -euo pipefail
 SCHEME="SFTransitWatch"
 DESTINATION='platform=iOS Simulator,OS=26.4.1,name=iPhone 17 Pro'
 DERIVED_DATA_GLOB="${HOME}/Library/Developer/Xcode/DerivedData/SFTransitWatch-*"
+export RUN_UI_TESTS=1
 
 echo ">> Wiping project DerivedData: ${DERIVED_DATA_GLOB}"
 # shellcheck disable=SC2086
@@ -23,17 +24,12 @@ if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
     export TEST_RUNNER_RECORD_SNAPSHOTS=1
 fi
 
-ARGS=(-scheme "${SCHEME}" -destination "${DESTINATION}")
-
-if [[ "${RUN_UI_TESTS:-}" == "1" ]]; then
-    echo ">> xcodebuild test -scheme \"${SCHEME}\" -only-testing:SFTransitWatchPhoneUITests"
-    ARGS+=(-only-testing:SFTransitWatchPhoneUITests)
-else
-    echo ">> xcodebuild test -scheme \"${SCHEME}\" (skipping UI tests)"
-    ARGS+=(-skip-testing:SFTransitWatchPhoneUITests)
-fi
-
-xcodebuild test "${ARGS[@]}" "$@"
+echo ">> xcodebuild test -scheme \"${SCHEME}\" -only-testing:SFTransitWatchPhoneUITests"
+xcodebuild test \
+    -scheme "${SCHEME}" \
+    -destination "${DESTINATION}" \
+    -only-testing:SFTransitWatchPhoneUITests \
+    "$@"
 
 if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
     echo ">> Resizing golden snapshots to App Store compliant 1284x2778"

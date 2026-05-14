@@ -20,6 +20,7 @@ set -euo pipefail
 SCHEME="SFTransitWatch Watch App"
 DESTINATION='platform=watchOS Simulator,name=Apple Watch SE 3 (44mm)'
 DERIVED_DATA_GLOB="${HOME}/Library/Developer/Xcode/DerivedData/SFTransitWatch-*"
+export RUN_UI_TESTS=1
 
 echo ">> Wiping project DerivedData: ${DERIVED_DATA_GLOB}"
 # shellcheck disable=SC2086
@@ -35,11 +36,7 @@ if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
 fi
 
 echo ">> xcodebuild test -scheme \"${SCHEME}\""
-ARGS=(-scheme "${SCHEME}" -destination "${DESTINATION}")
-
-if [[ "${RUN_UI_TESTS:-}" != "1" ]]; then
-    echo ">> Skipping UI tests (set RUN_UI_TESTS=1 to include them)"
-    ARGS+=(-skip-testing:SFTransitWatchUITests -skip-testing:SFTransitWatchPhoneUITests)
-fi
-
-exec xcodebuild test "${ARGS[@]}" "$@"
+exec xcodebuild test \
+    -scheme "${SCHEME}" \
+    -destination "${DESTINATION}" \
+    "$@"
