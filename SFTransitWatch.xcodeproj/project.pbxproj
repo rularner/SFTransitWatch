@@ -48,7 +48,6 @@
 		CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 		CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000P001 /* PinnedStopsManager.swift */; };
 		CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 		CAFE0000000000000000E001B /* CommuteSlotPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E001 /* CommuteSlotPickerView.swift */; };
 		CAFE0000000000000000E002B /* CommuteSlotPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E002 /* CommuteSlotPickerView.swift */; };
@@ -169,7 +168,6 @@
 		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Complication.entitlements"; sourceTree = "<group>"; };
 		CAFE0000000000000000ENT0 /* SFTransitWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SFTransitWatch.entitlements; sourceTree = "<group>"; };
-		CAFE0000000000000000P001 /* PinnedStopsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedStopsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000S001 /* CommuteSlotsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotsManager.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000E001 /* CommuteSlotPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotPickerView.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000E002 /* CommuteSlotPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommuteSlotPickerView.swift; sourceTree = "<group>"; };
@@ -294,7 +292,6 @@
 				CAFE000000000000000015E0 /* SiriManager.swift */,
 				CAFE000000000000000015F0 /* SiriShortcutsView.swift */,
 				CAFE0000000000000000E002 /* CommuteSlotPickerView.swift */,
-				CAFE0000000000000000P001 /* PinnedStopsManager.swift */,
 				CAFE0000000000000000S001 /* CommuteSlotsManager.swift */,
 				CAFE0000000000000000C004 /* ComplicationUpdater.swift */,
 				CAFE0000000000000000B001 /* BackgroundRefreshController.swift */,
@@ -710,7 +707,6 @@
 				CAFE000000000000000015EA /* SiriManager.swift in Sources */,
 				CAFE000000000000000015FA /* SiriShortcutsView.swift in Sources */,
 				CAFE0000000000000000E002B /* CommuteSlotPickerView.swift in Sources */,
-				CAFE0000000000000000P002 /* PinnedStopsManager.swift in Sources */,
 				CAFE0000000000000000S002 /* CommuteSlotsManager.swift in Sources */,
 				CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */,
 				CAFE0000000000000000B002 /* BackgroundRefreshController.swift in Sources */,
