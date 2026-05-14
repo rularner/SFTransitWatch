@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8437B6052FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
+		8437B6062FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
+		8437B6072FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
+		8437B6082FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
+		8437B6092FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
 		84E024872FAAE089006B3F47 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84E024862FAAE089006B3F47 /* SFTransitWatchPackage */; };
 		84F0010100000000000010A0 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010A1 /* SFTransitWatchPackage */; };
 		84F0010100000000000010B0 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
@@ -180,6 +185,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8437B6082FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -187,6 +193,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8437B6092FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -194,6 +201,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8437B6062FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */,
 				84E024872FAAE089006B3F47 /* SFTransitWatchPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -202,6 +210,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8437B6072FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,6 +226,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8437B6052FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */,
 				84F0010100000000000010A0 /* SFTransitWatchPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -383,6 +393,7 @@
 			);
 			name = SFTransitWatchPhoneTests;
 			packageProductDependencies = (
+				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 			);
 			productName = SFTransitWatchPhoneTests;
 			productReference = 8477FCC42FB16F9000C98E73 /* SFTransitWatchPhoneTests.xctest */;
@@ -406,6 +417,7 @@
 			);
 			name = SFTransitWatchPhoneUITests;
 			packageProductDependencies = (
+				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 			);
 			productName = SFTransitWatchPhoneUITests;
 			productReference = 8477FCD12FB16F9E00C98E73 /* SFTransitWatchPhoneUITests.xctest */;
@@ -429,6 +441,7 @@
 			);
 			name = SFTransitWatchTests;
 			packageProductDependencies = (
+				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 				84E024862FAAE089006B3F47 /* SFTransitWatchPackage */,
 			);
 			productName = SFTransitWatchTests;
@@ -453,6 +466,7 @@
 			);
 			name = SFTransitWatchUITests;
 			packageProductDependencies = (
+				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 			);
 			productName = SFTransitWatchUITests;
 			productReference = 84E0253E2FAD714C006B3F47 /* SFTransitWatchUITests.xctest */;
@@ -475,6 +489,7 @@
 			name = "SFTransitWatch Watch App";
 			packageProductDependencies = (
 				84F0010100000000000010B1 /* SFTransitWatchPackage */,
+				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 			);
 			productName = "SFTransitWatch Watch App";
 			productReference = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */;
@@ -496,6 +511,7 @@
 			);
 			name = SFTransitWatch;
 			packageProductDependencies = (
+				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 				84F0010100000000000010A1 /* SFTransitWatchPackage */,
 			);
 			productName = SFTransitWatch;
