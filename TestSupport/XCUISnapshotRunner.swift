@@ -5,18 +5,6 @@ import UniformTypeIdentifiers
 
 enum XCUISnapshotRunner {
 
-    /// Pixels at the top of the captured screenshot to ignore when diffing.
-    /// Above this band are: (1) the watchOS system time (changes every run),
-    /// (2) the sheet close-X / chevron back button, and (3) the navigation
-    /// title row. The nav title shifts ~1px when the time width changes
-    /// (e.g. "3:57" -> "10:43"), so even though the title text is identical,
-    /// pixel comparison sees it as different. Excluding the full title row
-    /// keeps the diff focused on body content. 200 covers all four observed
-    /// layouts on Apple Watch SE 3 44mm at 368x448. Goldens still include
-    /// this band so the App Store deliverable PNG looks like a real watch
-    /// screen.
-    private static let topBarPixelsToIgnore: Int = 200
-
     /// Capture `app`, attach the full PNG to the test result, and diff against
     /// the bundled golden — ignoring the top-of-screen band where the watchOS
     /// time lives.
@@ -41,6 +29,7 @@ enum XCUISnapshotRunner {
         _ app: XCUIApplication,
         named name: String,
         in testCase: XCTestCase,
+        topPixelsToIgnore: Int = 200,
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
@@ -97,11 +86,11 @@ enum XCUISnapshotRunner {
             return
         }
 
-        guard let new = decodeAndCropTopBar(pngData) else {
+        guard let new = decodeAndCropTopBar(pngData, topPixelsToIgnore: topPixelsToIgnore) else {
             XCTFail("Could not decode captured screenshot for diffing", file: file, line: line)
             return
         }
-        guard let golden = decodeAndCropTopBar(goldenData) else {
+        guard let golden = decodeAndCropTopBar(goldenData, topPixelsToIgnore: topPixelsToIgnore) else {
             XCTFail("Could not decode bundled golden for diffing: \(goldenURL.path)", file: file, line: line)
             return
         }
@@ -139,7 +128,7 @@ enum XCUISnapshotRunner {
         let totalPixels = new.width * new.height
         let percent = Double(diff.count) / Double(totalPixels) * 100.0
         XCTFail("""
-            Snapshot \(name) differs from golden (top \(topBarPixelsToIgnore)px ignored).
+            Snapshot \(name) differs from golden (top \(topPixelsToIgnore)px ignored).
               \(diff.count) / \(totalPixels) pixels differ (\(String(format: "%.3f", percent))%)
               Diff bounds (cropped coords, +y down from top of compared region): \
               x=\(diff.minX)-\(diff.maxX), y=\(diff.minY)-\(diff.maxY)
@@ -162,17 +151,17 @@ enum XCUISnapshotRunner {
     }
 
     /// Decode `pngData` and return raw RGBA bytes for the image with the top
-    /// `topBarPixelsToIgnore` rows of pixels excluded.
-    private static func decodeAndCropTopBar(_ pngData: Data) -> CroppedImage? {
+    /// `topPixelsToIgnore` rows of pixels excluded.
+    private static func decodeAndCropTopBar(_ pngData: Data, topPixelsToIgnore: Int) -> CroppedImage? {
         guard let source = CGImageSourceCreateWithData(pngData as CFData, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             return nil
         }
         let width = cgImage.width
         let height = cgImage.height
-        guard height > topBarPixelsToIgnore else { return nil }
+        guard height > topPixelsToIgnore else { return nil }
 
-        let croppedHeight = height - topBarPixelsToIgnore
+        let croppedHeight = height - topPixelsToIgnore
         let bytesPerRow = width * 4
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
@@ -186,7 +175,7 @@ enum XCUISnapshotRunner {
             bitmapInfo: bitmapInfo
         ) else { return nil }
 
-        // Draw the source image so that the image's TOP `topBarPixelsToIgnore` rows
+        // Draw the source image so that the image's TOP `topPixelsToIgnore` rows
         // are clipped away and the bottom `croppedHeight` rows are kept.
         // CG draws with origin bottom-left: drawing the full-height image at y:0
         // places its bottom flush with the context bottom and pushes its top above

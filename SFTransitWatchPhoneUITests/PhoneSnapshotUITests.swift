@@ -1,6 +1,6 @@
 import XCTest
 
-final class WatchSnapshotUITests: XCTestCase {
+final class PhoneSnapshotUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -20,7 +20,7 @@ final class WatchSnapshotUITests: XCTestCase {
         let app = launchSnapshotModeApp()
         XCTAssertTrue(app.staticTexts["Castro Station"].waitForExistence(timeout: 10),
                       "Expected Castro Station to be visible (SnapshotMode should serve it)")
-        try XCUISnapshotRunner.verify(app, named: "BusStopList", in: self, topPixelsToIgnore: 200)
+        try XCUISnapshotRunner.verify(app, named: "BusStopList", in: self, topPixelsToIgnore: 140)
     }
 
     func testSnapshot_BusArrival() throws {
@@ -30,30 +30,46 @@ final class WatchSnapshotUITests: XCTestCase {
         castro.firstMatch.tap()
         XCTAssertTrue(app.staticTexts["K"].waitForExistence(timeout: 10),
                       "Expected K-Ingleside arrival row to be visible")
-        try XCUISnapshotRunner.verify(app, named: "BusArrival", in: self, topPixelsToIgnore: 200)
+        try XCUISnapshotRunner.verify(app, named: "BusArrival", in: self, topPixelsToIgnore: 140)
     }
 
     func testSnapshot_Settings() throws {
         let app = launchSnapshotModeApp()
-        // Toolbar gear icon. If `app.buttons["gearshape"]` doesn't match, the view may need
-        // an explicit `.accessibilityIdentifier("Settings")` modifier in BusStopListView.swift
-        // or ContentView.swift — surface as a follow-up if so.
         let settingsButton = app.buttons.matching(identifier: "gearshape").firstMatch
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 10),
-                      "Settings toolbar button not found — may need accessibilityIdentifier")
+                      "Settings button not found — may need accessibilityIdentifier")
         settingsButton.tap()
         XCTAssertTrue(app.staticTexts["API Key"].waitForExistence(timeout: 10),
                       "Expected Settings screen's API Key section header")
-        try XCUISnapshotRunner.verify(app, named: "Settings", in: self, topPixelsToIgnore: 200)
+        try XCUISnapshotRunner.verify(app, named: "Settings", in: self, topPixelsToIgnore: 140)
     }
 
-    func testSnapshot_StopCodeEntry() throws {
+    func testSnapshot_SiriShortcuts() throws {
         let app = launchSnapshotModeApp()
-        let searchButton = app.buttons.matching(identifier: "magnifyingglass").firstMatch
-        XCTAssertTrue(searchButton.waitForExistence(timeout: 10),
-                      "Search toolbar button not found — may need accessibilityIdentifier")
-        searchButton.tap()
-        XCTAssertTrue(app.staticTexts["Find Stop by Code"].waitForExistence(timeout: 10))
-        try XCUISnapshotRunner.verify(app, named: "StopCodeEntry", in: self, topPixelsToIgnore: 200)
+        let settingsButton = app.buttons.matching(identifier: "gearshape").firstMatch
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10),
+                      "Settings button not found")
+        settingsButton.tap()
+
+        XCTAssertTrue(app.staticTexts["API Key"].waitForExistence(timeout: 10),
+                      "Settings view not loaded")
+
+        sleep(1)
+
+        let settingsList = app.tables.firstMatch
+        settingsList.swipeUp()
+
+        sleep(1)
+
+        let voiceCommandsText = app.staticTexts.matching(NSPredicate(format: "label == 'Voice Commands'")).firstMatch
+        XCTAssertTrue(voiceCommandsText.waitForExistence(timeout: 10),
+                      "Voice Commands text not found after scroll")
+
+        voiceCommandsText.tap()
+
+        XCTAssertTrue(app.navigationBars["Siri"].waitForExistence(timeout: 10),
+                      "Siri Shortcuts view did not appear")
+        try XCUISnapshotRunner.verify(app, named: "SiriShortcuts", in: self, topPixelsToIgnore: 140)
     }
+
 }

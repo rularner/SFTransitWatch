@@ -405,6 +405,24 @@ RECORD_SNAPSHOTS=1 bin/run-watch-snapshot-tests.sh
 
 The wrapper sets `SIMCTL_CHILD_RECORD_SNAPSHOTS=1` so the env var propagates through `xcodebuild` into the simulator's test process. Review the regenerated PNGs in `SFTransitWatchUITests/Goldens/` and commit them. The next test build picks them up as bundle resources automatically.
 
+## Snapshot tests (iPhone)
+
+Snapshot tests for the iOS companion app live in `SFTransitWatchPhoneUITests/`.
+
+Run locally:
+
+```bash
+bin/run-phone-snapshot-tests.sh
+```
+
+Record new goldens (after intentional layout changes):
+
+```bash
+RECORD_SNAPSHOTS=1 bin/run-phone-snapshot-tests.sh
+```
+
+Goldens are stored in `SFTransitWatchPhoneUITests/Goldens/` and committed to the repo for CI reproducibility.
+
 ## Rate Limits
 
 511.org API has rate limits:

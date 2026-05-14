@@ -19,6 +19,9 @@ class TransitAPI: ObservableObject {
     }
 
     private var hasUsableKey: Bool {
+        // SnapshotMode: pretend the key is configured so settings/onboarding views render normally.
+        if SnapshotMode.isActive { return true }
+
         return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
     }
 
@@ -64,7 +67,15 @@ class TransitAPI: ObservableObject {
         return "network"
     }
 
+    @MainActor
     func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
+        // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
+        // SnapshotMode.arrivals(for:) currently always returns Castro Station's 4 arrivals
+        // regardless of the stop arg. That's intentional for the App Store snapshot.
+        if SnapshotMode.isActive {
+            return SnapshotMode.arrivals(for: SnapshotMode.sampleStop)
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -130,7 +141,13 @@ class TransitAPI: ObservableObject {
         }
     }
     
+    @MainActor
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
+        // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
+        if SnapshotMode.isActive {
+            return SnapshotMode.nearbyStops
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -291,6 +308,9 @@ class TransitAPI: ObservableObject {
     
     // Check if API key is configured
     var isAPIKeyConfigured: Bool {
+        // SnapshotMode: pretend the key is configured so settings/onboarding views
+        // render their post-configuration state in App Store screenshots.
+        if SnapshotMode.isActive { return true }
         return hasUsableKey
     }
 }

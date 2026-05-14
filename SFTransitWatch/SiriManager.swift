@@ -116,3 +116,49 @@ struct SFTransitAppShortcuts: AppShortcutsProvider {
         )
     }
 }
+
+// MARK: - Siri Intent Donation Manager
+
+final class SiriManager {
+    /// Determines whether nearby stops are eligible for Siri donation.
+    /// Pure predicate with no side effects; extracted to enable unit testing.
+    ///
+    /// - Parameter stops: Array of nearby bus stops to evaluate
+    /// - Returns: `true` if stops are non-empty and eligible for donation
+    static func shouldDonateNearbyStops(stops: [BusStop]) -> Bool {
+        return !stops.isEmpty
+    }
+
+    /// Creates a Siri intent for nearby stops.
+    /// Currently a placeholder pending full AppIntents integration.
+    /// Extracted to enable unit testing of intent construction logic.
+    ///
+    /// - Parameter stops: Array of nearby bus stops to build intent from
+    /// - Returns: `CheckNearbyStopsIntent` if stops are non-empty; `nil` otherwise
+    static func createNearbyStopsIntent(for stops: [BusStop]) -> CheckNearbyStopsIntent? {
+        guard !stops.isEmpty else { return nil }
+
+        // TODO: Populate intent with actual stop data once AppIntents fully supports
+        // dynamic list parameters. For now, the intent is created but not populated.
+        return CheckNearbyStopsIntent()
+    }
+
+    /// Donates nearby stops to Siri for shortcuts and voice control.
+    /// Skips donation during snapshot testing and eligibility checks.
+    ///
+    /// - Parameter stops: Array of nearby bus stops to donate
+    func donateNearbyStops(_ stops: [BusStop]) {
+        // SnapshotMode: skip INInteraction donations during snapshot runs.
+        if SnapshotMode.isActive { return }
+
+        guard Self.shouldDonateNearbyStops(stops: stops) else { return }
+
+        if let intent = Self.createNearbyStopsIntent(for: stops) {
+            // Note: AppIntents (iOS 16.1+) use a different donation path than INInteraction.
+            // INInteraction.donate is for legacy Intents/SiriKit.
+            // For now, we prepare the intent but don't invoke a donation callback.
+            // This will be updated when the app's intent donation strategy is finalized.
+            _ = intent  // Placeholder to avoid "unused" warning
+        }
+    }
+}
