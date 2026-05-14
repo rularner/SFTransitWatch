@@ -36,7 +36,10 @@ if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
 fi
 
 echo ">> xcodebuild test -scheme \"${SCHEME}\""
-exec xcodebuild test \
-    -scheme "${SCHEME}" \
-    -destination "${DESTINATION}" \
-    "$@"
+ARGS=(-scheme "${SCHEME}" -destination "${DESTINATION}")
+
+if [[ "${RUN_UI_TESTS:-}" == "1" ]]; then
+    ARGS+=(-only-testing:SFTransitWatchUITests -only-testing:SFTransitWatchPhoneUITests)
+fi
+
+exec xcodebuild test "${ARGS[@]}" "$@"
