@@ -23,12 +23,17 @@ if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
     export TEST_RUNNER_RECORD_SNAPSHOTS=1
 fi
 
-echo ">> xcodebuild test -scheme \"${SCHEME}\" -only-testing:SFTransitWatchPhoneUITests"
-xcodebuild test \
-    -scheme "${SCHEME}" \
-    -destination "${DESTINATION}" \
-    -only-testing:SFTransitWatchPhoneUITests \
-    "$@"
+ARGS=(-scheme "${SCHEME}" -destination "${DESTINATION}")
+
+if [[ "${RUN_UI_TESTS:-}" == "1" ]]; then
+    echo ">> xcodebuild test -scheme \"${SCHEME}\" -only-testing:SFTransitWatchPhoneUITests"
+    ARGS+=(-only-testing:SFTransitWatchPhoneUITests)
+else
+    echo ">> xcodebuild test -scheme \"${SCHEME}\" (skipping UI tests)"
+    ARGS+=(-skip-testing:SFTransitWatchPhoneUITests)
+fi
+
+xcodebuild test "${ARGS[@]}" "$@"
 
 if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
     echo ">> Resizing golden snapshots to App Store compliant 1284x2778"
