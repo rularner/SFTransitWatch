@@ -11,6 +11,7 @@ struct BusStopListView: View {
     @State private var nearbyStops: [BusStop] = []
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
+    @State private var foundStop: BusStop? = nil
 
     init(
         transitAPI: TransitAPI? = nil,
@@ -86,8 +87,12 @@ struct BusStopListView: View {
                 transitAPI: transitAPI,
                 defaultAgency: EnabledAgencies.defaultAgency(enabledAgenciesRaw)
             ) { foundStop in
+                self.foundStop = foundStop
                 showingStopCodeEntry = false
             }
+        }
+        .navigationDestination(item: $foundStop) { stop in
+            BusArrivalView(stop: stop)
         }
         .refreshable {
             await loadNearbyStops()

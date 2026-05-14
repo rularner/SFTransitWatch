@@ -9,6 +9,7 @@ struct BusStopListView: View {
     @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
     @State private var showingSettingsAlert = false
+    @State private var foundStop: BusStop? = nil
 
     private var activeAgencyFilter: Agency? {
         guard !selectedAgencyRaw.isEmpty else { return nil }
@@ -48,6 +49,9 @@ struct BusStopListView: View {
             }
         }
         .navigationTitle("Nearby Stops")
+        .navigationDestination(item: $foundStop) { stop in
+            BusArrivalView(stop: stop)
+        }
         .refreshable {
             await loadNearbyStops()
         }
