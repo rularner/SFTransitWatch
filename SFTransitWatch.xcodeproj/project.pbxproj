@@ -44,6 +44,7 @@
 		CAFE0000000000000000B004 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000B003 /* AppDelegate.swift */; };
 		CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 		CAFE0000000000000000CT10 /* ComplicationWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C002 /* ComplicationWidget.swift */; };
+		CAFE0000000000000000CT16 /* NearbyFavoritesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C011 /* NearbyFavoritesWidget.swift */; };
 		CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S001 /* CommuteSlotsManager.swift */; };
 		CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -162,6 +163,7 @@
 		CAFE0000000000000000B001 /* BackgroundRefreshController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundRefreshController.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000B003 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C002 /* ComplicationWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationWidget.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000C011 /* NearbyFavoritesWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyFavoritesWidget.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C004 /* ComplicationUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationUpdater.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -363,6 +365,7 @@
 			isa = PBXGroup;
 			children = (
 				CAFE0000000000000000C002 /* ComplicationWidget.swift */,
+				CAFE0000000000000000C011 /* NearbyFavoritesWidget.swift */,
 				CAFE0000000000000000CT14 /* Info.plist */,
 				CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */,
 			);
@@ -740,6 +743,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CAFE0000000000000000CT10 /* ComplicationWidget.swift in Sources */,
+				CAFE0000000000000000CT16 /* NearbyFavoritesWidget.swift in Sources */,
 				CAFE0000000000000000CT11 /* CommuteSlotsManager.swift in Sources */,
 				CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */,
 			);
