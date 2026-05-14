@@ -1,7 +1,5 @@
 import WidgetKit
 import SwiftUI
-import SFTransitWatchPackage
-import CoreLocation
 
 // MARK: - Timeline Entry
 
