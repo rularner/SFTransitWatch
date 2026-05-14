@@ -3,21 +3,21 @@ import WatchKit
 import SFTransitWatchPackage
 
 struct SettingsView: View {
+    @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
+    @StateObject private var locationManager = LocationManager()
     @State private var apiKey = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
+    @State private var nearbyStops: [BusStop] = []
 
     init(
         favoritesManager: FavoritesManager? = nil,
-        pinnedStopsManager: PinnedStopsManager? = nil,
         commuteSlotsManager: CommuteSlotsManager? = nil
     ) {
         _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
-        _pinnedStopsManager = StateObject(wrappedValue: pinnedStopsManager ?? PinnedStopsManager())
         _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
     }
 
@@ -118,7 +118,7 @@ struct SettingsView: View {
 
                 ForEach(CommuteSlotsManager.Slot.allCases, id: \.self) { slot in
                     NavigationLink {
-                        CommuteSlotPickerView(slot: slot, slotsManager: commuteSlotsManager, pinnedStopsManager: pinnedStopsManager)
+                        CommuteSlotPickerView(slot: slot, allFavorites: favoriteStopsForPicker, slotsManager: commuteSlotsManager)
                     } label: {
                         HStack {
                             Text(slot.displayName)
@@ -195,6 +195,16 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .onAppear {
             apiKey = ConfigurationManager.shared.apiKey
+            locationManager.startLocationUpdates()
+            Task {
+                if let location = locationManager.currentLocation {
+                    nearbyStops = await transitAPI.fetchNearbyStops(
+                        latitude: location.coordinate.latitude,
+                        longitude: location.coordinate.longitude,
+                        agencies: EnabledAgencies.parse(ConfigurationManager.shared.enabledAgencies)
+                    )
+                }
+            }
         }
         .sheet(isPresented: $showingAPIKeyEntry) {
             APIKeyEntryView(apiKey: $apiKey)
@@ -207,7 +217,11 @@ struct SettingsView: View {
 
     private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {
         guard let id = commuteSlotsManager.stopId(for: slot) else { return "Not set" }
-        return pinnedStopsManager.pinned.first(where: { $0.id == id })?.name ?? "Stop \(id)"
+        return nearbyStops.first(where: { $0.id == id })?.name ?? "Stop \(id)"
+    }
+
+    private var favoriteStopsForPicker: [BusStop] {
+        favoritesManager.getFavoriteStops(from: nearbyStops)
     }
 
     /// Two-way binding between the per-agency toggle and the comma-separated
@@ -227,59 +241,6 @@ struct SettingsView: View {
                 enabledAgenciesRaw = EnabledAgencies.format(codes)
             }
         )
-    }
-}
-
-// MARK: - Slot picker
-
-struct CommuteSlotPickerView: View {
-    let slot: CommuteSlotsManager.Slot
-    @ObservedObject var slotsManager: CommuteSlotsManager
-    @ObservedObject var pinnedStopsManager: PinnedStopsManager
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        List {
-            if pinnedStopsManager.pinned.isEmpty {
-                Section {
-                    Text("Pin a stop from the main list first.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            } else {
-                Section {
-                    ForEach(pinnedStopsManager.pinned) { stop in
-                        Button {
-                            slotsManager.setStopId(stop.id, for: slot)
-                            dismiss()
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(stop.name).font(.body)
-                                    Text("Stop \(stop.code)").font(.caption2).foregroundColor(.secondary)
-                                }
-                                Spacer()
-                                if slotsManager.stopId(for: slot) == stop.id {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if slotsManager.stopId(for: slot) != nil {
-                Section {
-                    Button("Clear") {
-                        slotsManager.setStopId(nil, for: slot)
-                        dismiss()
-                    }
-                    .foregroundColor(.red)
-                }
-            }
-        }
-        .navigationTitle(slot.displayName)
     }
 }
 

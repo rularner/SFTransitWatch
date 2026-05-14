@@ -5,12 +5,17 @@ import SFTransitWatchPackage
 struct SettingsView: View {
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var slotsManager = CommuteSlotsManager()
+    @StateObject private var locationManager = LocationManager()
     @State private var apiKey = ""
     @State private var showingAPIKeyAlert = false
     @State private var showingSuccessAlert = false
     @State private var showingClearFavoritesAlert = false
     @State private var workerLinkDraft = ""
     @State private var workerLinkError: String?
+    @State private var showingMorningPicker = false
+    @State private var showingAfternoonPicker = false
+    @State private var nearbyStops: [BusStop] = []
     
     var body: some View {
         List {
@@ -71,6 +76,56 @@ struct SettingsView: View {
                     Button("Save") { saveWorkerLink() }
                         .buttonStyle(.bordered)
                         .disabled(workerLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+
+            if !favoritesManager.favoriteStopIds.isEmpty {
+                Section(header: Text("Commute Stops")) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Morning")
+                                .font(.headline)
+                            Text(slotDisplayName(for: .morning))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Button("Change") {
+                            showingMorningPicker = true
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Afternoon")
+                                .font(.headline)
+                            Text(slotDisplayName(for: .afternoon))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Button("Change") {
+                            showingAfternoonPicker = true
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .sheet(isPresented: $showingMorningPicker) {
+                    CommuteSlotPickerView(
+                        slot: .morning,
+                        allFavorites: favoriteStopsForPicker,
+                        slotsManager: slotsManager
+                    )
+                }
+                .sheet(isPresented: $showingAfternoonPicker) {
+                    CommuteSlotPickerView(
+                        slot: .afternoon,
+                        allFavorites: favoriteStopsForPicker,
+                        slotsManager: slotsManager
+                    )
                 }
             }
 
@@ -164,6 +219,16 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .onAppear {
             apiKey = ConfigurationManager.shared.apiKey
+            locationManager.startLocationUpdates()
+            Task {
+                if let location = locationManager.currentLocation {
+                    nearbyStops = await transitAPI.fetchNearbyStops(
+                        latitude: location.coordinate.latitude,
+                        longitude: location.coordinate.longitude,
+                        agencies: EnabledAgencies.parse(ConfigurationManager.shared.enabledAgencies)
+                    )
+                }
+            }
         }
         .alert("API Key Required", isPresented: $showingAPIKeyAlert) {
             Button("OK") { }
@@ -216,6 +281,18 @@ struct SettingsView: View {
         if let url = URL(string: "https://511.org/developers/") {
             UIApplication.shared.open(url)
         }
+    }
+
+    private func slotDisplayName(for slot: CommuteSlotsManager.Slot) -> String {
+        guard let stopId = slotsManager.stopId(for: slot),
+              let stop = nearbyStops.first(where: { $0.id == stopId }) else {
+            return "Not configured"
+        }
+        return stop.name
+    }
+
+    private var favoriteStopsForPicker: [BusStop] {
+        favoritesManager.getFavoriteStops(from: nearbyStops)
     }
 }
 
