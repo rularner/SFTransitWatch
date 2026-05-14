@@ -46,5 +46,22 @@ enum ComplicationUpdater {
         static func minutesAway(_ slot: CommuteSlotsManager.Slot) -> String {
             "complication_\(slot.rawValue)_minutes_away"
         }
+
+        // Nearby favorites keys
+        static let nearbyStopName = "complication_nearby_stop_name"
+        static let nearbyRoute = "complication_nearby_route"
+        static let nearbyMinutesAway = "complication_nearby_minutes_away"
+    }
+
+    @MainActor
+    static func updateNearby(
+        stopName: String,
+        route: String,
+        minutesAway: Int
+    ) {
+        defaults.set(stopName, forKey: StorageKey.nearbyStopName)
+        defaults.set(route, forKey: StorageKey.nearbyRoute)
+        defaults.set(minutesAway, forKey: StorageKey.nearbyMinutesAway)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }

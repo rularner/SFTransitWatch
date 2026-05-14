@@ -1,7 +1,7 @@
 import Foundation
 import CoreLocation
 
-public struct BusStop: Identifiable, Codable, Sendable {
+public struct BusStop: Identifiable, Codable, Sendable, Hashable {
     public let id: String
     public let name: String
     public let code: String
@@ -47,6 +47,15 @@ public struct BusStop: Identifiable, Codable, Sendable {
 
     public func distance(to location: CLLocation) -> CLLocationDistance {
         return self.location.distance(from: location)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(agency)
+    }
+
+    public static func == (lhs: BusStop, rhs: BusStop) -> Bool {
+        lhs.id == rhs.id && lhs.agency == rhs.agency
     }
 }
 

@@ -6,23 +6,21 @@ struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var pinnedStopsManager = PinnedStopsManager()
     @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
     @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
     @State private var showingSettingsAlert = false
     @State private var showingStopCodeEntry = false
+    @State private var foundStop: BusStop? = nil
 
     init(
         transitAPI: TransitAPI? = nil,
         favoritesManager: FavoritesManager? = nil,
-        pinnedStopsManager: PinnedStopsManager? = nil,
         locationManager: LocationManager? = nil,
         initialNearbyStops: [BusStop] = []
     ) {
         _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
         _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
-        _pinnedStopsManager = StateObject(wrappedValue: pinnedStopsManager ?? PinnedStopsManager())
         _locationManager = StateObject(wrappedValue: locationManager ?? LocationManager())
         _nearbyStops = State(initialValue: initialNearbyStops)
     }
@@ -89,8 +87,12 @@ struct BusStopListView: View {
                 transitAPI: transitAPI,
                 defaultAgency: EnabledAgencies.defaultAgency(enabledAgenciesRaw)
             ) { foundStop in
-                pinnedStopsManager.pin(foundStop)
+                self.foundStop = foundStop
+                showingStopCodeEntry = false
             }
+        }
+        .navigationDestination(item: $foundStop) { stop in
+            BusArrivalView(stop: stop)
         }
         .refreshable {
             await loadNearbyStops()
@@ -206,22 +208,6 @@ struct BusStopListView: View {
 
     @ViewBuilder
     private var stopSections: some View {
-        if !pinnedStopsManager.pinned.isEmpty {
-            Section(header: Text("Pinned")) {
-                ForEach(pinnedStopsManager.pinned) { stop in
-                    NavigationLink(destination: BusArrivalView(stop: stop)) {
-                        BusStopRow(
-                            stop: stop,
-                            currentLocation: locationManager.currentLocation,
-                            favoritesManager: favoritesManager,
-                            showAgencyBadge: showAgencyBadges
-                        )
-                    }
-                }
-                .onDelete { pinnedStopsManager.unpin(at: $0) }
-            }
-        }
-
         let favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
         if !favoriteStops.isEmpty {
             Section(header: Text("Favorites")) {
