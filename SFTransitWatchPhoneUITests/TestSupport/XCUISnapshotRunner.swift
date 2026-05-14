@@ -311,7 +311,7 @@ enum XCUISnapshotRunner {
     /// `RECORD_SNAPSHOTS=1` is the only caller and Xcode Cloud doesn't record.
     private static func sourceGoldenURL(for name: String, file: StaticString) -> URL {
         repoRoot(file: file)
-            .appendingPathComponent("SFTransitWatchUITests", isDirectory: true)
+            .appendingPathComponent("SFTransitWatchPhoneUITests", isDirectory: true)
             .appendingPathComponent("Goldens", isDirectory: true)
             .appendingPathComponent("\(name).png")
     }

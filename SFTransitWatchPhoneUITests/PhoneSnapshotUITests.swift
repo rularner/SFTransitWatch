@@ -47,14 +47,27 @@ final class PhoneSnapshotUITests: XCTestCase {
     func testSnapshot_SiriShortcuts() throws {
         let app = launchSnapshotModeApp()
         let settingsButton = app.buttons.matching(identifier: "gearshape").firstMatch
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10))
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10),
+                      "Settings button not found")
         settingsButton.tap()
 
-        let siriLink = app.staticTexts.matching(identifier: "Siri Shortcuts").firstMatch
-        XCTAssertTrue(siriLink.waitForExistence(timeout: 10))
-        siriLink.tap()
+        XCTAssertTrue(app.staticTexts["API Key"].waitForExistence(timeout: 10),
+                      "Settings view not loaded")
 
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Siri'")).firstMatch.waitForExistence(timeout: 10),
+        sleep(1)
+
+        let settingsList = app.tables.firstMatch
+        settingsList.swipeUp()
+
+        sleep(1)
+
+        let voiceCommandsText = app.staticTexts.matching(NSPredicate(format: "label == 'Voice Commands'")).firstMatch
+        XCTAssertTrue(voiceCommandsText.waitForExistence(timeout: 10),
+                      "Voice Commands text not found after scroll")
+
+        voiceCommandsText.tap()
+
+        XCTAssertTrue(app.navigationBars["Siri"].waitForExistence(timeout: 10),
                       "Siri Shortcuts view did not appear")
         try XCUISnapshotRunner.verify(app, named: "SiriShortcuts", in: self, topPixelsToIgnore: 140)
     }
