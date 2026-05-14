@@ -225,7 +225,7 @@ struct SettingsView: View {
                     nearbyStops = await transitAPI.fetchNearbyStops(
                         latitude: location.coordinate.latitude,
                         longitude: location.coordinate.longitude,
-                        agencies: EnabledAgencies.parse(ConfigurationManager.shared.enabledAgencies)
+                        agencies: [EnabledAgencies.default]
                     )
                 }
             }
