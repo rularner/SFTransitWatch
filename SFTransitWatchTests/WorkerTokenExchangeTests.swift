@@ -52,12 +52,32 @@ class WorkerTokenExchangeTests: XCTestCase {
             XCTFail("Expected URLError")
         }
     }
+
+    func testExchangeThrowsOnHTTPError() async {
+        let mockSession = MockURLSession()
+        let exchange = WorkerTokenExchange(session: mockSession)
+
+        mockSession.mockStatusCode = 401
+        mockSession.mockData = """
+        {"error": "Unauthorized"}
+        """.data(using: .utf8)
+
+        do {
+            _ = try await exchange.exchange(code: "code", workerURL: "https://api.example.com")
+            XCTFail("Expected invalidResponse error for non-200 status")
+        } catch let error as WorkerTokenExchangeError {
+            XCTAssertEqual(error, .invalidResponse)
+        } catch {
+            XCTFail("Expected WorkerTokenExchangeError, got: \(error)")
+        }
+    }
 }
 
 // Mock for testing
 class MockURLSession: URLSessionProtocol {
     var mockData: Data?
     var mockError: Error?
+    var mockStatusCode: Int = 200
     var lastRequest: URLRequest?
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
@@ -68,7 +88,7 @@ class MockURLSession: URLSessionProtocol {
         let data = mockData ?? Data()
         let response = HTTPURLResponse(
             url: request.url!,
-            statusCode: 200,
+            statusCode: mockStatusCode,
             httpVersion: nil,
             headerFields: nil
         )!
