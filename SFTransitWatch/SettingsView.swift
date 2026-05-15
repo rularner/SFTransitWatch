@@ -11,8 +11,6 @@ struct SettingsView: View {
     @State private var showingAPIKeyAlert = false
     @State private var showingSuccessAlert = false
     @State private var showingClearFavoritesAlert = false
-    @State private var workerLinkDraft = ""
-    @State private var workerLinkError: String?
     @State private var showingMorningPicker = false
     @State private var showingAfternoonPicker = false
     @State private var nearbyStops: [BusStop] = []
@@ -49,7 +47,7 @@ struct SettingsView: View {
             
             Section(
                 header: Text("Worker proxy (optional)"),
-                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by clicking a worker bootstrap link of the form https://rularner.github.io/sftransitwatch/wt?u=…&t=…. Leave blank to call 511.org directly with your own API key.")
+                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…. Leave blank to call 511.org directly with your own API key.")
             ) {
                 if ConfigurationManager.shared.isWorkerConfigured {
                     HStack {
@@ -64,18 +62,9 @@ struct SettingsView: View {
                         ConfigurationManager.shared.clearWorkerConfig()
                     }
                 } else {
-                    TextField("Paste worker bootstrap link", text: $workerLinkDraft)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                    if let workerLinkError {
-                        Text(workerLinkError)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
-                    Button("Save") { saveWorkerLink() }
-                        .buttonStyle(.bordered)
-                        .disabled(workerLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Text("Open a bootstrap link to configure")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
 
@@ -252,18 +241,6 @@ struct SettingsView: View {
     
     private var workerHostDisplay: String {
         return URL(string: ConfigurationManager.shared.workerBaseURL)?.host ?? ConfigurationManager.shared.workerBaseURL
-    }
-
-    private func saveWorkerLink() {
-        let trimmed = workerLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed),
-              let config = WorkerConfigLink.workerConfig(from: url) else {
-            workerLinkError = "Couldn't parse that link. Expected a /wt link with both u= and t= parameters."
-            return
-        }
-        ConfigurationManager.shared.setWorkerConfig(url: config.url, token: config.token)
-        workerLinkDraft = ""
-        workerLinkError = nil
     }
 
     private func saveAPIKey() {

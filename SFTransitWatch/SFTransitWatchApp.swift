@@ -4,6 +4,7 @@ import SFTransitWatchPackage
 @main
 struct SFTransitWatchApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    @State private var tokenExchange = WorkerTokenExchange()
 
     init() {
         PhoneSession.shared.activate()
@@ -17,8 +18,10 @@ struct SFTransitWatchApp: App {
                         ConfigurationManager.shared.apiKey = key
                         return
                     }
-                    if let config = WorkerConfigLink.workerConfig(from: url) {
-                        ConfigurationManager.shared.setWorkerConfig(url: config.url, token: config.token)
+                    if let bootstrap = WorkerConfigLink.workerBootstrap(from: url) {
+                        Task {
+                            await handleWorkerBootstrap(bootstrap)
+                        }
                     }
                 }
         }
@@ -26,6 +29,15 @@ struct SFTransitWatchApp: App {
             if newPhase == .active {
                 Telemetry.shared.flush()
             }
+        }
+    }
+
+    private func handleWorkerBootstrap(_ bootstrap: (url: String, code: String)) async {
+        do {
+            let token = try await tokenExchange.exchange(code: bootstrap.code, workerURL: bootstrap.url)
+            ConfigurationManager.shared.setWorkerConfig(url: bootstrap.url, token: token)
+        } catch {
+            print("Worker token exchange failed: \(error.localizedDescription)")
         }
     }
 }
