@@ -257,11 +257,11 @@ struct SettingsView: View {
     private func saveWorkerLink() {
         let trimmed = workerLinkDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed),
-              let config = WorkerConfigLink.workerConfig(from: url) else {
-            workerLinkError = "Couldn't parse that link. Expected a /wt link with both u= and t= parameters."
+              let bootstrap = WorkerConfigLink.workerBootstrap(from: url) else {
+            workerLinkError = "Couldn't parse that link. Expected a /wt link with both u= and c= parameters."
             return
         }
-        ConfigurationManager.shared.setWorkerConfig(url: config.url, token: config.token)
+        // Will be handled in Task 3 with token exchange
         workerLinkDraft = ""
         workerLinkError = nil
     }

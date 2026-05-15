@@ -19,8 +19,8 @@ struct SFTransitWatchApp: App {
                         ConfigurationManager.shared.apiKey = key
                         return
                     }
-                    if let config = WorkerConfigLink.workerConfig(from: url) {
-                        ConfigurationManager.shared.setWorkerConfig(url: config.url, token: config.token)
+                    if let bootstrap = WorkerConfigLink.workerBootstrap(from: url) {
+                        // Will be handled in Task 3 with token exchange
                     }
                 }
         }
