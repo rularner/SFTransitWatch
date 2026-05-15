@@ -163,28 +163,8 @@ struct BusArrivalView: View {
                     secondsUntilRefresh -= 1
                 }
             }
-        }
-    
-        private func loadArrivals() async {
-            arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
-            lastUpdated = Date()
-            secondsUntilRefresh = refreshInterval
-    
-            fireHapticsIfNeeded()
-    
-            if let first = arrivals.first {
-                ComplicationUpdater.update(
-                    stopId: stop.id,
-                    stopName: stop.name,
-                    route: first.route,
-                    minutesAway: first.minutesAway,
-                    slotsManager: commuteSlotsManager
-                )
-            }
-        }
-            }
             .tag(0)
-            
+
             // MARK: - Location Pane
             VStack {
                 StopLocationView(stop: stop, currentLocation: locationManager.currentLocation)
@@ -199,12 +179,31 @@ struct BusArrivalView: View {
                 await loadArrivals()
             }
         }
-        .onReceive(Timer.publish(every: refreshInterval, on: .main, in: .common).autoconnect()) { _ in
+        .onReceive(Timer.publish(every: TimeInterval(refreshInterval), on: .main, in: .common).autoconnect()) { _ in
             Task {
                 await loadArrivals()
             }
         }
     }
+
+    private func loadArrivals() async {
+        arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
+        lastUpdated = Date()
+        secondsUntilRefresh = refreshInterval
+
+        fireHapticsIfNeeded()
+
+        if let first = arrivals.first {
+            ComplicationUpdater.update(
+                stopId: stop.id,
+                stopName: stop.name,
+                route: first.route,
+                minutesAway: first.minutesAway,
+                slotsManager: commuteSlotsManager
+            )
+        }
+    }
+
     private func fireHapticsIfNeeded() {
         for arrival in arrivals where arrival.minutesAway <= 2 {
             guard !notifiedArrivalIDs.contains(arrival.id) else { continue }

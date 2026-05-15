@@ -5,6 +5,11 @@ public struct StopLocationView: View {
     let stop: BusStop
     let currentLocation: CLLocation?
 
+    public init(stop: BusStop, currentLocation: CLLocation?) {
+        self.stop = stop
+        self.currentLocation = currentLocation
+    }
+
     private var bearing: Double {
         guard let currentLocation = currentLocation else { return 0 }
         let lat1 = currentLocation.coordinate.latitude * .pi / 180
