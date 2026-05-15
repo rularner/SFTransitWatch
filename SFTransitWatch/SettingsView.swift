@@ -49,7 +49,7 @@ struct SettingsView: View {
             
             Section(
                 header: Text("Worker proxy (optional)"),
-                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by clicking a worker bootstrap link of the form https://rularner.github.io/sftransitwatch/wt?u=…&t=…. Leave blank to call 511.org directly with your own API key.")
+                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by pasting a worker bootstrap link. Leave blank to call 511.org directly with your own API key.")
             ) {
                 if ConfigurationManager.shared.isWorkerConfigured {
                     HStack {
