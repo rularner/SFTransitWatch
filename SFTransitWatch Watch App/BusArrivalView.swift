@@ -8,6 +8,8 @@ struct BusArrivalView: View {
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var commuteSlotsManager = CommuteSlotsManager()
 
+    @StateObject private var locationManager = LocationManager()
+    @State private var selectedTab = 0
     @State private var arrivals: [BusArrival] = []
     @State private var lastUpdated = Date()
     @State private var secondsUntilRefresh = 30
@@ -41,145 +43,168 @@ struct BusArrivalView: View {
     }
 
     var body: some View {
-        List {
-            // Header
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(stop.name)
-                                .font(.headline)
-                            Text("Stop \(stop.code)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+        TabView(selection: $selectedTab) {
+            // MARK: - Arrivals Pane
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(stop.name)
+                                    .font(.headline)
+                                Text("Stop \(stop.code)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Button(action: { favoritesManager.toggleFavorite(for: stop.id) }) {
+                                Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
+                                    .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)
+                                    .font(.title2)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .accessibilityLabel(favoritesManager.isFavorite(stop.id) ? "Remove from favorites" : "Add to favorites")
                         }
-                        Spacer()
-                        Button(action: { favoritesManager.toggleFavorite(for: stop.id) }) {
-                            Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
-                                .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)
-                                .font(.title2)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .accessibilityLabel(favoritesManager.isFavorite(stop.id) ? "Remove from favorites" : "Add to favorites")
-                    }
-
-                    if !stop.routes.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                RouteFilterPill(label: "All", isSelected: selectedRoute == nil) {
-                                    selectedRoute = nil
-                                }
-                                ForEach(uniqueRoutes, id: \.self) { route in
-                                    RouteFilterPill(label: route, isSelected: selectedRoute == route) {
-                                        selectedRoute = selectedRoute == route ? nil : route
+    
+                        if !stop.routes.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    RouteFilterPill(label: "All", isSelected: selectedRoute == nil) {
+                                        selectedRoute = nil
+                                    }
+                                    ForEach(uniqueRoutes, id: \.self) { route in
+                                        RouteFilterPill(label: route, isSelected: selectedRoute == route) {
+                                            selectedRoute = selectedRoute == route ? nil : route
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
-            }
-
-            if let error = transitAPI.errorMessage {
+    
+                if let error = transitAPI.errorMessage {
+                    Section {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text(error)
+                                .font(.caption)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Error: \(error)")
+                    }
+                }
+    
+                // Arrivals
                 Section {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text(error)
-                            .font(.caption)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Error: \(error)")
-                }
-            }
-
-            // Arrivals
-            Section {
-                if transitAPI.isLoading && arrivals.isEmpty {
-                    HStack {
-                        ProgressView()
-                        Text("Loading arrivals...")
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .listRowBackground(Color.clear)
-                } else if let error = transitAPI.errorMessage, arrivals.isEmpty {
-                    ErrorStateView(message: error) {
-                        Task { await loadArrivals() }
-                    }
-                    .listRowBackground(Color.clear)
-                } else if filteredArrivals.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "bus")
-                            .font(.system(size: 30))
-                            .foregroundColor(.secondary)
-                        Text(arrivals.isEmpty ? "No upcoming arrivals" : "No \(selectedRoute ?? "") arrivals")
-                            .font(.headline)
-                        Text("Check back later for updates")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .listRowBackground(Color.clear)
-                } else {
-                    ForEach(filteredArrivals) { arrival in
-                        BusArrivalRow(arrival: arrival)
-                    }
-                }
-            } header: {
-                HStack {
-                    Text("Next Arrivals")
-                    Spacer()
-                    if transitAPI.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
+                    if transitAPI.isLoading && arrivals.isEmpty {
+                        HStack {
+                            ProgressView()
+                            Text("Loading arrivals...")
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .listRowBackground(Color.clear)
+                    } else if let error = transitAPI.errorMessage, arrivals.isEmpty {
+                        ErrorStateView(message: error) {
+                            Task { await loadArrivals() }
+                        }
+                        .listRowBackground(Color.clear)
+                    } else if filteredArrivals.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "bus")
+                                .font(.system(size: 30))
+                                .foregroundColor(.secondary)
+                            Text(arrivals.isEmpty ? "No upcoming arrivals" : "No \(selectedRoute ?? "") arrivals")
+                                .font(.headline)
+                            Text("Check back later for updates")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .listRowBackground(Color.clear)
                     } else {
-                        Text("↻ \(secondsUntilRefresh)s")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .monospacedDigit()
+                        ForEach(filteredArrivals) { arrival in
+                            BusArrivalRow(arrival: arrival)
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("Next Arrivals")
+                        Spacer()
+                        if transitAPI.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Text("↻ \(secondsUntilRefresh)s")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .monospacedDigit()
+                        }
                     }
                 }
             }
-        }
-        .navigationTitle("Arrivals")
-        .refreshable {
-            await loadArrivals()
-        }
-        .onAppear {
-            Task { await loadArrivals() }
-        }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            guard !transitAPI.isLoading else { return }
-            if secondsUntilRefresh <= 1 {
-                secondsUntilRefresh = refreshInterval
+            .navigationTitle("Arrivals")
+            .refreshable {
+                await loadArrivals()
+            }
+            .onAppear {
                 Task { await loadArrivals() }
-            } else {
-                secondsUntilRefresh -= 1
+            }
+            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+                guard !transitAPI.isLoading else { return }
+                if secondsUntilRefresh <= 1 {
+                    secondsUntilRefresh = refreshInterval
+                    Task { await loadArrivals() }
+                } else {
+                    secondsUntilRefresh -= 1
+                }
+            }
+        }
+    
+        private func loadArrivals() async {
+            arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
+            lastUpdated = Date()
+            secondsUntilRefresh = refreshInterval
+    
+            fireHapticsIfNeeded()
+    
+            if let first = arrivals.first {
+                ComplicationUpdater.update(
+                    stopId: stop.id,
+                    stopName: stop.name,
+                    route: first.route,
+                    minutesAway: first.minutesAway,
+                    slotsManager: commuteSlotsManager
+                )
+            }
+        }
+            }
+            .tag(0)
+            
+            // MARK: - Location Pane
+            VStack {
+                StopLocationView(stop: stop, currentLocation: locationManager.currentLocation)
+                    .padding()
+            }
+            .tag(1)
+        }
+        .tabViewStyle(.page(indexDisplayMode: .automatic))
+        .onAppear {
+            locationManager.startLocationUpdates()
+            Task {
+                await loadArrivals()
+            }
+        }
+        .onReceive(Timer.publish(every: refreshInterval, on: .main, in: .common).autoconnect()) { _ in
+            Task {
+                await loadArrivals()
             }
         }
     }
-
-    private func loadArrivals() async {
-        arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
-        lastUpdated = Date()
-        secondsUntilRefresh = refreshInterval
-
-        fireHapticsIfNeeded()
-
-        if let first = arrivals.first {
-            ComplicationUpdater.update(
-                stopId: stop.id,
-                stopName: stop.name,
-                route: first.route,
-                minutesAway: first.minutesAway,
-                slotsManager: commuteSlotsManager
-            )
-        }
-    }
-
     private func fireHapticsIfNeeded() {
         for arrival in arrivals where arrival.minutesAway <= 2 {
             guard !notifiedArrivalIDs.contains(arrival.id) else { continue }
