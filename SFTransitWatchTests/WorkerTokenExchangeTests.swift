@@ -4,7 +4,7 @@ import XCTest
 class WorkerTokenExchangeTests: XCTestCase {
 
     func testExchangeBootstrapCodeForToken() async {
-        let mockSession = MockURLSession()
+        let mockSession = SimpleURLSessionMock()
         let exchange = WorkerTokenExchange(session: mockSession)
 
         let testWorkerURL = "https://api.example.com"
@@ -24,7 +24,7 @@ class WorkerTokenExchangeTests: XCTestCase {
     }
 
     func testExchangeThrowsOnInvalidResponse() async {
-        let mockSession = MockURLSession()
+        let mockSession = SimpleURLSessionMock()
         let exchange = WorkerTokenExchange(session: mockSession)
 
         mockSession.mockData = "invalid json".data(using: .utf8)
@@ -38,7 +38,7 @@ class WorkerTokenExchangeTests: XCTestCase {
     }
 
     func testExchangeThrowsOnNetworkError() async {
-        let mockSession = MockURLSession()
+        let mockSession = SimpleURLSessionMock()
         let exchange = WorkerTokenExchange(session: mockSession)
 
         mockSession.mockError = URLError(.notConnectedToInternet)
@@ -54,7 +54,7 @@ class WorkerTokenExchangeTests: XCTestCase {
     }
 
     func testExchangeThrowsOnHTTPError() async {
-        let mockSession = MockURLSession()
+        let mockSession = SimpleURLSessionMock()
         let exchange = WorkerTokenExchange(session: mockSession)
 
         mockSession.mockStatusCode = 401
@@ -74,7 +74,7 @@ class WorkerTokenExchangeTests: XCTestCase {
 }
 
 // Mock for testing
-class MockURLSession: URLSessionProtocol {
+class SimpleURLSessionMock: URLSessionProtocol {
     var mockData: Data?
     var mockError: Error?
     var mockStatusCode: Int = 200
