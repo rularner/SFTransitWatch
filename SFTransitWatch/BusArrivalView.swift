@@ -5,9 +5,10 @@ struct BusArrivalView: View {
     let stop: BusStop
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var locationManager = LocationManager()
     @State private var arrivals: [BusArrival] = []
     @State private var lastUpdated = Date()
-    
+
     var body: some View {
         List {
             // Header section
@@ -51,7 +52,12 @@ struct BusArrivalView: View {
                 }
                 .padding(.vertical, 4)
             }
-            
+
+            Section {
+                StopLocationView(stop: stop, currentLocation: locationManager.currentLocation)
+                    .listRowBackground(Color.clear)
+            }
+
             Section {
                 if transitAPI.isLoading && arrivals.isEmpty {
                     HStack {
@@ -114,6 +120,7 @@ struct BusArrivalView: View {
             await loadArrivals()
         }
         .onAppear {
+            locationManager.startLocationUpdates()
             Task {
                 await loadArrivals()
             }
