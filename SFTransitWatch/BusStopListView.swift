@@ -8,6 +8,7 @@ struct BusStopListView: View {
     @StateObject private var favoritesManager = FavoritesManager()
     @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
+    @State private var favoriteStops: [BusStop] = []
     @State private var showingSettingsAlert = false
     @State private var foundStop: BusStop? = nil
 
@@ -83,6 +84,11 @@ struct BusStopListView: View {
         .onChange(of: selectedAgencyRaw) {
             Task {
                 await loadNearbyStops()
+            }
+        }
+        .onChange(of: favoritesManager.favoriteStopIds) {
+            Task { @MainActor in
+                favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
             }
         }
     }
@@ -168,7 +174,6 @@ struct BusStopListView: View {
 
     @ViewBuilder
     private var stopSections: some View {
-        let favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
         if !favoriteStops.isEmpty {
             Section(header: Text("Favorites")) {
                 ForEach(favoriteStops) { stop in
@@ -196,6 +201,7 @@ struct BusStopListView: View {
         }
     }
 
+    @MainActor
     private func loadNearbyStops() async {
         if let location = locationManager.currentLocation {
             let agencies = activeAgencyFilter.map { [$0.code] } ?? ["SF"]
@@ -215,6 +221,7 @@ struct BusStopListView: View {
         }
 
         nearbyStops = favoritesManager.sortStopsWithFavoritesFirst(nearbyStops)
+        favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
     }
 }
 
