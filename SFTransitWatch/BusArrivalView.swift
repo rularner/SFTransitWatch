@@ -54,7 +54,12 @@ struct BusArrivalView: View {
             }
 
             Section {
-                StopLocationView(stop: stop, currentLocation: locationManager.currentLocation)
+                StopLocationView(
+                    stop: stop,
+                    currentLocation: locationManager.currentLocation,
+                    currentHeading: locationManager.currentHeading,
+                    isHeadingEnabled: locationManager.isLocationEnabled
+                )
                     .listRowBackground(Color.clear)
             }
 

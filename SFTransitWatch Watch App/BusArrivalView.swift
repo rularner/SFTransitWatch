@@ -167,7 +167,12 @@ struct BusArrivalView: View {
 
             // MARK: - Location Pane
             VStack {
-                StopLocationView(stop: stop, currentLocation: locationManager.currentLocation)
+                StopLocationView(
+                    stop: stop,
+                    currentLocation: locationManager.currentLocation,
+                    currentHeading: locationManager.currentHeading,
+                    isHeadingEnabled: locationManager.isLocationEnabled
+                )
                     .padding()
             }
             .tag(1)
