@@ -75,6 +75,7 @@ struct CommuteSlotPickerView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     CommuteSlotPickerView(
         slot: .morning,
@@ -82,3 +83,4 @@ struct CommuteSlotPickerView: View {
         slotsManager: CommuteSlotsManager(userDefaultsSuiteName: "preview")
     )
 }
+#endif
