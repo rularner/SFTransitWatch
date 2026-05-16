@@ -88,4 +88,4 @@ extension LocationManager: CLLocationManagerDelegate {
             currentHeading = newHeading
         }
     }
-} 
+}
