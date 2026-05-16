@@ -56,4 +56,18 @@ final class WatchSnapshotUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Find Stop by Code"].waitForExistence(timeout: 10))
         try XCUISnapshotRunner.verify(app, named: "StopCodeEntry", in: self, topPixelsToIgnore: 200)
     }
+
+    func testSnapshot_StopLocation() throws {
+        let app = launchSnapshotModeApp()
+        let castro = app.staticTexts["Castro Station"]
+        XCTAssertTrue(castro.waitForExistence(timeout: 10))
+        castro.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["K"].waitForExistence(timeout: 10),
+                      "Expected K-Ingleside arrival row to be visible")
+        // Swipe left to the compass/location tab (tab 1 in the TabView)
+        app.swipeLeft()
+        XCTAssertTrue(app.staticTexts["Stop Location"].waitForExistence(timeout: 5),
+                      "Expected Stop Location heading on the direction tab")
+        try XCUISnapshotRunner.verify(app, named: "StopLocation", in: self, topPixelsToIgnore: 200)
+    }
 }
