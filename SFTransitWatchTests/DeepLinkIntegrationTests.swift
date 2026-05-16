@@ -6,15 +6,13 @@ class DeepLinkIntegrationTests: XCTestCase {
 
     override func tearDown() {
         super.tearDown()
-        // Clean up after each test
         ConfigurationManager.shared.apiKey = ""
         ConfigurationManager.shared.clearWorkerConfig()
     }
 
     func testAPIKeyLinkHandling() {
-        // Test parsing and storing API key from universal link
         let testKey = "test-api-key-12345"
-        let urlString = "https://rularner.github.io/sftransitwatch/key?k=\(testKey)"
+        let urlString = "sftransitwatch://key/\(testKey)"
         let url = URL(string: urlString)!
 
         if let key = WorkerConfigLink.apiKey(from: url), !key.isEmpty {
@@ -24,25 +22,47 @@ class DeepLinkIntegrationTests: XCTestCase {
         XCTAssertEqual(ConfigurationManager.shared.apiKey, testKey)
     }
 
-    func testWorkerLinkHandling() {
-        // Test parsing and storing worker config from universal link
+    func testWorkerBootstrapLinkHandling() {
         let testURL = "https://api.example.com"
-        let testToken = "worker-token-xyz"
+        let testCode = "one-time-bootstrap-code-xyz"
         let encodedURL = testURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? testURL
-        let urlString = "https://rularner.github.io/sftransitwatch/wt?u=\(encodedURL)&t=\(testToken)"
+        let urlString = "sftransitwatch://wt?u=\(encodedURL)&c=\(testCode)"
         let url = URL(string: urlString)!
 
-        if let config = WorkerConfigLink.workerConfig(from: url) {
-            ConfigurationManager.shared.setWorkerConfig(url: config.url, token: config.token)
+        if let bootstrap = WorkerConfigLink.workerBootstrap(from: url) {
+            XCTAssertEqual(bootstrap.url, testURL)
+            XCTAssertEqual(bootstrap.code, testCode)
+        } else {
+            XCTFail("Failed to parse bootstrap link")
         }
+    }
 
-        XCTAssertEqual(ConfigurationManager.shared.workerBaseURL, testURL)
-        XCTAssertEqual(ConfigurationManager.shared.workerToken, testToken)
-        XCTAssertTrue(ConfigurationManager.shared.isWorkerConfigured)
+    func testWorkerBootstrapLinkValidation() {
+        let validURL = "https://api.example.com"
+        let encodedURL = validURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? validURL
+        let urlString = "sftransitwatch://wt?u=\(encodedURL)&c=code123"
+        let url = URL(string: urlString)!
+
+        XCTAssertNotNil(WorkerConfigLink.workerBootstrap(from: url))
+    }
+
+    func testWorkerBootstrapLinkRejectsNonHTTPS() {
+        let invalidURL = "http://api.example.com"
+        let encodedURL = invalidURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? invalidURL
+        let urlString = "sftransitwatch://wt?u=\(encodedURL)&c=code123"
+        let url = URL(string: urlString)!
+
+        XCTAssertNil(WorkerConfigLink.workerBootstrap(from: url))
+    }
+
+    func testWorkerBootstrapLinkRejectsMissingParameters() {
+        let urlString = "sftransitwatch://wt?u=https://api.example.com"
+        let url = URL(string: urlString)!
+
+        XCTAssertNil(WorkerConfigLink.workerBootstrap(from: url))
     }
 
     func testWorkerConfigClear() {
-        // Test clearing worker config
         ConfigurationManager.shared.setWorkerConfig(
             url: "https://api.example.com",
             token: "test-token"
@@ -56,12 +76,9 @@ class DeepLinkIntegrationTests: XCTestCase {
     }
 
     func testSharedStoragePersistence() {
-        // Test that values persist in App Groups storage
         let testKey = "persistent-key"
         ConfigurationManager.shared.apiKey = testKey
 
-        // Simulate app relaunch by creating a new manager instance
-        // (In real integration test, this would be a full app lifecycle)
         let freshManager = ConfigurationManager.shared
         XCTAssertEqual(freshManager.apiKey, testKey)
     }

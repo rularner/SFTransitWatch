@@ -45,13 +45,10 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("To load via email or text:")
+                    Text("To load via deep link:")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("Send yourself a message containing:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("https://rularner.github.io/sftransitwatch/key?k=YOUR_KEY")
+                    Text("Use a link of the form sftransitwatch://key?k=YOUR_KEY")
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.primary)
                     Text("Then tap the link on your watch.")
@@ -70,7 +67,7 @@ struct SettingsView: View {
 
             Section(
                 header: Text("Worker proxy"),
-                footer: Text("Optional. Send yourself a Messages link of the form https://rularner.github.io/sftransitwatch/wt?u=YOUR_WORKER_URL&t=YOUR_TOKEN and tap it on the watch to set.")
+                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…. Leave blank to call 511.org directly with your own API key.")
             ) {
                 HStack {
                     Text("Worker")
