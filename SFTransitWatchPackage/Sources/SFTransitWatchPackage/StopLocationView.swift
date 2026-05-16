@@ -11,10 +11,14 @@ func effectiveHeadingDegrees(trueHeading: Double, magneticHeading: Double) -> Do
 public struct StopLocationView: View {
     let stop: BusStop
     let currentLocation: CLLocation?
+    let currentHeading: CLHeading?
+    let isHeadingEnabled: Bool
 
-    public init(stop: BusStop, currentLocation: CLLocation?) {
+    public init(stop: BusStop, currentLocation: CLLocation?, currentHeading: CLHeading?, isHeadingEnabled: Bool) {
         self.stop = stop
         self.currentLocation = currentLocation
+        self.currentHeading = currentHeading
+        self.isHeadingEnabled = isHeadingEnabled
     }
 
     private var bearing: Double {
@@ -43,6 +47,11 @@ public struct StopLocationView: View {
         let directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
         let index = Int((bearing + 11.25) / 22.5) % 16
         return directions[index]
+    }
+
+    private var headingDegrees: Double? {
+        guard let h = currentHeading else { return nil }
+        return effectiveHeadingDegrees(trueHeading: h.trueHeading, magneticHeading: h.magneticHeading)
     }
 
     public var body: some View {
@@ -87,6 +96,14 @@ public struct StopLocationView: View {
             }
             .frame(height: 200)
             .padding()
+            .rotationEffect(.degrees(-(headingDegrees ?? 0)))
+            .animation(.easeOut(duration: 0.15), value: headingDegrees)
+
+            if isHeadingEnabled && headingDegrees == nil {
+                Text("Compass unavailable")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -125,7 +142,9 @@ public struct StopLocationView: View {
             longitude: -122.4348,
             agency: "SF"
         ),
-        currentLocation: CLLocation(latitude: 37.7858, longitude: -122.4064)
+        currentLocation: CLLocation(latitude: 37.7858, longitude: -122.4064),
+        currentHeading: nil,
+        isHeadingEnabled: false
     )
     .padding()
 }
