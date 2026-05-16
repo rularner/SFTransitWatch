@@ -10,12 +10,14 @@ class LocationManager: NSObject, ObservableObject {
     @Published var currentLocation: CLLocation?
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var isLocationEnabled = false
+    @Published var currentHeading: CLHeading?
     
     override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 10 // Update every 10 meters
+        locationManager.headingFilter = 5  // only fire on ≥5° change
 
         // SnapshotMode: serve a fixed Castro Station location instead of any real CL request.
         if SnapshotMode.isActive {
@@ -42,11 +44,13 @@ class LocationManager: NSObject, ObservableObject {
         }
 
         locationManager.startUpdatingLocation()
+        locationManager.startUpdatingHeading()
         isLocationEnabled = true
     }
     
     func stopLocationUpdates() {
         locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingHeading()
         isLocationEnabled = false
     }
 }
@@ -77,6 +81,12 @@ extension LocationManager: CLLocationManagerDelegate {
             @unknown default:
                 break
             }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        Task { @MainActor in
+            currentHeading = newHeading
         }
     }
 } 
