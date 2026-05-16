@@ -46,7 +46,7 @@ public struct Agency: Hashable, Codable, Identifiable, Sendable {
 /// always falls back to Muni so we never query 511 with no agency.
 public enum EnabledAgencies {
     public static let storageKey = "enabled_agencies"
-    public static let `default` = "SF"
+    public static let `default`: String = Agency.known.map(\.code).joined(separator: ",")
 
     public static func parse(_ stored: String) -> [String] {
         let codes = stored

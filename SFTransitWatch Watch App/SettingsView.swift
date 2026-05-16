@@ -9,7 +9,8 @@ struct SettingsView: View {
     @StateObject private var locationManager = LocationManager()
     @State private var apiKey = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
-    @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
+    @AppStorage(EnabledAgencies.storageKey, store: UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName))
+    private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
     @State private var nearbyStops: [BusStop] = []
 

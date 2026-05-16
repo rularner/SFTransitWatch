@@ -71,9 +71,9 @@ final class BackgroundRefreshController {
         }
 
         let pinnedStop = pinnedStop(for: stopId)
-        let agency = pinnedStop?.agency ?? EnabledAgencies.defaultAgency(
-            UserDefaults.standard.string(forKey: EnabledAgencies.storageKey) ?? ""
-        )
+        let storedAgencies = UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName)?
+            .string(forKey: EnabledAgencies.storageKey) ?? ""
+        let agency = pinnedStop?.agency ?? EnabledAgencies.defaultAgency(storedAgencies)
 
         let api = TransitAPI()
         let arrivals = await api.fetchArrivals(for: stopId, agency: agency)
