@@ -183,7 +183,7 @@ struct SettingsView: View {
                     Text("SF Transit Watch")
                         .font(.headline)
                     
-                    Text("Version 1.0")
+                    Text("Version \(appVersion)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
@@ -241,6 +241,13 @@ struct SettingsView: View {
     
     private var workerHostDisplay: String {
         return URL(string: ConfigurationManager.shared.workerBaseURL)?.host ?? ConfigurationManager.shared.workerBaseURL
+    }
+
+    private var appVersion: String {
+        guard let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else {
+            return "Unknown"
+        }
+        return version
     }
 
     private func saveAPIKey() {
