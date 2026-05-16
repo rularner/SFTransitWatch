@@ -1,6 +1,13 @@
 import SwiftUI
 import CoreLocation
 
+/// Picks the heading angle to display: prefers `trueHeading` (accounts for
+/// magnetic declination) when it is ≥ 0, falls back to `magneticHeading`.
+/// `trueHeading` is negative when CoreLocation hasn't produced a calibrated value.
+func effectiveHeadingDegrees(trueHeading: Double, magneticHeading: Double) -> Double {
+    trueHeading >= 0 ? trueHeading : magneticHeading
+}
+
 public struct StopLocationView: View {
     let stop: BusStop
     let currentLocation: CLLocation?

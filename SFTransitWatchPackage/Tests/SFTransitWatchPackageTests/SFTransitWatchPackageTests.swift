@@ -1,8 +1,22 @@
 import Testing
 @testable import SFTransitWatchPackage
 
-@Test func example() async throws {
-    // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-    // Swift Testing Documentation
-    // https://developer.apple.com/documentation/testing
+@Suite struct EffectiveHeadingTests {
+    @Test func prefersTrueHeadingWhenPositive() {
+        #expect(effectiveHeadingDegrees(trueHeading: 90.0, magneticHeading: 85.0) == 90.0)
+    }
+
+    @Test func trueHeadingZeroIsValid() {
+        // 0.0 = true north; ≥ 0 so trueHeading should win
+        #expect(effectiveHeadingDegrees(trueHeading: 0.0, magneticHeading: 10.0) == 0.0)
+    }
+
+    @Test func fallsBackToMagneticWhenTrueIsNegative() {
+        // CLHeading uses -1 when trueHeading is uncalibrated
+        #expect(effectiveHeadingDegrees(trueHeading: -1.0, magneticHeading: 85.0) == 85.0)
+    }
+
+    @Test func trueHeading360IsValid() {
+        #expect(effectiveHeadingDegrees(trueHeading: 360.0, magneticHeading: 10.0) == 360.0)
+    }
 }
