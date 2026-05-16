@@ -18,18 +18,24 @@ final class WatchSnapshotUITests: XCTestCase {
 
     func testSnapshot_BusStopList() throws {
         let app = launchSnapshotModeApp()
-        XCTAssertTrue(app.staticTexts["Castro Station"].waitForExistence(timeout: 10),
-                      "Expected Castro Station to be visible (SnapshotMode should serve it)")
+        // BusStopRow uses accessibilityElement(children: .combine), so individual
+        // staticTexts are hidden. The section header is always a plain staticText.
+        XCTAssertTrue(app.staticTexts["Nearby Stops"].waitForExistence(timeout: 10),
+                      "Expected Nearby Stops section header (SnapshotMode should serve stops)")
         try XCUISnapshotRunner.verify(app, named: "BusStopList", in: self, topPixelsToIgnore: 200)
     }
 
     func testSnapshot_BusArrival() throws {
         let app = launchSnapshotModeApp()
-        let castro = app.staticTexts["Castro Station"]
-        XCTAssertTrue(castro.waitForExistence(timeout: 10))
-        castro.firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["K"].waitForExistence(timeout: 10),
-                      "Expected K-Ingleside arrival row to be visible")
+        // BusStopRow uses accessibilityElement(children: .combine): the row is a
+        // button whose label starts with the stop name.
+        let castro = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'")).firstMatch
+        XCTAssertTrue(castro.waitForExistence(timeout: 10),
+                      "Expected Castro Station cell (SnapshotMode should serve it)")
+        castro.tap()
+        // "Next Arrivals" is the section header — always visible, not inside combine.
+        XCTAssertTrue(app.staticTexts["Next Arrivals"].waitForExistence(timeout: 10),
+                      "Expected Next Arrivals section header in BusArrivalView")
         try XCUISnapshotRunner.verify(app, named: "BusArrival", in: self, topPixelsToIgnore: 200)
     }
 
@@ -59,11 +65,12 @@ final class WatchSnapshotUITests: XCTestCase {
 
     func testSnapshot_StopLocation() throws {
         let app = launchSnapshotModeApp()
-        let castro = app.staticTexts["Castro Station"]
-        XCTAssertTrue(castro.waitForExistence(timeout: 10))
-        castro.firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["K"].waitForExistence(timeout: 10),
-                      "Expected K-Ingleside arrival row to be visible")
+        let castro = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'")).firstMatch
+        XCTAssertTrue(castro.waitForExistence(timeout: 10),
+                      "Expected Castro Station cell (SnapshotMode should serve it)")
+        castro.tap()
+        XCTAssertTrue(app.staticTexts["Next Arrivals"].waitForExistence(timeout: 10),
+                      "Expected Next Arrivals section header in BusArrivalView")
         // Swipe left to the compass/location tab (tab 1 in the TabView)
         app.swipeLeft()
         XCTAssertTrue(app.staticTexts["Stop Location"].waitForExistence(timeout: 5),
