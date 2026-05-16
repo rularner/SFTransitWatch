@@ -91,6 +91,7 @@ public struct StopLocationView: View {
                         .font(.caption)
                         .fontWeight(.semibold)
                 }
+                .rotationEffect(.degrees(headingDegrees ?? 0))
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .padding(.bottom, 12)
             }
