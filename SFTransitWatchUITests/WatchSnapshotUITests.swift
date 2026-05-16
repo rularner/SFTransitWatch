@@ -27,9 +27,11 @@ final class WatchSnapshotUITests: XCTestCase {
 
     func testSnapshot_BusArrival() throws {
         let app = launchSnapshotModeApp()
-        // BusStopRow uses accessibilityElement(children: .combine): the row is a
-        // button whose label starts with the stop name.
-        let castro = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'")).firstMatch
+        // BusStopRow uses accessibilityElement(children: .combine). On watchOS the
+        // NavigationLink row may not be classified as a .button, so search all types.
+        let castro = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'"))
+            .firstMatch
         XCTAssertTrue(castro.waitForExistence(timeout: 10),
                       "Expected Castro Station cell (SnapshotMode should serve it)")
         castro.tap()
@@ -65,7 +67,9 @@ final class WatchSnapshotUITests: XCTestCase {
 
     func testSnapshot_StopLocation() throws {
         let app = launchSnapshotModeApp()
-        let castro = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'")).firstMatch
+        let castro = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'"))
+            .firstMatch
         XCTAssertTrue(castro.waitForExistence(timeout: 10),
                       "Expected Castro Station cell (SnapshotMode should serve it)")
         castro.tap()
