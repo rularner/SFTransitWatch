@@ -75,9 +75,13 @@ final class WatchSnapshotUITests: XCTestCase {
         castro.tap()
         XCTAssertTrue(app.staticTexts["Next Arrivals"].waitForExistence(timeout: 10),
                       "Expected Next Arrivals section header in BusArrivalView")
-        // Swipe left to the compass/location tab (tab 1 in the TabView)
-        app.swipeLeft()
-        XCTAssertTrue(app.staticTexts["Stop Location"].waitForExistence(timeout: 5),
+        // Navigate to the compass/location tab (tab 1).
+        // app.swipeLeft() can trigger the watchOS back gesture or get consumed by the
+        // List scroll view. An explicit coordinate drag is more reliable.
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertTrue(app.staticTexts["Stop Location"].waitForExistence(timeout: 10),
                       "Expected Stop Location heading on the direction tab")
         try XCUISnapshotRunner.verify(app, named: "StopLocation", in: self, topPixelsToIgnore: 200)
     }
