@@ -6,6 +6,7 @@ struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
     @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var agenciesManager = SharedAgenciesManager()
     @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
     @State private var favoriteStops: [BusStop] = []
@@ -20,6 +21,7 @@ struct BusStopListView: View {
     var body: some View {
         List {
             filterBanner
+            AgencyFilterToolbar(agenciesManager: agenciesManager)
             if !transitAPI.isAPIKeyConfigured {
                 apiKeyPromptSection
             } else if transitAPI.isLoading && nearbyStops.isEmpty {
@@ -90,6 +92,9 @@ struct BusStopListView: View {
             Task { @MainActor in
                 favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
             }
+        }
+        .onChange(of: agenciesManager.enabledCodes) {
+            Task { await loadNearbyStops() }
         }
     }
 
@@ -204,7 +209,7 @@ struct BusStopListView: View {
     @MainActor
     private func loadNearbyStops() async {
         if let location = locationManager.currentLocation {
-            let agencies = activeAgencyFilter.map { [$0.code] } ?? ["SF"]
+            let agencies = activeAgencyFilter.map { [$0.code] } ?? agenciesManager.asArray
             nearbyStops = await transitAPI.fetchNearbyStops(
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
@@ -291,6 +296,16 @@ struct BusStopRow: View {
                     }
                 }
             }
+
+            if let agency = Agency.named(stop.agency) {
+                Text(agency.badge)
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(.systemGray5))
+                    .foregroundColor(.secondary)
+                    .cornerRadius(4)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -301,6 +316,42 @@ struct BusStopRow: View {
         } else {
             return String(format: "%.1fkm", distance / 1000)
         }
+    }
+}
+
+struct AgencyFilterToolbar: View {
+    @ObservedObject var agenciesManager: SharedAgenciesManager
+
+    var body: some View {
+        Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Agency.known) { agency in
+                        Button(action: { agenciesManager.toggle(agency.code) }) {
+                            Text(agency.badge)
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(agenciesManager.isEnabled(agency.code)
+                                    ? Color.accentColor
+                                    : Color(.systemGray5))
+                                .foregroundColor(agenciesManager.isEnabled(agency.code)
+                                    ? .white
+                                    : .secondary)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel(
+                            "\(agency.displayName): \(agenciesManager.isEnabled(agency.code) ? "enabled" : "disabled")"
+                        )
+                        .accessibilityHint("Tap to toggle")
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 }
 
