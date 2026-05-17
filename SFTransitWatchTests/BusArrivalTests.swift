@@ -275,6 +275,41 @@ final class BusArrivalTests: XCTestCase {
         XCTAssertNotNil(arrivals)
         XCTAssertTrue(arrivals?.first?.onwardStops.isEmpty ?? false)
         XCTAssertNil(arrivals?.first?.vehicleRef)
+        let buffered = Telemetry.shared.bufferedEventsForTesting
+        XCTAssertTrue(buffered.contains(where: { $0.errorKind == "no_onward_calls" }),
+                      "Expected a no_onward_calls telemetry event to be buffered")
+    }
+
+    func testDecodeArrivalsOnwardCallWithAimedTimeFallback() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "Downtown",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  },
+                  "OnwardCalls": {
+                    "OnwardCall": {
+                      "StopPointRef": "55555",
+                      "StopPointName": "Ferry Building",
+                      "AimedArrivalTime": "2026-01-01T10:45:00+00:00"
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.onwardStops.count, 1)
+        XCTAssertEqual(arrivals?.first?.onwardStops[0].id, "55555")
+        XCTAssertEqual(arrivals?.first?.onwardStops[0].name, "Ferry Building")
     }
 
     func testBusArrivalRoundTrips() throws {

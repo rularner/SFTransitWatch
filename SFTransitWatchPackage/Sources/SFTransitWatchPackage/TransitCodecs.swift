@@ -76,7 +76,7 @@ public enum TransitJSON {
             } ?? [:]
 
         let formatter = ISO8601DateFormatter()
-        return payload.serviceDelivery.stopMonitoringDelivery.monitoredStopVisit.compactMap { visit in
+        let arrivals = payload.serviceDelivery.stopMonitoringDelivery.monitoredStopVisit.compactMap { visit -> BusArrival? in
             let journey = visit.monitoredVehicleJourney
             let call = journey.monitoredCall
             let rawTime =
@@ -90,15 +90,6 @@ public enum TransitJSON {
             else { return nil }
 
             let alerts = (call.situationRefs ?? []).compactMap { situations[$0] }
-
-            if journey.onwardCalls.isEmpty {
-                Telemetry.shared.logFetchError(
-                    endpoint: "StopMonitoring",
-                    errorKind: "no_onward_calls",
-                    httpStatus: nil,
-                    latencyMs: 0
-                )
-            }
 
             let onwardStops: [OnwardStop] = journey.onwardCalls.compactMap { oc in
                 let rawOcTime = oc.expectedArrivalTime
@@ -119,6 +110,17 @@ public enum TransitJSON {
                 onwardStops: onwardStops
             )
         }
+
+        if arrivals.contains(where: { $0.onwardStops.isEmpty }) {
+            Telemetry.shared.logFetchError(
+                endpoint: "StopMonitoring",
+                errorKind: "no_onward_calls",
+                httpStatus: nil,
+                latencyMs: 0
+            )
+        }
+
+        return arrivals
     }
 }
 
