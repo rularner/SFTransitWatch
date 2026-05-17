@@ -16,6 +16,20 @@ final class WatchSnapshotUITests: XCTestCase {
         return app
     }
 
+    /// Launches directly into BusArrivalView for Castro Station, bypassing
+    /// the stop list. Needed because watchOS List cell accessibility on the
+    /// simulator doesn't expose cells in a way XCUI can reliably query.
+    private func launchSnapshotModeAppAtArrival() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-SNAPSHOT_MODE",
+            "-SNAPSHOT_ARRIVAL",
+            "-511_API_KEY", "fake-snapshot-key",
+        ]
+        app.launch()
+        return app
+    }
+
     func testSnapshot_BusStopList() throws {
         let app = launchSnapshotModeApp()
         // BusStopRow uses accessibilityElement(children: .combine), so individual
@@ -26,16 +40,7 @@ final class WatchSnapshotUITests: XCTestCase {
     }
 
     func testSnapshot_BusArrival() throws {
-        let app = launchSnapshotModeApp()
-        // BusStopRow uses accessibilityElement(children: .combine). On watchOS the
-        // NavigationLink row may not be classified as a .button, so search all types.
-        let castro = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'"))
-            .firstMatch
-        XCTAssertTrue(castro.waitForExistence(timeout: 10),
-                      "Expected Castro Station cell (SnapshotMode should serve it)")
-        castro.tap()
-        // "Next Arrivals" is the section header — always visible, not inside combine.
+        let app = launchSnapshotModeAppAtArrival()
         XCTAssertTrue(app.staticTexts["Next Arrivals"].waitForExistence(timeout: 10),
                       "Expected Next Arrivals section header in BusArrivalView")
         try XCUISnapshotRunner.verify(app, named: "BusArrival", in: self, topPixelsToIgnore: 200)
@@ -66,18 +71,12 @@ final class WatchSnapshotUITests: XCTestCase {
     }
 
     func testSnapshot_StopLocation() throws {
-        let app = launchSnapshotModeApp()
-        let castro = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH 'Castro Station'"))
-            .firstMatch
-        XCTAssertTrue(castro.waitForExistence(timeout: 10),
-                      "Expected Castro Station cell (SnapshotMode should serve it)")
-        castro.tap()
+        let app = launchSnapshotModeAppAtArrival()
         XCTAssertTrue(app.staticTexts["Next Arrivals"].waitForExistence(timeout: 10),
                       "Expected Next Arrivals section header in BusArrivalView")
         // Navigate to the compass/location tab (tab 1).
-        // app.swipeLeft() can trigger the watchOS back gesture or get consumed by the
-        // List scroll view. An explicit coordinate drag is more reliable.
+        // app.swipeLeft() can trigger the watchOS back gesture. An explicit
+        // coordinate drag is more reliable for TabView page navigation.
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
         let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: end)

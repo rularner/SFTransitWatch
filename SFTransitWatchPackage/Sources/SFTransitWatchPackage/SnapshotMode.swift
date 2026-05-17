@@ -13,6 +13,13 @@ public enum SnapshotMode {
         ProcessInfo.processInfo.arguments.contains("-SNAPSHOT_MODE")
     }
 
+    /// When true, the app should start directly on `BusArrivalView` for
+    /// `sampleStop` instead of the stop list. Used by snapshot tests that
+    /// need the arrival or compass screen without navigating from the list.
+    public static var showArrivalDirectly: Bool {
+        isActive && ProcessInfo.processInfo.arguments.contains("-SNAPSHOT_ARRIVAL")
+    }
+
     /// 5 hand-curated SF Muni Metro stops centered around the Castro neighborhood.
     /// Editing these values changes what appears in the App Store screenshots.
     public static let nearbyStops: [BusStop] = [
