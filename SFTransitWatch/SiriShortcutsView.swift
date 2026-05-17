@@ -36,7 +36,7 @@ private struct SiriPhraseRow: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         SiriShortcutsView()
     }
 }

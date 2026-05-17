@@ -9,7 +9,8 @@ struct SettingsView: View {
     @StateObject private var locationManager = LocationManager()
     @State private var apiKey = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
-    @AppStorage(EnabledAgencies.storageKey) private var enabledAgenciesRaw = EnabledAgencies.default
+    @AppStorage(EnabledAgencies.storageKey, store: UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName))
+    private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
     @State private var nearbyStops: [BusStop] = []
 
@@ -178,7 +179,7 @@ struct SettingsView: View {
                     Text("SF Transit Watch")
                         .font(.headline)
 
-                    Text("Version 1.0")
+                    Text("Version \(appVersion)")
                         .font(.caption)
                         .foregroundColor(.secondary)
 
@@ -206,6 +207,10 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAPIKeyEntry) {
             APIKeyEntryView(apiKey: $apiKey)
         }
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
 
     private var workerHostDisplay: String {

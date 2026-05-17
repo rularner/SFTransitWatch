@@ -143,7 +143,6 @@ class TransitAPI: ObservableObject {
     
     @MainActor
     func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int = 1000, agencies: [String] = ["SF"]) async -> [BusStop] {
-        // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
         if SnapshotMode.isActive {
             return SnapshotMode.nearbyStops
         }
@@ -157,18 +156,38 @@ class TransitAPI: ObservableObject {
             return []
         }
 
-        let agency = agencies.first ?? "SF"
+        var allStops: [BusStop] = []
+        for agency in agencies {
+            do {
+                let stops = try await fetchStopsForOneAgency(agency, latitude: latitude, longitude: longitude, radius: radius)
+                allStops.append(contentsOf: stops)
+            } catch {
+                Telemetry.shared.logFetchError(endpoint: "Stops", errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: 0)
+            }
+        }
+
+        if allStops.isEmpty {
+            errorMessage = "No nearby stops found"
+        }
+        return allStops
+    }
+    
+    @MainActor
+    private func fetchStopsForOneAgency(
+        _ agencyCode: String,
+        latitude: Double,
+        longitude: Double,
+        radius: Int
+    ) async throws -> [BusStop] {
         let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
-            URLQueryItem(name: "operator_id", value: agency),
-            URLQueryItem(name: "lat", value: String(latitude)),
-            URLQueryItem(name: "lon", value: String(longitude)),
-            // 511.org deployments differ on expected coordinate keys.
-            // Send both forms so geofiltering works consistently.
-            URLQueryItem(name: "latitude", value: String(latitude)),
-            URLQueryItem(name: "longitude", value: String(longitude)),
-            URLQueryItem(name: "radius", value: String(radius))
+            URLQueryItem(name: "operator_id", value: agencyCode),
+            URLQueryItem(name: "lat",         value: String(latitude)),
+            URLQueryItem(name: "lon",         value: String(longitude)),
+            URLQueryItem(name: "latitude",    value: String(latitude)),
+            URLQueryItem(name: "longitude",   value: String(longitude)),
+            URLQueryItem(name: "radius",      value: String(radius))
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
@@ -176,54 +195,41 @@ class TransitAPI: ObservableObject {
         components?.queryItems = queryItems
 
         guard let url = components?.url else {
-            errorMessage = "Failed to load nearby stops: invalid URL"
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: 0)
-            return []
+            throw APIError.invalidResponse
         }
         let request = makeRequest(url: url)
-
         let started = Date()
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
-                throw APIError.invalidResponse
-            }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
-            if httpResponse.statusCode == 401, !isDirect511Mode {
-                useDirectFallback = true
-                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "worker_401_fallback", httpStatus: 401, latencyMs: latencyMs)
-                return await fetchNearbyStops(latitude: latitude, longitude: longitude, radius: radius, agencies: agencies)
-            }
-
-            if httpResponse.statusCode != 200 {
-                Telemetry.shared.logFetchError(
-                    endpoint: endpoint,
-                    errorKind: errorKind(for: APIError.invalidResponse, status: httpResponse.statusCode),
-                    httpStatus: httpResponse.statusCode,
-                    latencyMs: latencyMs
-                )
-                errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
-                return []
-            }
-
-            let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
-            Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            let stops = try parse511Stops(data: data, agency: agency)
-            if stops.isEmpty {
-                errorMessage = "No nearby stops found"
-            }
-            return stops
-        } catch {
-            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
-            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
-            errorMessage = "Failed to load nearby stops: \(error.localizedDescription)"
-            return []
+        guard let httpResponse = response as? HTTPURLResponse else {
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
+            throw APIError.invalidResponse
         }
+
+        if httpResponse.statusCode == 401, !isDirect511Mode {
+            useDirectFallback = true
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "worker_401_fallback", httpStatus: 401, latencyMs: latencyMs)
+            return try await fetchStopsForOneAgency(agencyCode, latitude: latitude, longitude: longitude, radius: radius)
+        }
+
+        if httpResponse.statusCode != 200 {
+            Telemetry.shared.logFetchError(
+                endpoint: endpoint,
+                errorKind: errorKind(for: APIError.invalidResponse, status: httpResponse.statusCode),
+                httpStatus: httpResponse.statusCode,
+                latencyMs: latencyMs
+            )
+            throw APIError.invalidResponse
+        }
+
+        let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
+        Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
+        return try parse511Stops(data: data, agency: agencyCode)
     }
-    
+
     // Parse 511.org XML response for arrivals
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
         // 511 currently serves JSON for StopMonitoring, but we keep XML fallback

@@ -35,6 +35,18 @@ public struct BusArrival: Identifiable, Codable, Sendable {
     }
 }
 
+public extension Array where Element == BusArrival {
+    func filtered(by route: String?) -> [BusArrival] {
+        guard let route else { return self }
+        return filter { $0.route == route }
+    }
+
+    var uniqueRoutes: [String] {
+        var seen = Set<String>()
+        return compactMap { seen.insert($0.route).inserted ? $0.route : nil }
+    }
+}
+
 #if DEBUG
 extension BusArrival {
     public static let previewArrivals: [BusArrival] = [

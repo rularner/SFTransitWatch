@@ -1,13 +1,24 @@
 import SwiftUI
 import CoreLocation
 
+/// Picks the heading angle to display: prefers `trueHeading` (accounts for
+/// magnetic declination) when it is ≥ 0, falls back to `magneticHeading`.
+/// `trueHeading` is negative when CoreLocation hasn't produced a calibrated value.
+func effectiveHeadingDegrees(trueHeading: Double, magneticHeading: Double) -> Double {
+    trueHeading >= 0 ? trueHeading : magneticHeading
+}
+
 public struct StopLocationView: View {
     let stop: BusStop
     let currentLocation: CLLocation?
+    let currentHeading: CLHeading?
+    let isHeadingEnabled: Bool
 
-    public init(stop: BusStop, currentLocation: CLLocation?) {
+    public init(stop: BusStop, currentLocation: CLLocation?, currentHeading: CLHeading?, isHeadingEnabled: Bool) {
         self.stop = stop
         self.currentLocation = currentLocation
+        self.currentHeading = currentHeading
+        self.isHeadingEnabled = isHeadingEnabled
     }
 
     private var bearing: Double {
@@ -36,6 +47,11 @@ public struct StopLocationView: View {
         let directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
         let index = Int((bearing + 11.25) / 22.5) % 16
         return directions[index]
+    }
+
+    private var headingDegrees: Double? {
+        guard let h = currentHeading else { return nil }
+        return effectiveHeadingDegrees(trueHeading: h.trueHeading, magneticHeading: h.magneticHeading)
     }
 
     public var body: some View {
@@ -75,11 +91,20 @@ public struct StopLocationView: View {
                         .font(.caption)
                         .fontWeight(.semibold)
                 }
+                .rotationEffect(.degrees(headingDegrees ?? 0))
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .padding(.bottom, 12)
             }
             .frame(height: 200)
             .padding()
+            .rotationEffect(.degrees(-(headingDegrees ?? 0)))
+            .animation(.easeOut(duration: 0.15), value: headingDegrees)
+
+            if isHeadingEnabled && headingDegrees == nil {
+                Text("Compass unavailable")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -118,7 +143,9 @@ public struct StopLocationView: View {
             longitude: -122.4348,
             agency: "SF"
         ),
-        currentLocation: CLLocation(latitude: 37.7858, longitude: -122.4064)
+        currentLocation: CLLocation(latitude: 37.7858, longitude: -122.4064),
+        currentHeading: nil,
+        isHeadingEnabled: false
     )
     .padding()
 }

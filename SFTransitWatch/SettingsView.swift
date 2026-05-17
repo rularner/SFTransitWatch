@@ -7,6 +7,7 @@ struct SettingsView: View {
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var slotsManager = CommuteSlotsManager()
     @StateObject private var locationManager = LocationManager()
+    @StateObject private var agenciesManager = SharedAgenciesManager()
     @State private var apiKey = ""
     @State private var showingAPIKeyAlert = false
     @State private var showingSuccessAlert = false
@@ -45,6 +46,17 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
             }
             
+            Section(header: Text("Transit Agencies")) {
+                ForEach(Agency.known) { agency in
+                    Toggle(isOn: Binding(
+                        get: { agenciesManager.isEnabled(agency.code) },
+                        set: { _ in agenciesManager.toggle(agency.code) }
+                    )) {
+                        Text(agency.displayName)
+                    }
+                }
+            }
+
             Section(
                 header: Text("Worker proxy (optional)"),
                 footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…. Leave blank to call 511.org directly with your own API key.")
@@ -214,7 +226,7 @@ struct SettingsView: View {
                     nearbyStops = await transitAPI.fetchNearbyStops(
                         latitude: location.coordinate.latitude,
                         longitude: location.coordinate.longitude,
-                        agencies: [EnabledAgencies.default]
+                        agencies: agenciesManager.asArray
                     )
                 }
             }
@@ -281,7 +293,7 @@ struct SettingsView: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         SettingsView()
     }
 } 

@@ -21,26 +21,21 @@ struct BusArrivalView: View {
         transitAPI: TransitAPI? = nil,
         favoritesManager: FavoritesManager? = nil,
         commuteSlotsManager: CommuteSlotsManager? = nil,
-        initialArrivals: [BusArrival] = []
+        initialArrivals: [BusArrival] = [],
+        initialTab: Int = 0
     ) {
         self.stop = stop
         _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
         _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
         _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
         _arrivals = State(initialValue: initialArrivals)
+        _selectedTab = State(initialValue: initialTab)
     }
 
     private let refreshInterval = 30
 
-    var filteredArrivals: [BusArrival] {
-        guard let route = selectedRoute else { return arrivals }
-        return arrivals.filter { $0.route == route }
-    }
-
-    var uniqueRoutes: [String] {
-        var seen = Set<String>()
-        return arrivals.compactMap { seen.insert($0.route).inserted ? $0.route : nil }
-    }
+    var filteredArrivals: [BusArrival] { arrivals.filtered(by: selectedRoute) }
+    var uniqueRoutes: [String] { arrivals.uniqueRoutes }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -167,7 +162,12 @@ struct BusArrivalView: View {
 
             // MARK: - Location Pane
             VStack {
-                StopLocationView(stop: stop, currentLocation: locationManager.currentLocation)
+                StopLocationView(
+                    stop: stop,
+                    currentLocation: locationManager.currentLocation,
+                    currentHeading: locationManager.currentHeading,
+                    isHeadingEnabled: locationManager.isLocationEnabled
+                )
                     .padding()
             }
             .tag(1)
