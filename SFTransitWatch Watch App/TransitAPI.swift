@@ -263,6 +263,7 @@ class TransitAPI: ObservableObject {
         if let jsonArrivals = TransitJSON.decodeArrivals(data), !jsonArrivals.isEmpty {
             return jsonArrivals
         }
+        Telemetry.shared.logFetchError(endpoint: "StopMonitoring", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
 
         let alerts = TransitJSON.parseSituationSummaries(from: data)
 
@@ -293,6 +294,7 @@ class TransitAPI: ObservableObject {
         if let jsonStops = TransitJSON.decodeStops(data, agency: agency), !jsonStops.isEmpty {
             return jsonStops
         }
+        Telemetry.shared.logFetchError(endpoint: "Stops", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
 
         let records = SIRIXMLParser.parseRecords(
             data: data,

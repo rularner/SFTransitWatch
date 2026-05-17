@@ -230,11 +230,10 @@ class TransitAPI: ObservableObject {
 
     // Parse 511.org XML response for arrivals
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
-        // 511 currently serves JSON for StopMonitoring, but we keep XML fallback
-        // for compatibility with worker/legacy responses.
         if let jsonArrivals = TransitJSON.decodeArrivals(data), !jsonArrivals.isEmpty {
             return jsonArrivals
         }
+        Telemetry.shared.logFetchError(endpoint: "StopMonitoring", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
         return try parseXMLArrivals(data: data)
     }
 
@@ -270,11 +269,10 @@ class TransitAPI: ObservableObject {
     
     // Parse 511.org XML response for stops
     private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
-        // Direct 511 Stops endpoint returns JSON. Worker/legacy paths may still
-        // return XML StopPlace payloads, so we attempt JSON first then fall back.
         if let jsonStops = TransitJSON.decodeStops(data, agency: agency), !jsonStops.isEmpty {
             return jsonStops
         }
+        Telemetry.shared.logFetchError(endpoint: "Stops", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
         return try parseXMLStops(data: data, agency: agency)
     }
 
