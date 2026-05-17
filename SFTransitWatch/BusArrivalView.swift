@@ -166,7 +166,17 @@ struct BusArrivalView: View {
                         .listRowBackground(Color.clear)
                     }
                     ForEach(filteredArrivals) { arrival in
-                        BusArrivalRow(arrival: arrival)
+                        if !arrival.onwardStops.isEmpty {
+                            NavigationLink(destination: BusJourneyView(
+                                arrival: arrival,
+                                originStopId: stop.id,
+                                agency: stop.agency
+                            )) {
+                                BusArrivalRow(arrival: arrival)
+                            }
+                        } else {
+                            BusArrivalRow(arrival: arrival)
+                        }
                     }
                 }
             } header: {
