@@ -5,7 +5,10 @@ struct ContentView: View {
     var body: some View {
         if SnapshotMode.showArrivalDirectly {
             NavigationStack {
-                BusArrivalView(stop: SnapshotMode.sampleStop)
+                BusArrivalView(
+                    stop: SnapshotMode.sampleStop,
+                    initialTab: SnapshotMode.showLocationTab ? 1 : 0
+                )
             }
         } else {
             NavigationStack {

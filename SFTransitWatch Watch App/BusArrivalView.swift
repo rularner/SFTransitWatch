@@ -21,13 +21,15 @@ struct BusArrivalView: View {
         transitAPI: TransitAPI? = nil,
         favoritesManager: FavoritesManager? = nil,
         commuteSlotsManager: CommuteSlotsManager? = nil,
-        initialArrivals: [BusArrival] = []
+        initialArrivals: [BusArrival] = [],
+        initialTab: Int = 0
     ) {
         self.stop = stop
         _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
         _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
         _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
         _arrivals = State(initialValue: initialArrivals)
+        _selectedTab = State(initialValue: initialTab)
     }
 
     private let refreshInterval = 30

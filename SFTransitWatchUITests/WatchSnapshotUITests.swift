@@ -16,14 +16,25 @@ final class WatchSnapshotUITests: XCTestCase {
         return app
     }
 
-    /// Launches directly into BusArrivalView for Castro Station, bypassing
-    /// the stop list. Needed because watchOS List cell accessibility on the
-    /// simulator doesn't expose cells in a way XCUI can reliably query.
+    /// Launches directly into BusArrivalView (arrivals tab) for Castro Station,
+    /// bypassing the stop list. watchOS List cells aren't reliably queryable via XCUI.
     private func launchSnapshotModeAppAtArrival() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "-SNAPSHOT_MODE",
             "-SNAPSHOT_ARRIVAL",
+            "-511_API_KEY", "fake-snapshot-key",
+        ]
+        app.launch()
+        return app
+    }
+
+    /// Launches directly into BusArrivalView on the location/compass tab (tab 1).
+    private func launchSnapshotModeAppAtLocation() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-SNAPSHOT_MODE",
+            "-SNAPSHOT_LOCATION",
             "-511_API_KEY", "fake-snapshot-key",
         ]
         app.launch()
@@ -71,17 +82,9 @@ final class WatchSnapshotUITests: XCTestCase {
     }
 
     func testSnapshot_StopLocation() throws {
-        let app = launchSnapshotModeAppAtArrival()
-        XCTAssertTrue(app.staticTexts["Next Arrivals"].waitForExistence(timeout: 10),
-                      "Expected Next Arrivals section header in BusArrivalView")
-        // Navigate to the compass/location tab (tab 1).
-        // app.swipeLeft() can trigger the watchOS back gesture. An explicit
-        // coordinate drag is more reliable for TabView page navigation.
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: end)
+        let app = launchSnapshotModeAppAtLocation()
         XCTAssertTrue(app.staticTexts["Stop Location"].waitForExistence(timeout: 10),
-                      "Expected Stop Location heading on the direction tab")
+                      "Expected Stop Location heading on the compass tab")
         try XCUISnapshotRunner.verify(app, named: "StopLocation", in: self, topPixelsToIgnore: 200)
     }
 }
