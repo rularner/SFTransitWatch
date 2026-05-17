@@ -91,12 +91,32 @@ public enum TransitJSON {
 
             let alerts = (call.situationRefs ?? []).compactMap { situations[$0] }
 
+            if journey.onwardCalls.isEmpty {
+                Telemetry.shared.logFetchError(
+                    endpoint: "StopMonitoring",
+                    errorKind: "no_onward_calls",
+                    httpStatus: nil,
+                    latencyMs: 0
+                )
+            }
+
+            let onwardStops: [OnwardStop] = journey.onwardCalls.compactMap { oc in
+                let rawOcTime = oc.expectedArrivalTime
+                    ?? oc.expectedDepartureTime
+                    ?? oc.aimedArrivalTime
+                    ?? oc.aimedDepartureTime
+                guard let rawOcTime, let ocTime = formatter.date(from: rawOcTime) else { return nil }
+                return OnwardStop(id: oc.stopPointRef, name: oc.stopPointName, arrivalTime: ocTime)
+            }
+
             return BusArrival(
                 route: Self.cleanLineRef(journey.lineRef),
                 destination: journey.directionRef,
                 arrivalTime: arrivalTime,
                 isRealTime: true,
-                alerts: alerts
+                alerts: alerts,
+                vehicleRef: journey.vehicleRef,
+                onwardStops: onwardStops
             )
         }
     }
@@ -183,12 +203,29 @@ struct MonitoredStopVisit: Decodable {
 struct MonitoredVehicleJourney: Decodable {
     let lineRef: String
     let directionRef: String
+    let vehicleRef: String?
     let monitoredCall: MonitoredCall
+    let onwardCalls: [OnwardCall]
 
     enum CodingKeys: String, CodingKey {
-        case lineRef = "LineRef"
-        case directionRef = "DirectionRef"
+        case lineRef       = "LineRef"
+        case directionRef  = "DirectionRef"
+        case vehicleRef    = "VehicleRef"
         case monitoredCall = "MonitoredCall"
+        case onwardCalls   = "OnwardCalls"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lineRef       = try  c.decode(String.self,        forKey: .lineRef)
+        directionRef  = try  c.decode(String.self,        forKey: .directionRef)
+        vehicleRef    = try? c.decodeIfPresent(String.self, forKey: .vehicleRef)
+        monitoredCall = try  c.decode(MonitoredCall.self, forKey: .monitoredCall)
+        if let wrapper = try? c.decodeIfPresent(OnwardCallsWrapper.self, forKey: .onwardCalls) {
+            onwardCalls = wrapper.calls
+        } else {
+            onwardCalls = []
+        }
     }
 }
 
@@ -265,4 +302,39 @@ struct PtSituationElement: Decodable {
 struct SituationText: Decodable {
     let value: String
     let lang: String?
+}
+
+struct OnwardCallsWrapper: Decodable {
+    let calls: [OnwardCall]
+
+    enum CodingKeys: String, CodingKey { case onwardCall = "OnwardCall" }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decodeIfPresent([OnwardCall].self, forKey: .onwardCall) {
+            calls = arr
+        } else if let single = try? c.decodeIfPresent(OnwardCall.self, forKey: .onwardCall) {
+            calls = [single]
+        } else {
+            calls = []
+        }
+    }
+}
+
+struct OnwardCall: Decodable {
+    let stopPointRef: String
+    let stopPointName: String
+    let expectedArrivalTime: String?
+    let expectedDepartureTime: String?
+    let aimedArrivalTime: String?
+    let aimedDepartureTime: String?
+
+    enum CodingKeys: String, CodingKey {
+        case stopPointRef          = "StopPointRef"
+        case stopPointName         = "StopPointName"
+        case expectedArrivalTime   = "ExpectedArrivalTime"
+        case expectedDepartureTime = "ExpectedDepartureTime"
+        case aimedArrivalTime      = "AimedArrivalTime"
+        case aimedDepartureTime    = "AimedDepartureTime"
+    }
 }

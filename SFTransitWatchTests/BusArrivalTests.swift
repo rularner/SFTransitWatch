@@ -175,6 +175,108 @@ final class BusArrivalTests: XCTestCase {
         XCTAssertEqual(arrival.onwardStops[1].name, "Stop B")
     }
 
+    // MARK: - TransitJSON OnwardCalls decoding
+
+    func testDecodeArrivalsWithOnwardCalls() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "Downtown",
+                  "VehicleRef": "SF:1234",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  },
+                  "OnwardCalls": {
+                    "OnwardCall": [
+                      {
+                        "StopPointRef": "15725",
+                        "StopPointName": "Market St & 4th St",
+                        "ExpectedArrivalTime": "2026-01-01T10:30:00+00:00"
+                      },
+                      {
+                        "StopPointRef": "15726",
+                        "StopPointName": "Market St & 5th St",
+                        "ExpectedArrivalTime": "2026-01-01T10:32:00+00:00"
+                      }
+                    ]
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertNotNil(arrivals)
+        XCTAssertEqual(arrivals?.count, 1)
+        XCTAssertEqual(arrivals?.first?.vehicleRef, "SF:1234")
+        XCTAssertEqual(arrivals?.first?.onwardStops.count, 2)
+        XCTAssertEqual(arrivals?.first?.onwardStops[0].id, "15725")
+        XCTAssertEqual(arrivals?.first?.onwardStops[0].name, "Market St & 4th St")
+        XCTAssertEqual(arrivals?.first?.onwardStops[1].id, "15726")
+    }
+
+    func testDecodeArrivalsWithSingleOnwardCall() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:N",
+                  "DirectionRef": "Judah",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  },
+                  "OnwardCalls": {
+                    "OnwardCall": {
+                      "StopPointRef": "99999",
+                      "StopPointName": "Ocean Beach",
+                      "ExpectedArrivalTime": "2026-01-01T10:40:00+00:00"
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.onwardStops.count, 1)
+        XCTAssertEqual(arrivals?.first?.onwardStops[0].id, "99999")
+    }
+
+    func testDecodeArrivalsWithNoOnwardCalls() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "Downtown",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertNotNil(arrivals)
+        XCTAssertTrue(arrivals?.first?.onwardStops.isEmpty ?? false)
+        XCTAssertNil(arrivals?.first?.vehicleRef)
+    }
+
     func testBusArrivalRoundTrips() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let stop = OnwardStop(id: "X", name: "Stop X",
