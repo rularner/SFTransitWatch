@@ -100,4 +100,47 @@ final class BusArrivalTests: XCTestCase {
                                        now: frozen)
         XCTAssertEqual(twoMinEarlier.minutesAway, 0)
     }
+
+    // MARK: - OnwardStop
+
+    func testOnwardStopMinutesAway() {
+        let now = Date()
+        let stop = OnwardStop(id: "15725", name: "Market St & 4th St",
+                              arrivalTime: now.addingTimeInterval(300), now: now)
+        XCTAssertEqual(stop.minutesAway, 5)
+    }
+
+    func testOnwardStopMinutesAwayNeverNegative() {
+        let now = Date()
+        let stop = OnwardStop(id: "15725", name: "Market St & 4th St",
+                              arrivalTime: now.addingTimeInterval(-60), now: now)
+        XCTAssertEqual(stop.minutesAway, 0)
+    }
+
+    func testOnwardStopMinutesStringDue() {
+        let now = Date()
+        let stop = OnwardStop(id: "15725", name: "Market St & 4th St",
+                              arrivalTime: now.addingTimeInterval(10), now: now)
+        XCTAssertEqual(stop.minutesString, "Due")
+    }
+
+    func testOnwardStopMinutesStringOneMinute() {
+        let now = Date()
+        let stop = OnwardStop(id: "15725", name: "Market St & 4th St",
+                              arrivalTime: now.addingTimeInterval(90), now: now)
+        XCTAssertEqual(stop.minutesString, "1 min")
+    }
+
+    func testOnwardStopMinutesStringMultiple() {
+        let now = Date()
+        let stop = OnwardStop(id: "15725", name: "Market St & 4th St",
+                              arrivalTime: now.addingTimeInterval(600), now: now)
+        XCTAssertEqual(stop.minutesString, "10 min")
+    }
+
+    func testOnwardStopTimeStringNotEmpty() {
+        let stop = OnwardStop(id: "15725", name: "Market St & 4th St",
+                              arrivalTime: Date().addingTimeInterval(300))
+        XCTAssertFalse(stop.timeString.isEmpty)
+    }
 }
