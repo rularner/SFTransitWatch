@@ -5,7 +5,7 @@ import SFTransitWatchPackage
 struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
-    @StateObject private var favoritesManager = FavoritesManager()
+    @EnvironmentObject var favoritesManager: FavoritesManager
     @StateObject private var agenciesManager = SharedAgenciesManager()
     @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
@@ -183,8 +183,7 @@ struct BusStopListView: View {
                 NavigationLink(destination: BusArrivalView(stop: stop)) {
                     BusStopRow(
                         stop: stop,
-                        currentLocation: locationManager.currentLocation,
-                        favoritesManager: favoritesManager
+                        currentLocation: locationManager.currentLocation
                     )
                 }
             }
@@ -217,7 +216,10 @@ struct BusStopListView: View {
 struct BusStopRow: View {
     let stop: BusStop
     let currentLocation: CLLocation?
-    let favoritesManager: FavoritesManager
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var slotsManager: CommuteSlotsManager
+    @State private var commutePromptStop: BusStop? = nil
+    @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -251,7 +253,15 @@ struct BusStopRow: View {
                     }
 
                     Button(action: {
+                        let isAdding = !favoritesManager.isFavorite(stop.id)
                         favoritesManager.toggleFavorite(stop)
+                        if isAdding {
+                            let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
+                            if !empty.isEmpty {
+                                commuteEmptySlots = empty
+                                commutePromptStop = stop
+                            }
+                        }
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
                             .foregroundColor(stop.isFavorite ? .yellow : .gray)
@@ -259,6 +269,21 @@ struct BusStopRow: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
+            }
+            .confirmationDialog(
+                "Add to commute?",
+                isPresented: Binding(get: { commutePromptStop != nil }, set: { if !$0 { commutePromptStop = nil } }),
+                presenting: commutePromptStop
+            ) { pendingStop in
+                if commuteEmptySlots.contains(.morning) {
+                    Button("Morning Commute") { slotsManager.setStopId(pendingStop.id, for: .morning) }
+                }
+                if commuteEmptySlots.contains(.afternoon) {
+                    Button("Afternoon Commute") { slotsManager.setStopId(pendingStop.id, for: .afternoon) }
+                }
+                Button("Not Now", role: .cancel) { }
+            } message: { pendingStop in
+                Text("Use \"\(pendingStop.name)\" as a commute stop?")
             }
 
             if !stop.routes.isEmpty {
@@ -341,4 +366,6 @@ struct AgencyFilterToolbar: View {
 
 #Preview {
     BusStopListView()
+        .environmentObject(FavoritesManager())
+        .environmentObject(CommuteSlotsManager())
 }

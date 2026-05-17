@@ -1,6 +1,10 @@
 import SwiftUI
+import SFTransitWatchPackage
 
 struct ContentView: View {
+    @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var slotsManager = CommuteSlotsManager()
+
     var body: some View {
         NavigationStack {
             BusStopListView()
@@ -13,6 +17,8 @@ struct ContentView: View {
                     }
                 }
         }
+        .environmentObject(favoritesManager)
+        .environmentObject(slotsManager)
     }
 }
 

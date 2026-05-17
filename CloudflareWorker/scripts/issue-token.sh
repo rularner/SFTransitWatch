@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Generate a per-device worker auth token, register its SHA-256 hash in
-# the CLIENT_TOKENS KV namespace, and print a worker bootstrap link that
-# carries both the worker URL and the raw token. Hand that link to the
-# device via Messages/Mail; on iOS, paste it into Settings; on watchOS,
-# tap it.
+# Issue a per-device worker auth token.
+#
+# Two KV entries are written to CLIENT_TOKENS:
+#   reg:<CODE>   -> raw TOKEN, TTL 4 hours  (one-time exchange code for the device)
+#   SHA256(TOKEN)-> {label, createdAt}     (permanent auth record used on every request)
+#
+# The bootstrap link carries only the one-time CODE, not the raw TOKEN, so the
+# token is never in a URL that could be logged or shared accidentally.
 #
 # Usage:
 #   scripts/issue-token.sh <label> [<worker-url>]
@@ -43,22 +46,31 @@ if ! command -v shasum >/dev/null; then
 fi
 
 # URL-encode the worker URL so it survives the query-string round trip.
-# python3 ships with macOS and is on every CI image we care about.
 ENCODED_URL=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$WORKER_URL")
 
+# Permanent token — never leaves the server after this script runs.
 TOKEN=$(openssl rand -hex 32)
 HASH=$(printf '%s' "$TOKEN" | shasum -a 256 | awk '{print $1}')
 CREATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-VALUE=$(printf '{"label":"%s","createdAt":"%s"}' "$LABEL" "$CREATED_AT")
 
-npx wrangler kv key put --binding CLIENT_TOKENS "$HASH" "$VALUE" >/dev/null
+# One-time registration code — carried in the bootstrap link, redeemed once for TOKEN.
+CODE=$(openssl rand -hex 16)
 
-echo "Registered token for label: $LABEL"
+# 1. Store the permanent auth record (hash → metadata).
+npx wrangler kv key put --binding CLIENT_TOKENS "$HASH" \
+    "$(printf '{"label":"%s","createdAt":"%s"}' "$LABEL" "$CREATED_AT")" >/dev/null
+
+# 2. Store the one-time exchange code (reg:<code> → token), expires in 4 hoursutes.
+npx wrangler kv key put --binding CLIENT_TOKENS "reg:${CODE}" "$TOKEN" \
+    --expiration-ttl 14400 >/dev/null
+
+echo "Issued token for label: $LABEL"
 echo "  worker URL:       $WORKER_URL"
-echo "  hash (KV key):    $HASH"
+echo "  token hash:       $HASH"
+echo "  code (expires in 4 hours, single use)"
 echo
-echo "Bootstrap link (paste into iOS Settings, or tap on watchOS):"
-echo "  https://rularner.github.io/sftransitwatch/wt?u=${ENCODED_URL}&t=${TOKEN}"
+echo "Bootstrap link (send to device via Messages/Mail — tap on iOS or watchOS):"
+echo "  sftransitwatch://wt?u=${ENCODED_URL}&c=${CODE}"
 echo
-echo "To revoke later:"
+echo "To revoke the permanent token later:"
 echo "  npx wrangler kv key delete --binding CLIENT_TOKENS $HASH"

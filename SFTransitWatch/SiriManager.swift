@@ -71,7 +71,7 @@ struct CheckStopArrivalsIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         UserDefaults.standard.set(agency?.rawValue ?? "", forKey: Agency.selectedAgencyKey)
 
-        let key = UserDefaults.standard.string(forKey: "511_API_KEY") ?? ""
+        let key = ConfigurationManager.shared.apiKey
         guard !key.isEmpty else {
             return .result(dialog: "Please configure your 511.org API key in SF Transit Watch settings.")
         }

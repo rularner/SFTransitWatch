@@ -5,8 +5,8 @@ import SFTransitWatchPackage
 struct BusArrivalView: View {
     let stop: BusStop
     @StateObject private var transitAPI = TransitAPI()
-    @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var commuteSlotsManager = CommuteSlotsManager()
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var slotsManager: CommuteSlotsManager
 
     @StateObject private var locationManager = LocationManager()
     @State private var selectedTab = 0
@@ -14,20 +14,18 @@ struct BusArrivalView: View {
     @State private var lastUpdated = Date()
     @State private var secondsUntilRefresh = 30
     @State private var notifiedArrivalIDs: Set<UUID> = []
-    @State private var selectedRoute: String? = nil  // nil = show all
+    @State private var selectedRoute: String? = nil
+    @State private var showCommutePrompt = false
+    @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
 
     init(
         stop: BusStop,
         transitAPI: TransitAPI? = nil,
-        favoritesManager: FavoritesManager? = nil,
-        commuteSlotsManager: CommuteSlotsManager? = nil,
         initialArrivals: [BusArrival] = [],
         initialTab: Int = 0
     ) {
         self.stop = stop
         _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
-        _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
-        _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
         _arrivals = State(initialValue: initialArrivals)
         _selectedTab = State(initialValue: initialTab)
     }
@@ -52,7 +50,17 @@ struct BusArrivalView: View {
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
-                            Button(action: { favoritesManager.toggleFavorite(stop) }) {
+                            Button(action: {
+                                let isAdding = !favoritesManager.isFavorite(stop.id)
+                                favoritesManager.toggleFavorite(stop)
+                                if isAdding {
+                                    let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
+                                    if !empty.isEmpty {
+                                        commuteEmptySlots = empty
+                                        showCommutePrompt = true
+                                    }
+                                }
+                            }) {
                                 Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
                                     .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)
                                     .font(.title2)
@@ -91,7 +99,24 @@ struct BusArrivalView: View {
                         .accessibilityLabel("Error: \(error)")
                     }
                 }
-    
+
+                let alerts = arrivals.uniqueAlerts
+                if !alerts.isEmpty {
+                    Section(header: Text("Service Alerts")) {
+                        ForEach(alerts, id: \.self) { alert in
+                            HStack(alignment: .top, spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption2)
+                                Text(alert)
+                                    .font(.caption2)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Service alert: \(alert)")
+                        }
+                    }
+                }
+
                 // Arrivals
                 Section {
                     if transitAPI.isLoading && arrivals.isEmpty {
@@ -184,6 +209,20 @@ struct BusArrivalView: View {
                 await loadArrivals()
             }
         }
+        .confirmationDialog(
+            "Add to commute?",
+            isPresented: $showCommutePrompt
+        ) {
+            if commuteEmptySlots.contains(.morning) {
+                Button("Morning Commute") { slotsManager.setStopId(stop.id, for: .morning) }
+            }
+            if commuteEmptySlots.contains(.afternoon) {
+                Button("Afternoon Commute") { slotsManager.setStopId(stop.id, for: .afternoon) }
+            }
+            Button("Not Now", role: .cancel) { }
+        } message: {
+            Text("Use \"\(stop.name)\" as a commute stop?")
+        }
     }
 
     private func loadArrivals() async {
@@ -199,7 +238,7 @@ struct BusArrivalView: View {
                 stopName: stop.name,
                 route: first.route,
                 minutesAway: first.minutesAway,
-                slotsManager: commuteSlotsManager
+                slotsManager: slotsManager
             )
         }
     }
@@ -249,6 +288,8 @@ struct BusArrivalRow: View {
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.white)
+                .minimumScaleFactor(0.4)
+                .lineLimit(1)
                 .frame(width: 40, height: 40)
                 .background(routeColor(for: arrival.route))
                 .cornerRadius(8)
@@ -321,6 +362,8 @@ struct BusArrivalRow: View {
 #Preview {
     NavigationStack {
         BusArrivalView(stop: BusStop.previewStops[0])
+            .environmentObject(FavoritesManager())
+            .environmentObject(CommuteSlotsManager())
     }
 }
 #endif

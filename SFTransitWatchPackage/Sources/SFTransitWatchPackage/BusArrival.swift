@@ -7,15 +7,36 @@ public struct BusArrival: Identifiable, Codable, Sendable {
     public let arrivalTime: Date
     public let minutesAway: Int
     public let isRealTime: Bool
+    /// Deduplicated service-alert summaries for this arrival's vehicle journey.
+    public let alerts: [String]
 
-    public init(route: String, destination: String, arrivalTime: Date, isRealTime: Bool = true, now: Date = Date()) {
+    public init(
+        route: String,
+        destination: String,
+        arrivalTime: Date,
+        isRealTime: Bool = true,
+        alerts: [String] = [],
+        now: Date = Date()
+    ) {
         self.route = route
         self.destination = destination
         self.arrivalTime = arrivalTime
         self.isRealTime = isRealTime
-
+        self.alerts = alerts
         let timeInterval = arrivalTime.timeIntervalSince(now)
         self.minutesAway = max(0, Int(timeInterval / 60))
+    }
+
+    // Custom decoder so older persisted payloads without "alerts" still decode.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id          = (try? c.decode(UUID.self,   forKey: .id))          ?? UUID()
+        route       = try  c.decode(String.self,  forKey: .route)
+        destination = try  c.decode(String.self,  forKey: .destination)
+        arrivalTime = try  c.decode(Date.self,    forKey: .arrivalTime)
+        minutesAway = try  c.decode(Int.self,     forKey: .minutesAway)
+        isRealTime  = try  c.decode(Bool.self,    forKey: .isRealTime)
+        alerts      = (try? c.decodeIfPresent([String].self, forKey: .alerts)) ?? []
     }
 
     public var timeString: String {
@@ -44,6 +65,12 @@ public extension Array where Element == BusArrival {
     var uniqueRoutes: [String] {
         var seen = Set<String>()
         return compactMap { seen.insert($0.route).inserted ? $0.route : nil }
+    }
+
+    /// Deduplicated service alerts across all arrivals, in first-seen order.
+    var uniqueAlerts: [String] {
+        var seen = Set<String>()
+        return flatMap { $0.alerts }.filter { seen.insert($0).inserted }
     }
 }
 

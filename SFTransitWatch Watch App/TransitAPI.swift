@@ -264,6 +264,8 @@ class TransitAPI: ObservableObject {
             return jsonArrivals
         }
 
+        let alerts = TransitJSON.parseSituationSummaries(from: data)
+
         let formatter = ISO8601DateFormatter()
         let records = SIRIXMLParser.parseRecords(
             data: data,
@@ -278,10 +280,11 @@ class TransitAPI: ObservableObject {
                 let arrivalTime = formatter.date(from: timeString)
             else { return nil }
             return BusArrival(
-                route: route,
+                route: TransitJSON.cleanLineRef(route),
                 destination: destination,
                 arrivalTime: arrivalTime,
-                isRealTime: true
+                isRealTime: true,
+                alerts: alerts
             )
         }
     }

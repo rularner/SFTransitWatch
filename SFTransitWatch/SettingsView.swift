@@ -4,9 +4,8 @@ import SFTransitWatchPackage
 
 struct SettingsView: View {
     @StateObject private var transitAPI = TransitAPI()
-    @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var slotsManager = CommuteSlotsManager()
-    @StateObject private var locationManager = LocationManager()
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var slotsManager: CommuteSlotsManager
     @StateObject private var agenciesManager = SharedAgenciesManager()
     @State private var apiKey = ""
     @State private var showingAPIKeyAlert = false
@@ -14,7 +13,6 @@ struct SettingsView: View {
     @State private var showingClearFavoritesAlert = false
     @State private var showingMorningPicker = false
     @State private var showingAfternoonPicker = false
-    @State private var nearbyStops: [BusStop] = []
     
     var body: some View {
         List {
@@ -220,16 +218,6 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .onAppear {
             apiKey = ConfigurationManager.shared.apiKey
-            locationManager.startLocationUpdates()
-            Task {
-                if let location = locationManager.currentLocation {
-                    nearbyStops = await transitAPI.fetchNearbyStops(
-                        latitude: location.coordinate.latitude,
-                        longitude: location.coordinate.longitude,
-                        agencies: agenciesManager.asArray
-                    )
-                }
-            }
         }
         .alert("API Key Required", isPresented: $showingAPIKeyAlert) {
             Button("OK") { }
@@ -292,5 +280,7 @@ struct SettingsView: View {
 #Preview {
     NavigationStack {
         SettingsView()
+            .environmentObject(FavoritesManager())
+            .environmentObject(CommuteSlotsManager())
     }
-} 
+}

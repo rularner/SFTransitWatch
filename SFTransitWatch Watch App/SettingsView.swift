@@ -4,23 +4,13 @@ import SFTransitWatchPackage
 
 struct SettingsView: View {
     @StateObject private var transitAPI = TransitAPI()
-    @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var commuteSlotsManager = CommuteSlotsManager()
-    @StateObject private var locationManager = LocationManager()
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var slotsManager: CommuteSlotsManager
     @State private var apiKey = ""
     @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
     @AppStorage(EnabledAgencies.storageKey, store: UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName))
     private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
-    @State private var nearbyStops: [BusStop] = []
-
-    init(
-        favoritesManager: FavoritesManager? = nil,
-        commuteSlotsManager: CommuteSlotsManager? = nil
-    ) {
-        _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
-        _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
-    }
 
     var body: some View {
         List {
@@ -68,20 +58,24 @@ struct SettingsView: View {
 
             Section(
                 header: Text("Worker proxy"),
-                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…. Leave blank to call 511.org directly with your own API key.")
+                footer: Text("Routes API calls through a Cloudflare Worker instead of calling 511.org directly. Open a bootstrap link of the form sftransitwatch://wt?u=…&c=… directly on your watch to configure.")
             ) {
-                HStack {
-                    Text("Worker")
-                    Spacer()
-                    Text(workerHostDisplay)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
                 if ConfigurationManager.shared.isWorkerConfigured {
+                    HStack {
+                        Text("Worker")
+                        Spacer()
+                        Text(workerHostDisplay)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                     Button("Clear", role: .destructive) {
                         ConfigurationManager.shared.clearWorkerConfig()
                     }
+                } else {
+                    Text("Not configured")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
                 }
             }
 
@@ -116,7 +110,7 @@ struct SettingsView: View {
 
                 ForEach(CommuteSlotsManager.Slot.allCases, id: \.self) { slot in
                     NavigationLink {
-                        CommuteSlotPickerView(slot: slot, allFavorites: favoriteStopsForPicker, slotsManager: commuteSlotsManager)
+                        CommuteSlotPickerView(slot: slot, allFavorites: favoriteStopsForPicker, slotsManager: slotsManager)
                     } label: {
                         HStack {
                             Text(slot.displayName)
@@ -193,16 +187,6 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .onAppear {
             apiKey = ConfigurationManager.shared.apiKey
-            locationManager.startLocationUpdates()
-            Task {
-                if let location = locationManager.currentLocation {
-                    nearbyStops = await transitAPI.fetchNearbyStops(
-                        latitude: location.coordinate.latitude,
-                        longitude: location.coordinate.longitude,
-                        agencies: EnabledAgencies.parse(enabledAgenciesRaw)
-                    )
-                }
-            }
         }
         .sheet(isPresented: $showingAPIKeyEntry) {
             APIKeyEntryView(apiKey: $apiKey)
@@ -218,7 +202,7 @@ struct SettingsView: View {
     }
 
     private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {
-        guard let id = commuteSlotsManager.stopId(for: slot) else { return "Not set" }
+        guard let id = slotsManager.stopId(for: slot) else { return "Not set" }
         return favoritesManager.favoriteStops.first(where: { $0.id == id })?.name ?? "Stop \(id)"
     }
 
@@ -283,5 +267,7 @@ struct APIKeyEntryView: View {
 #Preview {
     NavigationStack {
         SettingsView()
+            .environmentObject(FavoritesManager())
+            .environmentObject(CommuteSlotsManager())
     }
 }

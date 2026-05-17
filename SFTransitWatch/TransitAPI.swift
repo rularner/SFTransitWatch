@@ -4,10 +4,8 @@ import SFTransitWatchPackage
 
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
-    @AppStorage("511_API_KEY") private var storedAPIKey = ""
+    // Key synced from the phone to the watch via WatchConnectivity — lives in .standard.
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
-    @AppStorage("WORKER_TOKEN") private var workerToken = ""
-    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -15,30 +13,30 @@ class TransitAPI: ObservableObject {
     private var useDirectFallback = false
 
     private var resolvedKey: String {
-        return phoneAPIKey.isEmpty ? storedAPIKey : phoneAPIKey
+        phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
     }
 
     private var hasUsableKey: Bool {
-        // SnapshotMode: pretend the key is configured so settings/onboarding views render normally.
         if SnapshotMode.isActive { return true }
-
-        return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
+        return !phoneAPIKey.isEmpty || !ConfigurationManager.shared.apiKey.isEmpty
     }
 
     private var isDirect511Mode: Bool {
-        return useDirectFallback || workerToken.isEmpty || workerBaseURL.isEmpty
+        return useDirectFallback
+            || ConfigurationManager.shared.workerToken.isEmpty
+            || ConfigurationManager.shared.workerBaseURL.isEmpty
     }
 
     private var baseURL: String {
-        return isDirect511Mode ? defaultBaseURL : workerBaseURL
+        isDirect511Mode ? defaultBaseURL : ConfigurationManager.shared.workerBaseURL
     }
 
     private var apiKey: String {
-        return resolvedKey.isEmpty ? "YOUR_511_API_KEY" : resolvedKey
+        resolvedKey.isEmpty ? "YOUR_511_API_KEY" : resolvedKey
     }
 
     private var appToken: String? {
-        return isDirect511Mode ? nil : workerToken
+        isDirect511Mode ? nil : ConfigurationManager.shared.workerToken
     }
 
     private func makeRequest(url: URL) -> URLRequest {
@@ -242,6 +240,7 @@ class TransitAPI: ObservableObject {
 
     private func parseXMLArrivals(data: Data) throws -> [BusArrival] {
         let xmlString = String(data: data, encoding: .utf8) ?? ""
+        let alerts = TransitJSON.parseSituationSummaries(from: data)
         var arrivals: [BusArrival] = []
         let pattern = #"<MonitoredVehicleJourney>.*?<LineRef>([^<]+)</LineRef>.*?<DirectionRef>([^<]+)</DirectionRef>.*?<(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>([^<]+)</(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>.*?</MonitoredVehicleJourney>"#
         let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
@@ -251,7 +250,7 @@ class TransitAPI: ObservableObject {
             if let routeRange = Range(match.range(at: 1), in: xmlString),
                let destinationRange = Range(match.range(at: 2), in: xmlString),
                let timeRange = Range(match.range(at: 3), in: xmlString) {
-                let route = String(xmlString[routeRange])
+                let route = TransitJSON.cleanLineRef(String(xmlString[routeRange]))
                 let destination = String(xmlString[destinationRange])
                 let timeString = String(xmlString[timeRange])
                 if let arrivalTime = formatter.date(from: timeString) {
@@ -259,13 +258,15 @@ class TransitAPI: ObservableObject {
                         route: route,
                         destination: destination,
                         arrivalTime: arrivalTime,
-                        isRealTime: true
+                        isRealTime: true,
+                        alerts: alerts
                     ))
                 }
             }
         }
         return arrivals
     }
+
     
     // Parse 511.org XML response for stops
     private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
@@ -306,10 +307,8 @@ class TransitAPI: ObservableObject {
         return stops
     }
     
-    // Helper method to get API key from user
     func setAPIKey(_ key: String) {
-        storedAPIKey = key
-        print("API key updated")
+        ConfigurationManager.shared.apiKey = key
     }
     
     // Check if API key is configured

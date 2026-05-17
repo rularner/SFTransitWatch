@@ -25,7 +25,7 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         // SnapshotMode: skip WCSession calls during snapshot runs.
         if SnapshotMode.isActive { return }
 
-        let key = UserDefaults.standard.string(forKey: "511_API_KEY")
+        let key = ConfigurationManager.shared.apiKey
         let payload = Self.payload(forKey: key)
         do {
             try WCSession.default.updateApplicationContext(payload)
