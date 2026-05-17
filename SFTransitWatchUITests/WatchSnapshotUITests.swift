@@ -83,8 +83,8 @@ final class WatchSnapshotUITests: XCTestCase {
 
     func testSnapshot_StopLocation() throws {
         let app = launchSnapshotModeAppAtLocation()
-        XCTAssertTrue(app.staticTexts["Stop Location"].waitForExistence(timeout: 10),
-                      "Expected Stop Location heading on the compass tab")
+        XCTAssertTrue(app.staticTexts["Distance"].waitForExistence(timeout: 10),
+                      "Expected Distance label in StopLocationView compass tab")
         try XCUISnapshotRunner.verify(app, named: "StopLocation", in: self, topPixelsToIgnore: 200)
     }
 }

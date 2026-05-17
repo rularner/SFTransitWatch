@@ -1,17 +1,22 @@
 import SwiftUI
-import SFTransitWatchPackage
 
-struct CommuteSlotPickerView: View {
-    let slot: CommuteSlotsManager.Slot
-    let allFavorites: [BusStop]
-    let slotsManager: CommuteSlotsManager
+public struct CommuteSlotPickerView: View {
+    public let slot: CommuteSlotsManager.Slot
+    public let allFavorites: [BusStop]
+    public let slotsManager: CommuteSlotsManager
     @Environment(\.dismiss) var dismiss
+
+    public init(slot: CommuteSlotsManager.Slot, allFavorites: [BusStop], slotsManager: CommuteSlotsManager) {
+        self.slot = slot
+        self.allFavorites = allFavorites
+        self.slotsManager = slotsManager
+    }
 
     var selectedStopId: String? {
         slotsManager.stopId(for: slot)
     }
 
-    var body: some View {
+    public var body: some View {
         NavigationStack {
             List {
                 Section(header: Text("Clear Selection")) {

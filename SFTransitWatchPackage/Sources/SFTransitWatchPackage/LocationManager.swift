@@ -1,53 +1,47 @@
 import Foundation
-import CoreLocation
-import SFTransitWatchPackage
+@preconcurrency import CoreLocation
 
 @MainActor
-class LocationManager: NSObject, ObservableObject {
+public class LocationManager: NSObject, ObservableObject {
     private let locationManager = CLLocationManager()
-    
-    @Published var currentLocation: CLLocation?
-    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
-    @Published var isLocationEnabled = false
-    @Published var currentHeading: CLHeading?
-    
-    override init() {
+
+    @Published public var currentLocation: CLLocation?
+    @Published public var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published public var isLocationEnabled = false
+    @Published public var currentHeading: CLHeading?
+
+    public override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 10 // Update every 10 meters
-        locationManager.headingFilter = 5  // only fire on ≥5° change
+        locationManager.distanceFilter = 10
+        locationManager.headingFilter = 5
 
-        // SnapshotMode: serve a fixed Castro Station location instead of any real CL request.
         if SnapshotMode.isActive {
             currentLocation = SnapshotMode.fixedLocation
         }
     }
-    
-    func requestLocationPermission() {
-        // SnapshotMode: don't trigger a permission prompt — we have a fixed location.
+
+    public func requestLocationPermission() {
         if SnapshotMode.isActive { return }
         locationManager.requestWhenInUseAuthorization()
     }
-    
-    func startLocationUpdates() {
-        // SnapshotMode: avoid kicking off any real Core Location authorization or updates.
+
+    public func startLocationUpdates() {
         if SnapshotMode.isActive {
             currentLocation = SnapshotMode.fixedLocation
             return
         }
-
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             requestLocationPermission()
             return
         }
-
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
         isLocationEnabled = true
     }
-    
-    func stopLocationUpdates() {
+
+    public func stopLocationUpdates() {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
         isLocationEnabled = false
@@ -55,21 +49,20 @@ class LocationManager: NSObject, ObservableObject {
 }
 
 extension LocationManager: CLLocationManagerDelegate {
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    public nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         Task { @MainActor in
             currentLocation = location
         }
     }
 
-    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    public nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("Location error: \(error.localizedDescription)")
     }
 
-    nonisolated func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+    public nonisolated func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         Task { @MainActor in
             authorizationStatus = status
-
             switch status {
             case .authorizedWhenInUse, .authorizedAlways:
                 startLocationUpdates()
@@ -83,7 +76,7 @@ extension LocationManager: CLLocationManagerDelegate {
         }
     }
 
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+    public nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         Task { @MainActor in
             currentHeading = newHeading
         }

@@ -1,7 +1,6 @@
 import Foundation
 
-@MainActor
-public class ConfigurationManager {
+public class ConfigurationManager: @unchecked Sendable {
     public static let shared = ConfigurationManager()
 
     /// The canonical App Group suite used by all shared storage in this project.

@@ -1,11 +1,9 @@
 import AppIntents
-import SFTransitWatchPackage
 import SwiftUI
-import WatchKit
 
 // MARK: - Agency Choice
 
-enum TransitAgencyChoice: String, AppEnum, CaseIterable, Sendable {
+public enum TransitAgencyChoice: String, AppEnum, CaseIterable, Sendable {
     case muni = "SF"
     case bart = "BA"
     case acTransit = "AC"
@@ -14,8 +12,8 @@ enum TransitAgencyChoice: String, AppEnum, CaseIterable, Sendable {
     case samTrans = "SM"
     case vta = "SC"
 
-    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Transit Agency"
-    static let caseDisplayRepresentations: [TransitAgencyChoice: DisplayRepresentation] = [
+    public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Transit Agency"
+    public static let caseDisplayRepresentations: [TransitAgencyChoice: DisplayRepresentation] = [
         .muni: "Muni",
         .bart: "BART",
         .acTransit: "AC Transit",
@@ -25,7 +23,7 @@ enum TransitAgencyChoice: String, AppEnum, CaseIterable, Sendable {
         .vta: "VTA"
     ]
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .muni: return "Muni"
         case .bart: return "BART"
@@ -40,16 +38,18 @@ enum TransitAgencyChoice: String, AppEnum, CaseIterable, Sendable {
 
 // MARK: - Check Nearby Stops Intent
 
-struct CheckNearbyStopsIntent: AppIntent {
-    static let title: LocalizedStringResource = "Find Nearby Stops"
-    static let description = IntentDescription("Shows transit stops near your current location.")
-    static let openAppWhenRun = true
+public struct CheckNearbyStopsIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Find Nearby Stops"
+    public static let description = IntentDescription("Shows transit stops near your current location.")
+    public static let openAppWhenRun = true
 
     @Parameter(title: "Agency")
-    var agency: TransitAgencyChoice?
+    public var agency: TransitAgencyChoice?
+
+    public init() {}
 
     @MainActor
-    func perform() async throws -> some IntentResult {
+    public func perform() async throws -> some IntentResult {
         UserDefaults.standard.set(agency?.rawValue ?? "", forKey: Agency.selectedAgencyKey)
         return .result()
     }
@@ -57,19 +57,21 @@ struct CheckNearbyStopsIntent: AppIntent {
 
 // MARK: - Check Stop Arrivals Intent
 
-struct CheckStopArrivalsIntent: AppIntent {
-    static let title: LocalizedStringResource = "Check Bus Times"
-    static let description = IntentDescription("Shows upcoming arrivals for a stop.")
-    static let openAppWhenRun = true
+public struct CheckStopArrivalsIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Check Bus Times"
+    public static let description = IntentDescription("Shows upcoming arrivals for a stop.")
+    public static let openAppWhenRun = true
 
     @Parameter(title: "Stop Name")
-    var stopName: String?
+    public var stopName: String?
 
     @Parameter(title: "Agency")
-    var agency: TransitAgencyChoice?
+    public var agency: TransitAgencyChoice?
+
+    public init() {}
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    public func perform() async throws -> some IntentResult & ProvidesDialog {
         UserDefaults.standard.set(agency?.rawValue ?? "", forKey: Agency.selectedAgencyKey)
 
         let key = ConfigurationManager.shared.apiKey
@@ -87,8 +89,8 @@ struct CheckStopArrivalsIntent: AppIntent {
 
 // MARK: - App Shortcuts Provider
 
-struct SFTransitAppShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
+public struct SFTransitAppShortcuts: AppShortcutsProvider {
+    public static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: CheckNearbyStopsIntent(),
             phrases: [
