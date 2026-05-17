@@ -143,4 +143,55 @@ final class BusArrivalTests: XCTestCase {
                               arrivalTime: Date().addingTimeInterval(300))
         XCTAssertFalse(stop.timeString.isEmpty)
     }
+
+    // MARK: - onwardStops and vehicleRef
+
+    func testOnwardStopsDefaultEmpty() {
+        let arrival = BusArrival(route: "38", destination: "Downtown",
+                                 arrivalTime: Date().addingTimeInterval(300))
+        XCTAssertTrue(arrival.onwardStops.isEmpty)
+    }
+
+    func testVehicleRefDefaultNil() {
+        let arrival = BusArrival(route: "38", destination: "Downtown",
+                                 arrivalTime: Date().addingTimeInterval(300))
+        XCTAssertNil(arrival.vehicleRef)
+    }
+
+    func testOnwardStopsPassedThrough() {
+        let now = Date()
+        let stops = [
+            OnwardStop(id: "A", name: "Stop A", arrivalTime: now.addingTimeInterval(300), now: now),
+            OnwardStop(id: "B", name: "Stop B", arrivalTime: now.addingTimeInterval(480), now: now),
+        ]
+        let arrival = BusArrival(route: "38", destination: "Downtown",
+                                 arrivalTime: now.addingTimeInterval(300),
+                                 vehicleRef: "SF:9999",
+                                 onwardStops: stops,
+                                 now: now)
+        XCTAssertEqual(arrival.vehicleRef, "SF:9999")
+        XCTAssertEqual(arrival.onwardStops.count, 2)
+        XCTAssertEqual(arrival.onwardStops[0].id, "A")
+        XCTAssertEqual(arrival.onwardStops[1].name, "Stop B")
+    }
+
+    func testBusArrivalRoundTrips() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let stop = OnwardStop(id: "X", name: "Stop X",
+                              arrivalTime: now.addingTimeInterval(300), now: now)
+        let original = BusArrival(route: "N", destination: "Judah",
+                                   arrivalTime: now.addingTimeInterval(120),
+                                   vehicleRef: "SF:42",
+                                   onwardStops: [stop],
+                                   now: now)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(original)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(BusArrival.self, from: data)
+        XCTAssertEqual(decoded.vehicleRef, "SF:42")
+        XCTAssertEqual(decoded.onwardStops.count, 1)
+        XCTAssertEqual(decoded.onwardStops[0].id, "X")
+    }
 }

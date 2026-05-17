@@ -9,6 +9,8 @@ public struct BusArrival: Identifiable, Codable, Sendable {
     public let isRealTime: Bool
     /// Deduplicated service-alert summaries for this arrival's vehicle journey.
     public let alerts: [String]
+    public let vehicleRef: String?
+    public let onwardStops: [OnwardStop]
 
     public init(
         route: String,
@@ -16,6 +18,8 @@ public struct BusArrival: Identifiable, Codable, Sendable {
         arrivalTime: Date,
         isRealTime: Bool = true,
         alerts: [String] = [],
+        vehicleRef: String? = nil,
+        onwardStops: [OnwardStop] = [],
         now: Date = Date()
     ) {
         self.route = route
@@ -23,6 +27,8 @@ public struct BusArrival: Identifiable, Codable, Sendable {
         self.arrivalTime = arrivalTime
         self.isRealTime = isRealTime
         self.alerts = alerts
+        self.vehicleRef = vehicleRef
+        self.onwardStops = onwardStops
         let timeInterval = arrivalTime.timeIntervalSince(now)
         self.minutesAway = max(0, Int(timeInterval / 60))
     }
@@ -36,7 +42,9 @@ public struct BusArrival: Identifiable, Codable, Sendable {
         arrivalTime = try  c.decode(Date.self,    forKey: .arrivalTime)
         minutesAway = try  c.decode(Int.self,     forKey: .minutesAway)
         isRealTime  = try  c.decode(Bool.self,    forKey: .isRealTime)
-        alerts      = (try? c.decodeIfPresent([String].self, forKey: .alerts)) ?? []
+        alerts      = (try? c.decodeIfPresent([String].self,     forKey: .alerts))      ?? []
+        vehicleRef  = try? c.decodeIfPresent(String.self,        forKey: .vehicleRef)
+        onwardStops = (try? c.decodeIfPresent([OnwardStop].self, forKey: .onwardStops)) ?? []
     }
 
     public var timeString: String {
