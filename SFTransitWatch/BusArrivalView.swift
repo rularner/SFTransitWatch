@@ -85,8 +85,10 @@ struct BusArrivalView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             stopInfoContent
                         }
-                        stopLocationView
-                            .frame(width: 160)
+                        if stop.hasValidLocation {
+                            stopLocationView
+                                .frame(width: 160)
+                        }
                     }
                     .padding(.vertical, 4)
                 }
@@ -98,9 +100,11 @@ struct BusArrivalView: View {
                     .padding(.vertical, 4)
                 }
 
-                Section {
-                    stopLocationView
-                        .listRowBackground(Color.clear)
+                if stop.hasValidLocation {
+                    Section {
+                        stopLocationView
+                            .listRowBackground(Color.clear)
+                    }
                 }
             }
 

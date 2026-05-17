@@ -21,6 +21,10 @@ public struct BusStop: Identifiable, Codable, Sendable, Hashable {
         CLLocation(latitude: latitude, longitude: longitude)
     }
 
+    public var hasValidLocation: Bool {
+        latitude != 0 || longitude != 0
+    }
+
     public init(id: String, name: String, code: String, latitude: Double, longitude: Double, routes: [String] = [], isFavorite: Bool = false, agency: String = "SF") {
         self.id = id
         self.name = name
