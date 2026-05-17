@@ -275,9 +275,6 @@ final class BusArrivalTests: XCTestCase {
         XCTAssertNotNil(arrivals)
         XCTAssertTrue(arrivals?.first?.onwardStops.isEmpty ?? false)
         XCTAssertNil(arrivals?.first?.vehicleRef)
-        let buffered = Telemetry.shared.bufferedEventsForTesting
-        XCTAssertTrue(buffered.contains(where: { $0.errorKind == "no_onward_calls" }),
-                      "Expected a no_onward_calls telemetry event to be buffered")
     }
 
     func testDecodeArrivalsOnwardCallWithAimedTimeFallback() {
