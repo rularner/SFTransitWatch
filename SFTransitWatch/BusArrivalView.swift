@@ -29,7 +29,7 @@ struct BusArrivalView: View {
                         Spacer()
 
                         Button(action: {
-                            favoritesManager.toggleFavorite(for: stop.id)
+                            favoritesManager.toggleFavorite(stop)
                         }) {
                             Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
                                 .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)

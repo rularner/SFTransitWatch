@@ -219,11 +219,11 @@ struct SettingsView: View {
 
     private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {
         guard let id = commuteSlotsManager.stopId(for: slot) else { return "Not set" }
-        return nearbyStops.first(where: { $0.id == id })?.name ?? "Stop \(id)"
+        return favoritesManager.favoriteStops.first(where: { $0.id == id })?.name ?? "Stop \(id)"
     }
 
     private var favoriteStopsForPicker: [BusStop] {
-        favoritesManager.getFavoriteStops(from: nearbyStops)
+        favoritesManager.favoriteStops
     }
 
     /// Two-way binding between the per-agency toggle and the comma-separated

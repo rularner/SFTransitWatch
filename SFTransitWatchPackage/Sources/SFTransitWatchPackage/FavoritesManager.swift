@@ -3,9 +3,12 @@ import Foundation
 @MainActor
 public class FavoritesManager: ObservableObject {
     @Published public var favoriteStopIds: Set<String> = []
+    /// Full stop objects, persisted so they're available without a live API call.
+    @Published public var favoriteStops: [BusStop] = []
 
     private let userDefaults: UserDefaults
     private let favoritesKey = "FavoriteStopIds"
+    private let favoriteStopsKey = "FavoriteStopObjects"
 
     public init(userDefaultsSuiteName: String? = nil) {
         self.userDefaults = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
@@ -17,11 +20,13 @@ public class FavoritesManager: ObservableObject {
         }
     }
 
-    public func toggleFavorite(for stopId: String) {
-        if favoriteStopIds.contains(stopId) {
-            favoriteStopIds.remove(stopId)
+    public func toggleFavorite(_ stop: BusStop) {
+        if favoriteStopIds.contains(stop.id) {
+            favoriteStopIds.remove(stop.id)
+            favoriteStops.removeAll { $0.id == stop.id }
         } else {
-            favoriteStopIds.insert(stopId)
+            favoriteStopIds.insert(stop.id)
+            favoriteStops.append(stop)
         }
         saveFavorites()
     }
@@ -37,6 +42,7 @@ public class FavoritesManager: ObservableObject {
 
     public func removeFromFavorites(_ stopId: String) {
         favoriteStopIds.remove(stopId)
+        favoriteStops.removeAll { $0.id == stopId }
         saveFavorites()
     }
 
@@ -60,6 +66,14 @@ public class FavoritesManager: ObservableObject {
     }
 
     private func loadFavorites() {
+        // Full stop objects are authoritative when present (written by toggleFavorite).
+        if let data = userDefaults.data(forKey: favoriteStopsKey),
+           let stops = try? JSONDecoder().decode([BusStop].self, from: data) {
+            favoriteStops = stops
+            favoriteStopIds = Set(stops.map { $0.id })
+            return
+        }
+        // Fall back to legacy ID-only storage (migrates automatically on next toggleFavorite).
         if let data = userDefaults.data(forKey: favoritesKey),
            let favorites = try? JSONDecoder().decode(Set<String>.self, from: data) {
             favoriteStopIds = favorites
@@ -70,10 +84,14 @@ public class FavoritesManager: ObservableObject {
         if let data = try? JSONEncoder().encode(favoriteStopIds) {
             userDefaults.set(data, forKey: favoritesKey)
         }
+        if let data = try? JSONEncoder().encode(favoriteStops) {
+            userDefaults.set(data, forKey: favoriteStopsKey)
+        }
     }
 
     public func clearAllFavorites() {
         favoriteStopIds.removeAll()
+        favoriteStops.removeAll()
         saveFavorites()
     }
 }

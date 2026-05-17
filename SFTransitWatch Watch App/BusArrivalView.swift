@@ -52,7 +52,7 @@ struct BusArrivalView: View {
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
-                            Button(action: { favoritesManager.toggleFavorite(for: stop.id) }) {
+                            Button(action: { favoritesManager.toggleFavorite(stop) }) {
                                 Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
                                     .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)
                                     .font(.title2)

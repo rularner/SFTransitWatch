@@ -17,14 +17,19 @@ final class FavoritesManagerTests: XCTestCase {
     }
 
     func testToggleAddsFavorite() {
-        manager.toggleFavorite(for: "stop-1")
-        XCTAssertTrue(manager.isFavorite("stop-1"))
+        let stop = makeStops()[0]
+        manager.toggleFavorite(stop)
+        XCTAssertTrue(manager.isFavorite(stop.id))
+        XCTAssertEqual(manager.favoriteStops.count, 1)
+        XCTAssertEqual(manager.favoriteStops[0].id, stop.id)
     }
 
     func testToggleRemovesFavorite() {
-        manager.toggleFavorite(for: "stop-1")
-        manager.toggleFavorite(for: "stop-1")
-        XCTAssertFalse(manager.isFavorite("stop-1"))
+        let stop = makeStops()[0]
+        manager.toggleFavorite(stop)
+        manager.toggleFavorite(stop)
+        XCTAssertFalse(manager.isFavorite(stop.id))
+        XCTAssertTrue(manager.favoriteStops.isEmpty)
     }
 
     func testAddToFavorites() {
@@ -81,5 +86,17 @@ final class FavoritesManagerTests: XCTestCase {
 
         let second = FavoritesManager(userDefaultsSuiteName: suiteName)
         XCTAssertTrue(second.isFavorite("stop-persist"))
+    }
+
+    func testTogglePersistsFullStopAcrossInstances() {
+        let suiteName = "FavoritesManagerTests-fullstop-\(UUID().uuidString)"
+        let stop = makeStops()[0]
+        let first = FavoritesManager(userDefaultsSuiteName: suiteName)
+        first.toggleFavorite(stop)
+
+        let second = FavoritesManager(userDefaultsSuiteName: suiteName)
+        XCTAssertTrue(second.isFavorite(stop.id))
+        XCTAssertEqual(second.favoriteStops.count, 1)
+        XCTAssertEqual(second.favoriteStops[0].name, stop.name)
     }
 }

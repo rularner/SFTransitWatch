@@ -280,15 +280,12 @@ struct SettingsView: View {
     }
 
     private func slotDisplayName(for slot: CommuteSlotsManager.Slot) -> String {
-        guard let stopId = slotsManager.stopId(for: slot),
-              let stop = nearbyStops.first(where: { $0.id == stopId }) else {
-            return "Not configured"
-        }
-        return stop.name
+        guard let stopId = slotsManager.stopId(for: slot) else { return "Not configured" }
+        return favoritesManager.favoriteStops.first(where: { $0.id == stopId })?.name ?? "Not configured"
     }
 
     private var favoriteStopsForPicker: [BusStop] {
-        favoritesManager.getFavoriteStops(from: nearbyStops)
+        favoritesManager.favoriteStops
     }
 }
 

@@ -209,22 +209,6 @@ struct BusStopListView: View {
 
     @ViewBuilder
     private var stopSections: some View {
-        let favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
-        if !favoriteStops.isEmpty {
-            Section(header: Text("Favorites")) {
-                ForEach(favoriteStops) { stop in
-                    NavigationLink(destination: BusArrivalView(stop: stop)) {
-                        BusStopRow(
-                            stop: stop,
-                            currentLocation: locationManager.currentLocation,
-                            favoritesManager: favoritesManager,
-                            showAgencyBadge: showAgencyBadges
-                        )
-                    }
-                }
-            }
-        }
-
         Section(header: Text("Nearby Stops")) {
             ForEach(nearbyStops) { stop in
                 NavigationLink(destination: BusArrivalView(stop: stop)) {
@@ -314,7 +298,7 @@ struct BusStopRow: View {
                     }
 
                     Button(action: {
-                        favoritesManager.toggleFavorite(for: stop.id)
+                        favoritesManager.toggleFavorite(stop)
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
                             .foregroundColor(stop.isFavorite ? .yellow : .gray)

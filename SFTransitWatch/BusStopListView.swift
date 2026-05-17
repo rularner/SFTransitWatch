@@ -9,7 +9,6 @@ struct BusStopListView: View {
     @StateObject private var agenciesManager = SharedAgenciesManager()
     @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
     @State private var nearbyStops: [BusStop] = []
-    @State private var favoriteStops: [BusStop] = []
     @State private var showingSettingsAlert = false
     @State private var foundStop: BusStop? = nil
 
@@ -90,7 +89,7 @@ struct BusStopListView: View {
         }
         .onChange(of: favoritesManager.favoriteStopIds) {
             Task { @MainActor in
-                favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
+                nearbyStops = favoritesManager.sortStopsWithFavoritesFirst(nearbyStops)
             }
         }
         .onChange(of: agenciesManager.enabledCodes) {
@@ -179,20 +178,6 @@ struct BusStopListView: View {
 
     @ViewBuilder
     private var stopSections: some View {
-        if !favoriteStops.isEmpty {
-            Section(header: Text("Favorites")) {
-                ForEach(favoriteStops) { stop in
-                    NavigationLink(destination: BusArrivalView(stop: stop)) {
-                        BusStopRow(
-                            stop: stop,
-                            currentLocation: locationManager.currentLocation,
-                            favoritesManager: favoritesManager
-                        )
-                    }
-                }
-            }
-        }
-
         Section(header: Text("Nearby Stops")) {
             ForEach(nearbyStops) { stop in
                 NavigationLink(destination: BusArrivalView(stop: stop)) {
@@ -226,7 +211,6 @@ struct BusStopListView: View {
         }
 
         nearbyStops = favoritesManager.sortStopsWithFavoritesFirst(nearbyStops)
-        favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
     }
 }
 
@@ -267,7 +251,7 @@ struct BusStopRow: View {
                     }
 
                     Button(action: {
-                        favoritesManager.toggleFavorite(for: stop.id)
+                        favoritesManager.toggleFavorite(stop)
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
                             .foregroundColor(stop.isFavorite ? .yellow : .gray)
