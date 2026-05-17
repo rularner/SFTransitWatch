@@ -34,15 +34,8 @@ struct BusArrivalView: View {
 
     private let refreshInterval = 30
 
-    var filteredArrivals: [BusArrival] {
-        guard let route = selectedRoute else { return arrivals }
-        return arrivals.filter { $0.route == route }
-    }
-
-    var uniqueRoutes: [String] {
-        var seen = Set<String>()
-        return arrivals.compactMap { seen.insert($0.route).inserted ? $0.route : nil }
-    }
+    var filteredArrivals: [BusArrival] { arrivals.filtered(by: selectedRoute) }
+    var uniqueRoutes: [String] { arrivals.uniqueRoutes }
 
     var body: some View {
         TabView(selection: $selectedTab) {

@@ -8,24 +8,26 @@ struct BusArrivalView: View {
     @StateObject private var locationManager = LocationManager()
     @State private var arrivals: [BusArrival] = []
     @State private var lastUpdated = Date()
+    @State private var selectedRoute: String? = nil
+
+    private var filteredArrivals: [BusArrival] { arrivals.filtered(by: selectedRoute) }
 
     var body: some View {
         List {
-            // Header section
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(stop.name)
                                 .font(.headline)
-                            
+
                             Text("Stop \(stop.code)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         Spacer()
-                        
+
                         Button(action: {
                             favoritesManager.toggleFavorite(for: stop.id)
                         }) {
@@ -35,18 +37,20 @@ struct BusArrivalView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
-                    
-                    if !stop.routes.isEmpty {
-                        HStack {
-                            ForEach(stop.routes, id: \.self) { route in
-                                Text(route)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.2))
-                                    .foregroundColor(.blue)
-                                    .cornerRadius(4)
+
+                    if !arrivals.uniqueRoutes.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                RouteFilterPill(label: "All", isSelected: selectedRoute == nil) {
+                                    selectedRoute = nil
+                                }
+                                ForEach(arrivals.uniqueRoutes, id: \.self) { route in
+                                    RouteFilterPill(label: route, isSelected: selectedRoute == route) {
+                                        selectedRoute = selectedRoute == route ? nil : route
+                                    }
+                                }
                             }
+                            .padding(.horizontal, 2)
                         }
                     }
                 }
@@ -60,7 +64,7 @@ struct BusArrivalView: View {
                     currentHeading: locationManager.currentHeading,
                     isHeadingEnabled: locationManager.isLocationEnabled
                 )
-                    .listRowBackground(Color.clear)
+                .listRowBackground(Color.clear)
             }
 
             Section {
@@ -78,12 +82,12 @@ struct BusArrivalView: View {
                         Task { await loadArrivals() }
                     }
                     .listRowBackground(Color.clear)
-                } else if arrivals.isEmpty {
+                } else if filteredArrivals.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "bus")
                             .font(.system(size: 30))
                             .foregroundColor(.secondary)
-                        Text("No upcoming arrivals")
+                        Text(arrivals.isEmpty ? "No upcoming arrivals" : "No \(selectedRoute ?? "") arrivals")
                             .font(.headline)
                         Text("Check back later for updates")
                             .font(.caption)
@@ -104,7 +108,7 @@ struct BusArrivalView: View {
                         .accessibilityLabel("Error: \(error)")
                         .listRowBackground(Color.clear)
                     }
-                    ForEach(arrivals) { arrival in
+                    ForEach(filteredArrivals) { arrival in
                         BusArrivalRow(arrival: arrival)
                     }
                 }
@@ -126,22 +130,18 @@ struct BusArrivalView: View {
         }
         .onAppear {
             locationManager.startLocationUpdates()
-            Task {
-                await loadArrivals()
-            }
+            Task { await loadArrivals() }
         }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
-            Task {
-                await loadArrivals()
-            }
+            Task { await loadArrivals() }
         }
     }
-    
+
     private func loadArrivals() async {
         arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
         lastUpdated = Date()
     }
-    
+
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
@@ -149,33 +149,57 @@ struct BusArrivalView: View {
     }
 }
 
+// MARK: - Route Filter Pill
+
+struct RouteFilterPill: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(isSelected ? Color.accentColor : Color(.systemGray5))
+                .foregroundColor(isSelected ? .white : .secondary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .accessibilityLabel(label == "All" ? "All routes" : "Route \(label)")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityHint(isSelected ? "Tap to clear filter" : "Tap to filter arrivals")
+    }
+}
+
+// MARK: - Arrival Row
+
 struct BusArrivalRow: View {
     let arrival: BusArrival
-    
+
     var body: some View {
         HStack {
-            // Route number
-            VStack {
-                Text(arrival.route)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(routeColor(for: arrival.route))
-                    .cornerRadius(8)
-            }
-            
+            Text(arrival.route)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .frame(width: 40, height: 40)
+                .background(routeColor(for: arrival.route))
+                .cornerRadius(8)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(arrival.destination)
                     .font(.headline)
                     .lineLimit(1)
-                
+
                 HStack {
                     Text(arrival.minutesString)
                         .font(.subheadline)
-                        .foregroundColor(arrival.minutesAway <= 5 ? .red : .primary)
+                        .foregroundColor(arrival.minutesAway <= 2 ? .red : arrival.minutesAway <= 5 ? .orange : .primary)
                         .fontWeight(.semibold)
-                    
+
                     if !arrival.isRealTime {
                         Text("Scheduled")
                             .font(.caption2)
@@ -183,14 +207,14 @@ struct BusArrivalRow: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing) {
                 Text(arrival.timeString)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                
+
                 if arrival.isRealTime {
                     Image(systemName: "clock.fill")
                         .font(.caption2)
@@ -199,19 +223,39 @@ struct BusArrivalRow: View {
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
     }
-    
+
+    private var accessibilityDescription: String {
+        let timing = arrival.isRealTime ? "real time" : "scheduled"
+        return "Route \(arrival.route) to \(arrival.destination), \(arrival.minutesString), \(timing)"
+    }
+
     private func routeColor(for route: String) -> Color {
-        // Simple color assignment based on route number
-        let colors: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
-        let index = abs(route.hashValue) % colors.count
-        return colors[index]
+        if let metro = metroLineColor(for: route) { return metro }
+        let fallback: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
+        return fallback[abs(route.hashValue) % fallback.count]
+    }
+
+    private func metroLineColor(for route: String) -> Color? {
+        switch route.uppercased() {
+        case "F": return Color(red: 0.73, green: 0.20, blue: 0.05)
+        case "J": return Color(red: 0.55, green: 0.35, blue: 0.17)
+        case "K", "KT": return Color(red: 0.43, green: 0.20, blue: 0.56)
+        case "L": return Color(red: 0.47, green: 0.47, blue: 0.47)
+        case "M": return Color(red: 0.15, green: 0.55, blue: 0.25)
+        case "N": return Color(red: 0.00, green: 0.35, blue: 0.62)
+        case "T": return Color(red: 0.78, green: 0.13, blue: 0.18)
+        case "S": return Color(red: 0.95, green: 0.62, blue: 0.07)
+        default: return nil
+        }
     }
 }
 
 #if DEBUG
 #Preview {
-    NavigationView {
+    NavigationStack {
         BusArrivalView(stop: BusStop.previewStops[0])
     }
 }

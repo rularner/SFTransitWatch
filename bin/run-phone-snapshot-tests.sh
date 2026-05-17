@@ -10,10 +10,9 @@
 
 set -euo pipefail
 
-SCHEME="SFTransitWatch"
+SCHEME="SFTransitWatchPhoneSnapshots"
 DESTINATION='platform=iOS Simulator,OS=26.4.1,name=iPhone 17 Pro'
 DERIVED_DATA_GLOB="${HOME}/Library/Developer/Xcode/DerivedData/SFTransitWatch-*"
-export RUN_UI_TESTS=1
 
 echo ">> Wiping project DerivedData: ${DERIVED_DATA_GLOB}"
 # shellcheck disable=SC2086
@@ -24,14 +23,8 @@ if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
     export TEST_RUNNER_RECORD_SNAPSHOTS=1
 fi
 
+echo ">> xcodebuild test -scheme \"${SCHEME}\""
 ARGS=(-scheme "${SCHEME}" -destination "${DESTINATION}")
-
-if [[ "${RUN_UI_TESTS:-}" == "1" ]]; then
-    echo ">> xcodebuild test -scheme \"${SCHEME}\" -only-testing:SFTransitWatchPhoneUITests"
-    ARGS+=(-only-testing:SFTransitWatchPhoneUITests)
-else
-    echo ">> xcodebuild test -scheme \"${SCHEME}\" (UI tests skipped)"
-fi
 
 xcodebuild test "${ARGS[@]}" "$@"
 
@@ -45,3 +38,7 @@ if [[ "${RECORD_SNAPSHOTS:-}" == "1" ]]; then
         fi
     done
 fi
+
+for f in SFTransitWatchPhoneUITests/Goldens/*.png; do
+  sips -z 2688 1242 "$f"
+done

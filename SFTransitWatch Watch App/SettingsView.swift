@@ -179,7 +179,7 @@ struct SettingsView: View {
                     Text("SF Transit Watch")
                         .font(.headline)
 
-                    Text("Version 1.0")
+                    Text("Version \(appVersion)")
                         .font(.caption)
                         .foregroundColor(.secondary)
 
@@ -207,6 +207,10 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAPIKeyEntry) {
             APIKeyEntryView(apiKey: $apiKey)
         }
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
 
     private var workerHostDisplay: String {
