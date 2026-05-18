@@ -67,8 +67,12 @@ public class FavoritesManager: ObservableObject {
 
     private func loadFavorites() {
         // Full stop objects are authoritative when present (written by toggleFavorite).
+        // Ignore an empty stops array — fall through to the ID-only key so that
+        // addToFavorites (which only writes IDs) isn't silently shadowed by a stale
+        // empty-array entry written during a previous clearAllFavorites or remove.
         if let data = userDefaults.data(forKey: favoriteStopsKey),
-           let stops = try? JSONDecoder().decode([BusStop].self, from: data) {
+           let stops = try? JSONDecoder().decode([BusStop].self, from: data),
+           !stops.isEmpty {
             favoriteStops = stops
             favoriteStopIds = Set(stops.map { $0.id })
             return
