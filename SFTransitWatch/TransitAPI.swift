@@ -1,4 +1,11 @@
 import Foundation
+
+protocol URLSessionProtocol {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse)
+}
+
+extension URLSession: URLSessionProtocol {}
+
 import SwiftUI
 import SFTransitWatchPackage
 
@@ -11,6 +18,8 @@ class TransitAPI: ObservableObject {
     @Published var errorMessage: String?
 
     private var useDirectFallback = false
+
+    var urlSession: URLSessionProtocol = URLSession.shared
 
     private var resolvedKey: String {
         phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
@@ -103,7 +112,7 @@ class TransitAPI: ObservableObject {
 
         let started = Date()
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -199,7 +208,7 @@ class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
         let started = Date()
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
         guard let httpResponse = response as? HTTPURLResponse else {
