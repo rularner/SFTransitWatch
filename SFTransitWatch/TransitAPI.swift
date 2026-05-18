@@ -314,6 +314,71 @@ class TransitAPI: ObservableObject {
         return stops
     }
     
+    private func fetchAllStops(agency: String) async throws -> [BusStop] {
+        let endpoint = "Stops"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+        var queryItems = [URLQueryItem(name: "operator_id", value: agency)]
+        if isDirect511Mode {
+            queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+        }
+        components?.queryItems = queryItems
+        guard let url = components?.url else { throw APIError.invalidResponse }
+        let request = makeRequest(url: url)
+
+        let started = Date()
+        let (data, response) = try await urlSession.data(for: request)
+        let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+        guard let http = response as? HTTPURLResponse else {
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network",
+                                           httpStatus: nil, latencyMs: latencyMs)
+            throw APIError.invalidResponse
+        }
+        if http.statusCode != 200 {
+            Telemetry.shared.logFetchError(endpoint: endpoint,
+                                           errorKind: errorKind(for: APIError.invalidResponse, status: http.statusCode),
+                                           httpStatus: http.statusCode, latencyMs: latencyMs)
+            throw APIError.invalidResponse
+        }
+        let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
+        Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200,
+                                         latencyMs: latencyMs, cacheStatus: cacheStatus)
+        return try parse511Stops(data: data, agency: agency)
+    }
+
+    func searchStops(query: String, agencies: [String]) async -> [BusStop]? {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !agencies.isEmpty else { return [] }
+        if SnapshotMode.isActive { return [] }
+        if isDirect511Mode && !hasUsableKey { return [] }
+
+        var successCount = 0
+        var all: [BusStop] = []
+
+        await withTaskGroup(of: (stops: [BusStop]?, succeeded: Bool).self) { [self] group in
+            for agency in agencies {
+                group.addTask {
+                    if let stops = try? await self.fetchAllStops(agency: agency) {
+                        return (stops, true)
+                    }
+                    return (nil, false)
+                }
+            }
+            for await result in group {
+                if result.succeeded { successCount += 1 }
+                if let stops = result.stops {
+                    all.append(contentsOf: stops.filter { stop in
+                        stop.code == trimmed || stop.id == trimmed ||
+                        stop.name.localizedCaseInsensitiveContains(trimmed)
+                    })
+                }
+            }
+        }
+
+        guard successCount > 0 else { return nil }
+        var seen = Set<String>()
+        return all.filter { seen.insert("\($0.id)|\($0.agency)").inserted }
+    }
+
     func setAPIKey(_ key: String) {
         ConfigurationManager.shared.apiKey = key
     }
