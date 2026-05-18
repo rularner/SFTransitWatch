@@ -1,5 +1,4 @@
 Quick wins (polish / watch-phone parity):
-  - Wire up stop code entry on iPhone (StopCodeEntryView exists, showingStopCodeEntry state exists, no trigger button)
   - Add MUNI metro line colors to phone BusArrivalRow (watch has J/K/L/M/N/T/F/S colors; phone uses generic hash fallback)
   - Stop direction not obvious in list, not easy using voice
   - tag only works on comments, not PR names. But we only validate PR names. Fix that.
