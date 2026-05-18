@@ -11,6 +11,7 @@ struct BusStopListView: View {
     @State private var nearbyStops: [BusStop] = []
     @State private var showingSettingsAlert = false
     @State private var foundStop: BusStop? = nil
+    @State private var showingStopCodeEntry = false
 
     private var activeAgencyFilter: Agency? {
         guard !selectedAgencyRaw.isEmpty else { return nil }
@@ -94,6 +95,25 @@ struct BusStopListView: View {
         }
         .onChange(of: agenciesManager.enabledCodes) {
             Task { await loadNearbyStops() }
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    showingStopCodeEntry = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .accessibilityLabel("Find a stop")
+            }
+        }
+        .sheet(isPresented: $showingStopCodeEntry) {
+            StopCodeEntryView(
+                transitAPI: transitAPI,
+                agencies: agenciesManager.asArray
+            ) { stop in
+                foundStop = stop
+                showingStopCodeEntry = false
+            }
         }
     }
 
@@ -361,6 +381,117 @@ struct AgencyFilterToolbar: View {
             }
         }
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+    }
+}
+
+// MARK: - Stop Search
+
+struct StopCodeEntryView: View {
+    let transitAPI: TransitAPI
+    let agencies: [String]
+    let onFound: (BusStop) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var results: [BusStop] = []
+    @State private var isSearching = false
+    @State private var errorMessage: String? = nil
+    @State private var hasSearched = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    TextField("Stop name or code", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit { Task { await search() } }
+                }
+
+                if isSearching {
+                    HStack {
+                        ProgressView()
+                        Text("Searching…")
+                            .foregroundColor(.secondary)
+                    }
+                    .listRowBackground(Color.clear)
+                }
+
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .listRowBackground(Color.clear)
+                }
+
+                if hasSearched && !isSearching {
+                    if results.isEmpty && errorMessage == nil {
+                        Text("No stops found for \"\(query)\"")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                            .listRowBackground(Color.clear)
+                    } else {
+                        Section("Results") {
+                            ForEach(results) { stop in
+                                Button {
+                                    onFound(stop)
+                                    dismiss()
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(stop.name)
+                                                .font(.headline)
+                                            Text("Stop \(stop.code)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                        if let agency = Agency.named(stop.agency) {
+                                            Text(agency.badge)
+                                                .font(.caption2)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color(.systemGray5))
+                                                .foregroundColor(.secondary)
+                                                .cornerRadius(4)
+                                        }
+                                    }
+                                }
+                                .foregroundColor(.primary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Find a Stop")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Search") { Task { await search() } }
+                        .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
+                }
+            }
+        }
+    }
+
+    private func search() async {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        isSearching = true
+        errorMessage = nil
+        hasSearched = false
+        results = []
+
+        if let found = await transitAPI.searchStops(query: trimmed, agencies: agencies) {
+            results = found
+        } else {
+            errorMessage = "Search failed. Check your connection."
+        }
+        hasSearched = true
+        isSearching = false
     }
 }
 
