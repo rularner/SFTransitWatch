@@ -84,7 +84,7 @@ struct BusStopListView: View {
         .sheet(isPresented: $showingStopCodeEntry) {
             StopCodeEntryView(
                 transitAPI: transitAPI,
-                defaultAgency: EnabledAgencies.defaultAgency(enabledAgenciesRaw)
+                agencies: EnabledAgencies.parse(enabledAgenciesRaw)
             ) { foundStop in
                 self.foundStop = foundStop
                 showingStopCodeEntry = false
@@ -387,56 +387,94 @@ struct BusStopRow: View {
 
 struct StopCodeEntryView: View {
     let transitAPI: TransitAPI
-    let defaultAgency: String
+    let agencies: [String]
     let onFound: (BusStop) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var code = ""
+    @State private var query = ""
+    @State private var results: [BusStop] = []
     @State private var isSearching = false
     @State private var errorMessage: String? = nil
+    @State private var hasSearched = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Find Stop by Code")
-                .font(.headline)
+        ScrollView {
+            VStack(spacing: 12) {
+                Text("Find a Stop")
+                    .font(.headline)
 
-            TextField("Stop code (e.g. 15552)", text: $code)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+                TextField("Name or code", text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
 
-            if let error = errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundColor(.red)
-                    .multilineTextAlignment(.center)
-            }
-
-            HStack(spacing: 8) {
-                Button("Cancel") { dismiss() }
-                    .foregroundColor(.secondary)
-
-                Button(isSearching ? "Searching…" : "Find") {
-                    Task { await search() }
+                if isSearching {
+                    ProgressView()
+                } else if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                } else if hasSearched && results.isEmpty {
+                    Text("No stops found")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
+
+                if !results.isEmpty {
+                    Divider()
+                    ForEach(results) { stop in
+                        Button {
+                            onFound(stop)
+                            dismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(stop.name)
+                                    .font(.caption)
+                                    .lineLimit(2)
+                                HStack(spacing: 4) {
+                                    if let agency = Agency.named(stop.agency) {
+                                        Text(agency.badge)
+                                            .font(.caption2)
+                                    }
+                                    Text(stop.code)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.secondary)
+                    Button(isSearching ? "Searching…" : "Find") {
+                        Task { await search() }
+                    }
+                    .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
+                }
             }
+            .padding()
         }
-        .padding()
     }
 
     private func search() async {
-        let trimmed = code.trimmingCharacters(in: .whitespaces)
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         isSearching = true
         errorMessage = nil
+        hasSearched = false
+        results = []
 
-        let results = await transitAPI.searchStops(query: trimmed, agencies: [defaultAgency])
-        if let stop = results?.first {
-            onFound(stop)
-            dismiss()
+        if let found = await transitAPI.searchStops(query: trimmed, agencies: agencies) {
+            results = found
         } else {
-            errorMessage = "Stop \"\(trimmed)\" not found. Check the code and try again."
+            errorMessage = "Search failed. Check your connection."
         }
+        hasSearched = true
         isSearching = false
     }
 }
