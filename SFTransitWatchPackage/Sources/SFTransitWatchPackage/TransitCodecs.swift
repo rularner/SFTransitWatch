@@ -111,7 +111,7 @@ public enum TransitJSON {
             )
         }
 
-        if arrivals.contains(where: { $0.onwardStops.isEmpty }) {
+        if !arrivals.isEmpty && arrivals.allSatisfy({ $0.onwardStops.isEmpty }) {
             Telemetry.shared.logFetchError(
                 endpoint: "StopMonitoring",
                 errorKind: "no_onward_calls",
