@@ -44,6 +44,19 @@ final class PhoneSnapshotUITests: XCTestCase {
         try XCUISnapshotRunner.verify(app, named: "Settings", in: self, topPixelsToIgnore: 140)
     }
 
+    func testSnapshot_StopSearch() throws {
+        let app = launchSnapshotModeApp()
+        XCTAssertTrue(app.staticTexts["Castro Station"].waitForExistence(timeout: 10),
+                      "Stop list must load before tapping search")
+        let searchButton = app.buttons.matching(identifier: "magnifyingglass").firstMatch
+        XCTAssertTrue(searchButton.waitForExistence(timeout: 5),
+                      "Search toolbar button not found")
+        searchButton.tap()
+        XCTAssertTrue(app.staticTexts["Find a Stop"].waitForExistence(timeout: 5),
+                      "Expected 'Find a Stop' sheet title")
+        try XCUISnapshotRunner.verify(app, named: "StopSearch", in: self, topPixelsToIgnore: 140)
+    }
+
     func testSnapshot_SiriShortcuts() throws {
         let app = launchSnapshotModeApp()
         let settingsButton = app.buttons.matching(identifier: "gearshape").firstMatch
