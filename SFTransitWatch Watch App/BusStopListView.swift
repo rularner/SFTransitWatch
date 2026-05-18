@@ -430,7 +430,8 @@ struct StopCodeEntryView: View {
         isSearching = true
         errorMessage = nil
 
-        if let stop = await transitAPI.fetchStop(code: trimmed, agency: defaultAgency) {
+        let results = await transitAPI.searchStops(query: trimmed, agencies: [defaultAgency])
+        if let stop = results?.first {
             onFound(stop)
             dismiss()
         } else {
