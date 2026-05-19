@@ -237,7 +237,7 @@ struct BusArrivalView: View {
                 stopId: stop.id,
                 stopName: stop.name,
                 route: first.route,
-                minutesAway: first.minutesAway,
+                arrivalTime: first.arrivalTime,
                 slotsManager: slotsManager
             )
         }

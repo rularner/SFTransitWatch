@@ -8,14 +8,14 @@ struct NearbyFavoritesEntry: TimelineEntry {
     let date: Date
     let stopName: String
     let route: String
-    let minutesAway: Int
+    let arrivalTime: Date?
     let isConfigured: Bool
 
     static let placeholder = NearbyFavoritesEntry(
         date: .now,
         stopName: "Market & 4th",
         route: "38",
-        minutesAway: 4,
+        arrivalTime: Date().addingTimeInterval(4 * 60),
         isConfigured: true
     )
 
@@ -23,7 +23,7 @@ struct NearbyFavoritesEntry: TimelineEntry {
         date: .now,
         stopName: "",
         route: "",
-        minutesAway: 0,
+        arrivalTime: nil,
         isConfigured: false
     )
 }
@@ -36,7 +36,7 @@ private enum NearbyFavoritesSnapshotStore {
     static func snapshot(at date: Date) -> NearbyFavoritesEntry {
         let stopName = defaults.string(forKey: ComplicationUpdater.StorageKey.nearbyStopName) ?? ""
         let route = defaults.string(forKey: ComplicationUpdater.StorageKey.nearbyRoute) ?? ""
-        let minutesAway = defaults.integer(forKey: ComplicationUpdater.StorageKey.nearbyMinutesAway)
+        let arrivalTime = defaults.object(forKey: ComplicationUpdater.StorageKey.nearbyArrivalTime) as? Date
 
         guard !stopName.isEmpty else { return .unconfigured }
 
@@ -44,7 +44,7 @@ private enum NearbyFavoritesSnapshotStore {
             date: date,
             stopName: stopName,
             route: route,
-            minutesAway: minutesAway,
+            arrivalTime: arrivalTime,
             isConfigured: true
         )
     }
@@ -104,7 +104,7 @@ struct NearbyFavoritesEntryView: View {
             Text(entry.route)
                 .font(.system(size: 14, weight: .bold))
                 .minimumScaleFactor(0.7)
-            Text(minutesLabel)
+            arrivalText
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(imminenceTint)
         }
@@ -122,7 +122,7 @@ struct NearbyFavoritesEntryView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Text(entry.minutesAway == 0 ? "Due now" : "\(entry.minutesAway) min")
+                arrivalText
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(imminenceTint)
@@ -133,7 +133,7 @@ struct NearbyFavoritesEntryView: View {
     }
 
     private var cornerView: some View {
-        Text(minutesLabel)
+        arrivalText
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(imminenceTint)
             .widgetLabel(entry.route)
@@ -141,16 +141,29 @@ struct NearbyFavoritesEntryView: View {
     }
 
     private var inlineView: some View {
-        Text("\(entry.route) \(minutesLabel)")
-            .widgetAccentable()
+        Group {
+            if let arrivalTime = entry.arrivalTime {
+                (Text(entry.route + " ") + Text(arrivalTime, style: .relative))
+                    .widgetAccentable()
+            } else {
+                Text(entry.route)
+                    .widgetAccentable()
+            }
+        }
     }
 
-    private var minutesLabel: String {
-        entry.minutesAway == 0 ? "Now" : "\(entry.minutesAway)m"
+    @ViewBuilder
+    private var arrivalText: some View {
+        if let arrivalTime = entry.arrivalTime {
+            Text(arrivalTime, style: .relative)
+        } else {
+            Text("—")
+        }
     }
 
     private var imminenceTint: Color {
-        entry.minutesAway <= 2 ? .red : .primary
+        guard let arrivalTime = entry.arrivalTime else { return .primary }
+        return arrivalTime.timeIntervalSinceNow <= 2 * 60 ? .red : .primary
     }
 }
 

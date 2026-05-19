@@ -12,6 +12,7 @@ struct BusStopListView: View {
     @State private var showingSettingsAlert = false
     @State private var foundStop: BusStop? = nil
     @State private var showingStopCodeEntry = false
+    @State private var loadTask: Task<Void, Never>?
 
     private var activeAgencyFilter: Agency? {
         guard !selectedAgencyRaw.isEmpty else { return nil }
@@ -29,7 +30,7 @@ struct BusStopListView: View {
             } else if let error = transitAPI.errorMessage, nearbyStops.isEmpty {
                 Section {
                     ErrorStateView(message: error) {
-                        Task { await loadNearbyStops() }
+                        scheduleLoadNearbyStops()
                     }
                     .listRowBackground(Color.clear)
                 }
@@ -69,24 +70,16 @@ struct BusStopListView: View {
         }
         .onAppear {
             locationManager.startLocationUpdates()
-            Task {
-                await loadNearbyStops()
-            }
+            scheduleLoadNearbyStops()
         }
         .onChange(of: locationManager.currentLocation) {
-            Task {
-                await loadNearbyStops()
-            }
+            scheduleLoadNearbyStops()
         }
         .onChange(of: transitAPI.isAPIKeyConfigured) {
-            Task {
-                await loadNearbyStops()
-            }
+            scheduleLoadNearbyStops()
         }
         .onChange(of: selectedAgencyRaw) {
-            Task {
-                await loadNearbyStops()
-            }
+            scheduleLoadNearbyStops()
         }
         .onChange(of: favoritesManager.favoriteStopIds) {
             Task { @MainActor in
@@ -94,7 +87,7 @@ struct BusStopListView: View {
             }
         }
         .onChange(of: agenciesManager.enabledCodes) {
-            Task { await loadNearbyStops() }
+            scheduleLoadNearbyStops()
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -210,15 +203,22 @@ struct BusStopListView: View {
         }
     }
 
+    private func scheduleLoadNearbyStops() {
+        loadTask?.cancel()
+        loadTask = Task { await loadNearbyStops() }
+    }
+
     @MainActor
     private func loadNearbyStops() async {
         if let location = locationManager.currentLocation {
             let agencies = activeAgencyFilter.map { [$0.code] } ?? agenciesManager.asArray
-            nearbyStops = await transitAPI.fetchNearbyStops(
+            let stops = await transitAPI.fetchNearbyStops(
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
                 agencies: agencies
             )
+            guard !Task.isCancelled else { return }
+            nearbyStops = stops
         } else {
             nearbyStops = []
         }

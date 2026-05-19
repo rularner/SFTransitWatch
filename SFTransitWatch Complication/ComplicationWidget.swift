@@ -9,7 +9,7 @@ struct NextArrivalEntry: TimelineEntry {
     let slot: CommuteSlotsManager.Slot?
     let stopName: String
     let route: String
-    let minutesAway: Int
+    let arrivalTime: Date?
     let isConfigured: Bool
 
     static let placeholder = NextArrivalEntry(
@@ -17,7 +17,7 @@ struct NextArrivalEntry: TimelineEntry {
         slot: .morning,
         stopName: "Market & 4th",
         route: "38",
-        minutesAway: 4,
+        arrivalTime: Date().addingTimeInterval(4 * 60),
         isConfigured: true
     )
 
@@ -26,7 +26,7 @@ struct NextArrivalEntry: TimelineEntry {
         slot: nil,
         stopName: "",
         route: "",
-        minutesAway: 0,
+        arrivalTime: nil,
         isConfigured: false
     )
 }
@@ -39,7 +39,7 @@ private enum SnapshotStore {
     static func snapshot(for slot: CommuteSlotsManager.Slot, at date: Date) -> NextArrivalEntry? {
         let stopName = defaults.string(forKey: ComplicationUpdater.StorageKey.stopName(slot)) ?? ""
         let route = defaults.string(forKey: ComplicationUpdater.StorageKey.route(slot)) ?? ""
-        let minutesAway = defaults.integer(forKey: ComplicationUpdater.StorageKey.minutesAway(slot))
+        let arrivalTime = defaults.object(forKey: ComplicationUpdater.StorageKey.arrivalTime(slot)) as? Date
         let configuredStopId = defaults.string(forKey: slot.storageKey) ?? ""
 
         guard !configuredStopId.isEmpty, !stopName.isEmpty else { return nil }
@@ -49,7 +49,7 @@ private enum SnapshotStore {
             slot: slot,
             stopName: stopName,
             route: route,
-            minutesAway: minutesAway,
+            arrivalTime: arrivalTime,
             isConfigured: true
         )
     }
@@ -66,7 +66,7 @@ private enum SnapshotStore {
             slot: nil,
             stopName: "",
             route: "",
-            minutesAway: 0,
+            arrivalTime: nil,
             isConfigured: false
         )
     }
@@ -94,8 +94,9 @@ struct NextArrivalProvider: TimelineProvider {
             entries.append(SnapshotStore.entry(at: boundary))
         }
 
-        // Reload every 5 minutes to pick up fresh minutesAway data written
-        // by the watch app, and to refresh the slot choice.
+        // Reload every 5 minutes so the watch app's freshly written arrivalTime
+        // is picked up. Text(date, style: .relative) handles the per-second
+        // countdown automatically without additional entries.
         completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(300))))
     }
 
@@ -144,7 +145,7 @@ struct ComplicationWidgetEntryView: View {
             Text(entry.route)
                 .font(.system(size: 14, weight: .bold))
                 .minimumScaleFactor(0.7)
-            Text(minutesLabel)
+            arrivalText
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(imminenceTint)
         }
@@ -162,7 +163,7 @@ struct ComplicationWidgetEntryView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Text(entry.minutesAway == 0 ? "Due now" : "\(entry.minutesAway) min")
+                arrivalText
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(imminenceTint)
@@ -173,26 +174,37 @@ struct ComplicationWidgetEntryView: View {
     }
 
     private var cornerView: some View {
-        Text(minutesLabel)
+        arrivalText
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(imminenceTint)
             .widgetLabel(entry.route)
             .containerBackground(.fill.tertiary, for: .widget)
     }
 
-    // Inline family: single horizontal line at the top of a face.
-    // Rendered as "· 38 4m" so the route and ETA read as one phrase.
     private var inlineView: some View {
-        Text("\(entry.route) \(minutesLabel)")
-            .widgetAccentable()
+        Group {
+            if let arrivalTime = entry.arrivalTime {
+                (Text(entry.route + " ") + Text(arrivalTime, style: .relative))
+                    .widgetAccentable()
+            } else {
+                Text(entry.route)
+                    .widgetAccentable()
+            }
+        }
     }
 
-    private var minutesLabel: String {
-        entry.minutesAway == 0 ? "Now" : "\(entry.minutesAway)m"
+    @ViewBuilder
+    private var arrivalText: some View {
+        if let arrivalTime = entry.arrivalTime {
+            Text(arrivalTime, style: .relative)
+        } else {
+            Text("—")
+        }
     }
 
     private var imminenceTint: Color {
-        entry.minutesAway <= 2 ? .red : .primary
+        guard let arrivalTime = entry.arrivalTime else { return .primary }
+        return arrivalTime.timeIntervalSinceNow <= 2 * 60 ? .red : .primary
     }
 }
 

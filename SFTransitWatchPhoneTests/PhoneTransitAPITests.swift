@@ -102,4 +102,38 @@ final class PhoneTransitAPITests: XCTestCase {
 
         XCTAssertNil(results)
     }
+
+    // MARK: - Filter toggle (race condition regression)
+
+    /// Each enabled agency produces exactly one API request.
+    /// Regression: rapid filter toggles previously caused stale-task results to overwrite
+    /// newer results because multiple unstructured Tasks raced to write nearbyStops.
+    func testFetchNearbyStopsOneRequestPerAgency() async {
+        let emptyXML = "<StopPlaces></StopPlaces>".data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/Stops")!, data: emptyXML)
+
+        _ = await api.fetchNearbyStops(latitude: 37.762, longitude: -122.435, agencies: ["SF", "AC", "SC"])
+
+        XCTAssertEqual(mockSession.requestCount(), 3, "One Stops request per enabled agency")
+    }
+
+    func testFetchNearbyStopsNoAgenciesMakesNoRequests() async {
+        _ = await api.fetchNearbyStops(latitude: 37.762, longitude: -122.435, agencies: [])
+
+        XCTAssertEqual(mockSession.requestCount(), 0, "No requests when all agencies are filtered out")
+    }
+
+    /// Cancelling a fetchNearbyStops task in flight (simulating a filter toggle that supersedes
+    /// a prior slow load) causes the task to exit before completing any requests.
+    func testFetchNearbyStopsRespectsTaskCancellation() async {
+        mockSession.delaySeconds = 5
+
+        let task = Task { @MainActor in
+            await self.api.fetchNearbyStops(latitude: 37.762, longitude: -122.435, agencies: ["SF"])
+        }
+        task.cancel()
+        _ = await task.value
+
+        XCTAssertEqual(mockSession.requestCount(), 0, "Cancelled task should not complete any requests")
+    }
 }

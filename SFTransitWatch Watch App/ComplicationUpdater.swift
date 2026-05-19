@@ -20,21 +20,21 @@ enum ComplicationUpdater {
         stopId: String,
         stopName: String,
         route: String,
-        minutesAway: Int,
+        arrivalTime: Date,
         slotsManager: CommuteSlotsManager
     ) {
         guard let slot = slotsManager.slot(for: stopId) else { return }
-        write(slot: slot, stopName: stopName, route: route, minutesAway: minutesAway)
+        write(slot: slot, stopName: stopName, route: route, arrivalTime: arrivalTime)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     /// Direct writer — separated so tests (and the widget-target code, once
     /// it grows) can inspect per-slot keys without going through a slots
     /// manager.
-    static func write(slot: CommuteSlotsManager.Slot, stopName: String, route: String, minutesAway: Int) {
+    static func write(slot: CommuteSlotsManager.Slot, stopName: String, route: String, arrivalTime: Date) {
         defaults.set(stopName, forKey: StorageKey.stopName(slot))
         defaults.set(route, forKey: StorageKey.route(slot))
-        defaults.set(minutesAway, forKey: StorageKey.minutesAway(slot))
+        defaults.set(arrivalTime, forKey: StorageKey.arrivalTime(slot))
     }
 
     enum StorageKey {
@@ -44,25 +44,25 @@ enum ComplicationUpdater {
         static func route(_ slot: CommuteSlotsManager.Slot) -> String {
             "complication_\(slot.rawValue)_route"
         }
-        static func minutesAway(_ slot: CommuteSlotsManager.Slot) -> String {
-            "complication_\(slot.rawValue)_minutes_away"
+        static func arrivalTime(_ slot: CommuteSlotsManager.Slot) -> String {
+            "complication_\(slot.rawValue)_arrival_time"
         }
 
         // Nearby favorites keys
         static let nearbyStopName = "complication_nearby_stop_name"
         static let nearbyRoute = "complication_nearby_route"
-        static let nearbyMinutesAway = "complication_nearby_minutes_away"
+        static let nearbyArrivalTime = "complication_nearby_arrival_time"
     }
 
     @MainActor
     static func updateNearby(
         stopName: String,
         route: String,
-        minutesAway: Int
+        arrivalTime: Date
     ) {
         defaults.set(stopName, forKey: StorageKey.nearbyStopName)
         defaults.set(route, forKey: StorageKey.nearbyRoute)
-        defaults.set(minutesAway, forKey: StorageKey.nearbyMinutesAway)
+        defaults.set(arrivalTime, forKey: StorageKey.nearbyArrivalTime)
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

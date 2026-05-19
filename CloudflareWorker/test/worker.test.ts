@@ -1,7 +1,7 @@
 /// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
 import { describe, it, expect, beforeAll } from "vitest";
 import { SELF, env } from "cloudflare:test";
-import { sha256Hex } from "../src/index";
+import { sha256Hex, parseStopsFromApi, distanceMeters } from "../src/index";
 
 const VALID_TOKEN = "test-token";
 let VALID_HASH = "";
@@ -221,5 +221,167 @@ describe("sha256Hex", () => {
         const a = await sha256Hex("alpha");
         const b = await sha256Hex("beta");
         expect(a).not.toBe(b);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Stops cache
+// ---------------------------------------------------------------------------
+
+interface StopPoint { id: string; Name: string; Location: { Latitude: string; Longitude: string } }
+interface StopsBody { Contents: { dataObjects: { ScheduledStopPoint: StopPoint[] } } }
+
+const STOPS_CACHE = () => (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE;
+
+const SF_STOPS_BLOB = JSON.stringify({
+    fetchedAtMs: Date.now(),
+    stops: [
+        { id: "15725", name: "Market St & 4th St",  lat: 37.7844, lon: -122.4062 },
+        { id: "15726", name: "Market St & 5th St",  lat: 37.7845, lon: -122.4073 },
+        { id: "16000", name: "Mission & 24th St",   lat: 37.7524, lon: -122.4183 },
+    ],
+});
+
+describe("distanceMeters", () => {
+    it("returns 0 for the same point", () => {
+        expect(distanceMeters(37.7844, -122.4062, 37.7844, -122.4062)).toBe(0);
+    });
+
+    it("returns a small distance for nearby SF stops (~100 m)", () => {
+        const d = distanceMeters(37.7844, -122.4062, 37.7845, -122.4073);
+        expect(d).toBeGreaterThan(50);
+        expect(d).toBeLessThan(300);
+    });
+
+    it("returns a large distance for SF to LA (~560 km)", () => {
+        const d = distanceMeters(37.7749, -122.4194, 34.0522, -118.2437);
+        expect(d).toBeGreaterThan(500_000);
+    });
+});
+
+describe("parseStopsFromApi", () => {
+    it("parses a well-formed 511.org stops JSON payload", () => {
+        const data = {
+            Contents: {
+                dataObjects: {
+                    ScheduledStopPoint: [
+                        { id: "15725", Name: "Market & 4th", Location: { Latitude: "37.7844", Longitude: "-122.4062" } },
+                    ],
+                },
+            },
+        };
+        const stops = parseStopsFromApi(data);
+        expect(stops).toHaveLength(1);
+        expect(stops[0]).toEqual({ id: "15725", name: "Market & 4th", lat: 37.7844, lon: -122.4062 });
+    });
+
+    it("returns empty array for null or missing Contents", () => {
+        expect(parseStopsFromApi(null)).toHaveLength(0);
+        expect(parseStopsFromApi({})).toHaveLength(0);
+        expect(parseStopsFromApi({ Contents: {} })).toHaveLength(0);
+    });
+
+    it("skips stops with non-numeric coordinates", () => {
+        const data = {
+            Contents: {
+                dataObjects: {
+                    ScheduledStopPoint: [
+                        { id: "1", Name: "Good", Location: { Latitude: "37.7", Longitude: "-122.4" } },
+                        { id: "2", Name: "Bad",  Location: { Latitude: "n/a",  Longitude: "-122.4" } },
+                    ],
+                },
+            },
+        };
+        const stops = parseStopsFromApi(data);
+        expect(stops).toHaveLength(1);
+        expect(stops[0].id).toBe("1");
+    });
+
+    it("skips stops missing id or Name", () => {
+        const data = {
+            Contents: {
+                dataObjects: {
+                    ScheduledStopPoint: [
+                        { Name: "No ID",  Location: { Latitude: "37.7", Longitude: "-122.4" } },
+                        { id: "99",       Location: { Latitude: "37.7", Longitude: "-122.4" } },
+                    ],
+                },
+            },
+        };
+        expect(parseStopsFromApi(data)).toHaveLength(0);
+    });
+});
+
+describe("GET /Stops (stops cache)", () => {
+    beforeAll(async () => {
+        await STOPS_CACHE().put("stops:SF", SF_STOPS_BLOB);
+    });
+
+    it("returns 400 when agency param is missing", async () => {
+        const res = await SELF.fetch("https://example.com/Stops", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it("returns all stops for the agency when no lat/lon provided", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as StopsBody;
+        expect(body.Contents.dataObjects.ScheduledStopPoint).toHaveLength(3);
+    });
+
+    it("filters stops by proximity when lat/lon and radius provided", async () => {
+        // 200 m around Market & 4th — should include Market & 5th but not Mission & 24th
+        const res = await SELF.fetch(
+            "https://example.com/Stops?agency=SF&lat=37.7844&lon=-122.4062&radius=200",
+            { headers: { "X-App-Token": VALID_TOKEN } },
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as StopsBody;
+        const ids = body.Contents.dataObjects.ScheduledStopPoint.map((s) => s.id);
+        expect(ids).toContain("15725");
+        expect(ids).toContain("15726");
+        expect(ids).not.toContain("16000");
+    });
+
+    it("also accepts latitude/longitude param names", async () => {
+        const res = await SELF.fetch(
+            "https://example.com/Stops?agency=SF&latitude=37.7844&longitude=-122.4062&radius=200",
+            { headers: { "X-App-Token": VALID_TOKEN } },
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as StopsBody;
+        const ids = body.Contents.dataObjects.ScheduledStopPoint.map((s) => s.id);
+        expect(ids).toContain("15725");
+        expect(ids).not.toContain("16000");
+    });
+
+    it("returns JSON matching the StopsResponse shape the app parses", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        const body = (await res.json()) as StopsBody;
+        const first = body.Contents.dataObjects.ScheduledStopPoint[0];
+        expect(typeof first.id).toBe("string");
+        expect(typeof first.Name).toBe("string");
+        expect(typeof first.Location.Latitude).toBe("string");
+        expect(typeof first.Location.Longitude).toBe("string");
+    });
+
+    it("sets X-Cache-Status: HIT when served from cache", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        expect(res.headers.get("X-Cache-Status")).toBe("HIT");
+    });
+
+    it("returns 502 when agency has no cached blob and upstream unreachable", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=CT", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        expect(res.status).toBe(502);
     });
 });

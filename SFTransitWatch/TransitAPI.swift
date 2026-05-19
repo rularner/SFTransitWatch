@@ -96,7 +96,8 @@ class TransitAPI: ObservableObject {
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
             URLQueryItem(name: "agency", value: agency),
-            URLQueryItem(name: "stopCode", value: stopId)
+            URLQueryItem(name: "stopCode", value: stopId),
+            URLQueryItem(name: "MaximumNumberOfCallsOnwards", value: "10")
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
