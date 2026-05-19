@@ -4,6 +4,7 @@ const STALE_TTL_SECONDS = 6 * 60 * 60;
 const MIN_UPSTREAM_INTERVAL_MS = 60_000;
 const LAST_UPSTREAM_FETCH_KEY = "meta:last_upstream_fetch_ms";
 const REFRESH_LOCK_KEY = "meta:refresh_lock";
+const STOPS_FRESH_TTL_SECONDS = 24 * 60 * 60;
 
 interface Env {
 	API_511_KEY: string;
@@ -17,6 +18,9 @@ type CachedResponse = {
 	contentType: string;
 	fetchedAtMs: number;
 };
+
+export type CachedStop = { id: string; name: string; lat: number; lon: number };
+type CachedStops = { stops: CachedStop[]; fetchedAtMs: number };
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -48,6 +52,11 @@ export default {
 
 			if (request.method !== "GET") {
 				return jsonError("Only GET requests are supported.", 405);
+			}
+
+			const endpoint = url.pathname.split("/").filter(Boolean).pop() ?? "";
+			if (endpoint === "Stops") {
+				return await handleStopsRequest(url, env);
 			}
 
 			const upstream = buildUpstreamUrl(request.url, env.API_511_KEY);
@@ -312,6 +321,144 @@ async function handleLog(request: Request): Promise<Response> {
 	}
 
 	return new Response(null, { status: 204, headers: corsHeaders() });
+}
+
+async function handleStopsRequest(url: URL, env: Env): Promise<Response> {
+	const agency = url.searchParams.get("agency");
+	if (!agency) {
+		return jsonError("agency parameter required.", 400);
+	}
+
+	const stopsKey = `stops:${agency}`;
+	const now = Date.now();
+
+	const raw = await env.TRANSIT_CACHE.get(stopsKey, "json");
+	const cached = isValidCachedStops(raw) ? raw : null;
+	const isFresh = cached !== null && now - cached.fetchedAtMs < STOPS_FRESH_TTL_SECONDS * 1000;
+
+	let active: CachedStops;
+	if (isFresh) {
+		active = cached;
+	} else {
+		const result = await fetchAndCacheAllStops(env, agency, now);
+		if (result.ok) {
+			active = result.value;
+		} else if (cached) {
+			active = cached;
+		} else {
+			return jsonError(result.error, 502);
+		}
+	}
+
+	const lat = parseFloat(url.searchParams.get("lat") ?? url.searchParams.get("latitude") ?? "");
+	const lon = parseFloat(url.searchParams.get("lon") ?? url.searchParams.get("longitude") ?? "");
+	const radius = parseInt(url.searchParams.get("radius") ?? "1000", 10);
+
+	const filtered =
+		Number.isFinite(lat) && Number.isFinite(lon)
+			? active.stops.filter((s) => distanceMeters(s.lat, s.lon, lat, lon) <= (Number.isFinite(radius) ? radius : 1000))
+			: active.stops;
+
+	return stopsJsonResponse(filtered, active.fetchedAtMs);
+}
+
+function isValidCachedStops(raw: unknown): raw is CachedStops {
+	if (!raw || typeof raw !== "object") return false;
+	const r = raw as Record<string, unknown>;
+	return Array.isArray(r.stops) && typeof r.fetchedAtMs === "number";
+}
+
+async function fetchAndCacheAllStops(
+	env: Env,
+	agency: string,
+	nowMs: number,
+): Promise<{ ok: true; value: CachedStops } | { ok: false; error: string }> {
+	const upstreamUrl = new URL(`${UPSTREAM_BASE_URL}/Stops`);
+	upstreamUrl.searchParams.set("agency", agency);
+	upstreamUrl.searchParams.set("api_key", env.API_511_KEY);
+
+	let response: Response;
+	try {
+		response = await fetch(upstreamUrl, { headers: { Accept: "application/json" } });
+	} catch {
+		return { ok: false, error: "Failed to contact 511 upstream." };
+	}
+
+	if (!response.ok) {
+		return { ok: false, error: `Upstream responded with HTTP ${response.status}.` };
+	}
+
+	let data: unknown;
+	try {
+		data = await response.json();
+	} catch {
+		return { ok: false, error: "Failed to parse stops JSON from upstream." };
+	}
+
+	const cached: CachedStops = { stops: parseStopsFromApi(data), fetchedAtMs: nowMs };
+	await env.TRANSIT_CACHE.put(`stops:${agency}`, JSON.stringify(cached), {
+		expirationTtl: STOPS_FRESH_TTL_SECONDS * 2,
+	});
+	return { ok: true, value: cached };
+}
+
+function stopsJsonResponse(stops: CachedStop[], fetchedAtMs: number): Response {
+	const body = JSON.stringify({
+		Contents: {
+			dataObjects: {
+				ScheduledStopPoint: stops.map((s) => ({
+					id: s.id,
+					Name: s.name,
+					Location: { Latitude: String(s.lat), Longitude: String(s.lon) },
+				})),
+			},
+		},
+	});
+	return new Response(body, {
+		status: 200,
+		headers: {
+			...corsHeaders(),
+			"Content-Type": "application/json; charset=utf-8",
+			"Cache-Control": `public, max-age=${STOPS_FRESH_TTL_SECONDS}, stale-if-error=${STALE_TTL_SECONDS}`,
+			"X-Cache-Status": "HIT",
+			"X-Cached-At": new Date(fetchedAtMs).toISOString(),
+		},
+	});
+}
+
+export function parseStopsFromApi(data: unknown): CachedStop[] {
+	if (!data || typeof data !== "object") return [];
+	const root = data as Record<string, unknown>;
+	const contents = root["Contents"] as Record<string, unknown> | undefined;
+	if (!contents) return [];
+	const dataObjects = contents["dataObjects"] as Record<string, unknown> | undefined;
+	if (!dataObjects) return [];
+	const points = dataObjects["ScheduledStopPoint"];
+	if (!Array.isArray(points)) return [];
+
+	return points.flatMap((pt: unknown) => {
+		if (!pt || typeof pt !== "object") return [];
+		const p = pt as Record<string, unknown>;
+		const id = p["id"];
+		const name = p["Name"];
+		const loc = p["Location"] as Record<string, unknown> | undefined;
+		if (typeof id !== "string" || typeof name !== "string" || !loc) return [];
+		const lat = parseFloat(String(loc["Latitude"] ?? ""));
+		const lon = parseFloat(String(loc["Longitude"] ?? ""));
+		if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+		return [{ id, name, lat, lon }];
+	});
+}
+
+export function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+	const R = 6_371_000;
+	const toRad = (d: number) => (d * Math.PI) / 180;
+	const dLat = toRad(lat2 - lat1);
+	const dLon = toRad(lon2 - lon1);
+	const a =
+		Math.sin(dLat / 2) ** 2 +
+		Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export async function sha256Hex(input: string): Promise<string> {
