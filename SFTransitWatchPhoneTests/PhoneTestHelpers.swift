@@ -6,8 +6,13 @@ class MockURLSession: URLSessionProtocol {
     private var _requests: [URLRequest] = []
     var responses: [URL: (data: Data, response: HTTPURLResponse)] = [:]
     var errors: [URL: Error] = [:]
+    /// Artificial delay (in seconds) before each response — honours task cancellation.
+    var delaySeconds: Double = 0
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        if delaySeconds > 0 {
+            try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+        }
         lock.withLock { _requests.append(request) }
         guard let url = request.url else { throw URLError(.badURL) }
         if let error = errors[url] { throw error }
@@ -27,4 +32,5 @@ class MockURLSession: URLSessionProtocol {
 
     func setMockError(for url: URL, error: Error) { errors[url] = error }
     func requestCount() -> Int { lock.withLock { _requests.count } }
+    func clearHistory() { lock.withLock { _requests.removeAll() } }
 }

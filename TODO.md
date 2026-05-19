@@ -1,7 +1,12 @@
 Bugs:
-  - What happened to Bus View?
+  - Turning on/off filters doesn't always work (likely due to internal rate limits)
+  - 
 
 Quick wins (polish / watch-phone parity):
+  - Add configuration for minimum time-to-stop for morning and evening
+  - Add early/late times for morning and evening
+  - Add ability to disable alerts
+  - Add detection of at stop to disable that stop's alerts for rest of day
   - Add MUNI metro line colors to phone BusArrivalRow (watch has J/K/L/M/N/T/F/S colors; phone uses generic hash fallback)
   - Stop direction not obvious in list, not easy using voice
   - tag only works on comments, not PR names. But we only validate PR names. Fix that.
