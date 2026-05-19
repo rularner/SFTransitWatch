@@ -7,7 +7,6 @@ final class FavoritesManagerTests: XCTestCase {
     private var manager: FavoritesManager!
 
     override func setUp() async throws {
-        // Use a fresh UserDefaults suite per test run to avoid cross-test pollution
         let suiteName = "FavoritesManagerTests-\(UUID().uuidString)"
         manager = FavoritesManager(userDefaultsSuiteName: suiteName)
     }
@@ -17,37 +16,45 @@ final class FavoritesManagerTests: XCTestCase {
     }
 
     func testToggleAddsFavorite() {
-        manager.toggleFavorite(for: "stop-1")
-        XCTAssertTrue(manager.isFavorite("stop-1"))
+        let stop = makeStops()[0]
+        manager.toggleFavorite(stop)
+        XCTAssertTrue(manager.isFavorite(stop.id))
+        XCTAssertEqual(manager.favoriteStops.count, 1)
+        XCTAssertEqual(manager.favoriteStops[0].id, stop.id)
     }
 
     func testToggleRemovesFavorite() {
-        manager.toggleFavorite(for: "stop-1")
-        manager.toggleFavorite(for: "stop-1")
-        XCTAssertFalse(manager.isFavorite("stop-1"))
+        let stop = makeStops()[0]
+        manager.toggleFavorite(stop)
+        manager.toggleFavorite(stop)
+        XCTAssertFalse(manager.isFavorite(stop.id))
+        XCTAssertTrue(manager.favoriteStops.isEmpty)
     }
 
     func testAddToFavorites() {
-        manager.addToFavorites("stop-2")
-        XCTAssertTrue(manager.isFavorite("stop-2"))
+        let stop = makeStops()[1]
+        manager.toggleFavorite(stop)
+        XCTAssertTrue(manager.isFavorite(stop.id))
     }
 
     func testRemoveFromFavorites() {
-        manager.addToFavorites("stop-3")
-        manager.removeFromFavorites("stop-3")
-        XCTAssertFalse(manager.isFavorite("stop-3"))
+        let stop = makeStops()[2]
+        manager.toggleFavorite(stop)
+        manager.removeFromFavorites(stop)
+        XCTAssertFalse(manager.isFavorite(stop.id))
     }
 
     func testClearAllFavorites() {
-        manager.addToFavorites("stop-1")
-        manager.addToFavorites("stop-2")
+        let stops = makeStops()
+        manager.toggleFavorite(stops[0])
+        manager.toggleFavorite(stops[1])
         manager.clearAllFavorites()
         XCTAssertTrue(manager.favoriteStopIds.isEmpty)
     }
 
     func testGetFavoriteStopsFiltersCorrectly() {
         let stops = makeStops()
-        manager.addToFavorites(stops[0].id)
+        manager.toggleFavorite(stops[0])
         let favorites = manager.getFavoriteStops(from: stops)
         XCTAssertEqual(favorites.count, 1)
         XCTAssertEqual(favorites[0].id, stops[0].id)
@@ -55,9 +62,33 @@ final class FavoritesManagerTests: XCTestCase {
 
     func testSortStopsWithFavoritesFirst() {
         let stops = makeStops()
-        manager.addToFavorites(stops[1].id) // favorite the second stop
+        manager.toggleFavorite(stops[1])
         let sorted = manager.sortStopsWithFavoritesFirst(stops)
         XCTAssertTrue(sorted[0].isFavorite)
+    }
+
+    func testPersistenceAcrossInstances() {
+        let suiteName = "FavoritesManagerTests-persistence-\(UUID().uuidString)"
+        let stop = makeStops()[0]
+        let first = FavoritesManager(userDefaultsSuiteName: suiteName)
+        first.toggleFavorite(stop)
+
+        let second = FavoritesManager(userDefaultsSuiteName: suiteName)
+        XCTAssertTrue(second.isFavorite(stop.id))
+        XCTAssertEqual(second.favoriteStops.count, 1)
+        XCTAssertEqual(second.favoriteStops[0].name, stop.name)
+    }
+
+    func testRoutesAreNotPersisted() {
+        let suiteName = "FavoritesManagerTests-routes-\(UUID().uuidString)"
+        let stop = makeStops()[0] // has routes: ["38"]
+        let first = FavoritesManager(userDefaultsSuiteName: suiteName)
+        first.toggleFavorite(stop)
+
+        let second = FavoritesManager(userDefaultsSuiteName: suiteName)
+        XCTAssertTrue(second.isFavorite(stop.id))
+        XCTAssertTrue(second.favoriteStops[0].routes.isEmpty,
+                      "Routes should not be persisted — they come from live API data")
     }
 
     private func makeStops() -> [BusStop] {
@@ -72,14 +103,5 @@ final class FavoritesManagerTests: XCTestCase {
                     latitude: 37.7649, longitude: -122.4294,
                     routes: ["F"], agency: "SF")
         ]
-    }
-
-    func testPersistenceAcrossInstances() {
-        let suiteName = "FavoritesManagerTests-persistence-\(UUID().uuidString)"
-        let first = FavoritesManager(userDefaultsSuiteName: suiteName)
-        first.addToFavorites("stop-persist")
-
-        let second = FavoritesManager(userDefaultsSuiteName: suiteName)
-        XCTAssertTrue(second.isFavorite("stop-persist"))
     }
 }

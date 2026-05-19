@@ -77,14 +77,14 @@ final class WatchSnapshotUITests: XCTestCase {
         XCTAssertTrue(searchButton.waitForExistence(timeout: 10),
                       "Search toolbar button not found — may need accessibilityIdentifier")
         searchButton.tap()
-        XCTAssertTrue(app.staticTexts["Find Stop by Code"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Find a Stop"].waitForExistence(timeout: 10))
         try XCUISnapshotRunner.verify(app, named: "StopCodeEntry", in: self, topPixelsToIgnore: 200)
     }
 
     func testSnapshot_StopLocation() throws {
         let app = launchSnapshotModeAppAtLocation()
-        XCTAssertTrue(app.staticTexts["Stop Location"].waitForExistence(timeout: 10),
-                      "Expected Stop Location heading on the compass tab")
+        XCTAssertTrue(app.staticTexts["Distance"].waitForExistence(timeout: 10),
+                      "Expected Distance label in StopLocationView compass tab")
         try XCUISnapshotRunner.verify(app, named: "StopLocation", in: self, topPixelsToIgnore: 200)
     }
 }

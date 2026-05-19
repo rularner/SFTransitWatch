@@ -17,6 +17,10 @@ class MockURLSession: URLSessionProtocol {
             throw error
         }
 
+        if let match = errors.first(where: { $0.key.host == url.host }) {
+            throw match.value
+        }
+
         if let (data, response) = responses[url] {
             return (data, response)
         }

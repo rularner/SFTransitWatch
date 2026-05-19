@@ -5,8 +5,8 @@ import SFTransitWatchPackage
 struct BusArrivalView: View {
     let stop: BusStop
     @StateObject private var transitAPI = TransitAPI()
-    @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var commuteSlotsManager = CommuteSlotsManager()
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var slotsManager: CommuteSlotsManager
 
     @StateObject private var locationManager = LocationManager()
     @State private var selectedTab = 0
@@ -14,20 +14,18 @@ struct BusArrivalView: View {
     @State private var lastUpdated = Date()
     @State private var secondsUntilRefresh = 30
     @State private var notifiedArrivalIDs: Set<UUID> = []
-    @State private var selectedRoute: String? = nil  // nil = show all
+    @State private var selectedRoute: String? = nil
+    @State private var showCommutePrompt = false
+    @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
 
     init(
         stop: BusStop,
         transitAPI: TransitAPI? = nil,
-        favoritesManager: FavoritesManager? = nil,
-        commuteSlotsManager: CommuteSlotsManager? = nil,
         initialArrivals: [BusArrival] = [],
         initialTab: Int = 0
     ) {
         self.stop = stop
         _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
-        _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
-        _commuteSlotsManager = StateObject(wrappedValue: commuteSlotsManager ?? CommuteSlotsManager())
         _arrivals = State(initialValue: initialArrivals)
         _selectedTab = State(initialValue: initialTab)
     }
@@ -52,7 +50,17 @@ struct BusArrivalView: View {
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
-                            Button(action: { favoritesManager.toggleFavorite(for: stop.id) }) {
+                            Button(action: {
+                                let isAdding = !favoritesManager.isFavorite(stop.id)
+                                favoritesManager.toggleFavorite(stop)
+                                if isAdding {
+                                    let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
+                                    if !empty.isEmpty {
+                                        commuteEmptySlots = empty
+                                        showCommutePrompt = true
+                                    }
+                                }
+                            }) {
                                 Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
                                     .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)
                                     .font(.title2)
@@ -91,7 +99,24 @@ struct BusArrivalView: View {
                         .accessibilityLabel("Error: \(error)")
                     }
                 }
-    
+
+                let alerts = arrivals.uniqueAlerts
+                if !alerts.isEmpty {
+                    Section(header: Text("Service Alerts")) {
+                        ForEach(alerts, id: \.self) { alert in
+                            HStack(alignment: .top, spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption2)
+                                Text(alert)
+                                    .font(.caption2)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Service alert: \(alert)")
+                        }
+                    }
+                }
+
                 // Arrivals
                 Section {
                     if transitAPI.isLoading && arrivals.isEmpty {
@@ -184,6 +209,20 @@ struct BusArrivalView: View {
                 await loadArrivals()
             }
         }
+        .confirmationDialog(
+            "Add to commute?",
+            isPresented: $showCommutePrompt
+        ) {
+            if commuteEmptySlots.contains(.morning) {
+                Button("Morning Commute") { slotsManager.setStopId(stop.id, for: .morning) }
+            }
+            if commuteEmptySlots.contains(.afternoon) {
+                Button("Afternoon Commute") { slotsManager.setStopId(stop.id, for: .afternoon) }
+            }
+            Button("Not Now", role: .cancel) { }
+        } message: {
+            Text("Use \"\(stop.name)\" as a commute stop?")
+        }
     }
 
     private func loadArrivals() async {
@@ -199,7 +238,7 @@ struct BusArrivalView: View {
                 stopName: stop.name,
                 route: first.route,
                 minutesAway: first.minutesAway,
-                slotsManager: commuteSlotsManager
+                slotsManager: slotsManager
             )
         }
     }
@@ -215,112 +254,12 @@ struct BusArrivalView: View {
 
 // MARK: - Route Filter Pill
 
-struct RouteFilterPill: View {
-    let label: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(label)
-                .font(.caption2)
-                .fontWeight(isSelected ? .bold : .regular)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(isSelected ? Color.blue : Color.blue.opacity(0.15))
-                .foregroundColor(isSelected ? .white : .blue)
-                .cornerRadius(8)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .accessibilityLabel(label == "All" ? "All routes" : "Route \(label)")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-        .accessibilityHint(isSelected ? "Tap to clear filter" : "Tap to filter arrivals")
-    }
-}
-
-// MARK: - Arrival Row
-
-struct BusArrivalRow: View {
-    let arrival: BusArrival
-
-    var body: some View {
-        HStack {
-            Text(arrival.route)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .frame(width: 40, height: 40)
-                .background(routeColor(for: arrival.route))
-                .cornerRadius(8)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(arrival.destination)
-                    .font(.headline)
-                    .lineLimit(1)
-
-                HStack {
-                    Text(arrival.minutesString)
-                        .font(.subheadline)
-                        .foregroundColor(arrival.minutesAway <= 2 ? .red : arrival.minutesAway <= 5 ? .orange : .primary)
-                        .fontWeight(.semibold)
-
-                    if !arrival.isRealTime {
-                        Text("Sched.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing) {
-                Text(arrival.timeString)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-
-                if arrival.isRealTime {
-                    Image(systemName: "clock.fill")
-                        .font(.caption2)
-                        .foregroundColor(.green)
-                }
-            }
-        }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityDescription)
-    }
-
-    private var accessibilityDescription: String {
-        let timing = arrival.isRealTime ? "real time" : "scheduled"
-        return "Route \(arrival.route) to \(arrival.destination), \(arrival.minutesString), \(timing)"
-    }
-
-    private func routeColor(for route: String) -> Color {
-        if let metro = metroLineColor(for: route) { return metro }
-        let fallback: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
-        return fallback[abs(route.hashValue) % fallback.count]
-    }
-
-    private func metroLineColor(for route: String) -> Color? {
-        switch route.uppercased() {
-        case "F": return Color(red: 0.73, green: 0.20, blue: 0.05)   // F Market, historic red
-        case "J": return Color(red: 0.55, green: 0.35, blue: 0.17)   // J Church, brown
-        case "K", "KT": return Color(red: 0.43, green: 0.20, blue: 0.56) // K Ingleside / KT, purple
-        case "L": return Color(red: 0.47, green: 0.47, blue: 0.47)   // L Taraval, gray
-        case "M": return Color(red: 0.15, green: 0.55, blue: 0.25)   // M Ocean View, green
-        case "N": return Color(red: 0.00, green: 0.35, blue: 0.62)   // N Judah, blue
-        case "T": return Color(red: 0.78, green: 0.13, blue: 0.18)   // T Third, red
-        case "S": return Color(red: 0.95, green: 0.62, blue: 0.07)   // S Shuttle, yellow-orange
-        default: return nil
-        }
-    }
-}
-
 #if DEBUG
 #Preview {
     NavigationStack {
         BusArrivalView(stop: BusStop.previewStops[0])
+            .environmentObject(FavoritesManager())
+            .environmentObject(CommuteSlotsManager())
     }
 }
 #endif

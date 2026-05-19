@@ -59,8 +59,8 @@ public final class Telemetry: @unchecked Sendable {
 
     public convenience init() {
         let info = Bundle.main.infoDictionary ?? [:]
-        let storedToken = UserDefaults.standard.string(forKey: "WORKER_TOKEN") ?? ""
-        let storedBase = UserDefaults.standard.string(forKey: "WORKER_BASE_URL") ?? ""
+        let storedToken = ConfigurationManager.shared.workerToken
+        let storedBase = ConfigurationManager.shared.workerBaseURL
         let token: String? = storedToken.isEmpty ? nil : storedToken
         let baseURL: String? = storedBase.isEmpty ? nil : storedBase
         let appVersion = (info["CFBundleShortVersionString"] as? String) ?? "0"

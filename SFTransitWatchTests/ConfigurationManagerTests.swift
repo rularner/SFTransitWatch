@@ -6,7 +6,7 @@ final class ConfigurationManagerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         // Clear app group storage before each test
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             userDefaults.removeObject(forKey: "511_API_KEY")
             userDefaults.removeObject(forKey: "WORKER_TOKEN")
             userDefaults.removeObject(forKey: "WORKER_BASE_URL")
@@ -16,7 +16,7 @@ final class ConfigurationManagerTests: XCTestCase {
     override func tearDown() {
         super.tearDown()
         // Clean up after each test
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             userDefaults.removeObject(forKey: "511_API_KEY")
             userDefaults.removeObject(forKey: "WORKER_TOKEN")
             userDefaults.removeObject(forKey: "WORKER_BASE_URL")
@@ -31,7 +31,7 @@ final class ConfigurationManagerTests: XCTestCase {
         ConfigurationManager.shared.apiKey = testKey
 
         // Verify it persists by checking the underlying UserDefaults
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             let storedValue = userDefaults.string(forKey: "511_API_KEY")
             XCTAssertEqual(storedValue, testKey,
                            "API key should persist in app group UserDefaults")
@@ -43,7 +43,7 @@ final class ConfigurationManagerTests: XCTestCase {
         let testKey = "persistent-key-xyz"
 
         // Set directly in app group storage
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             userDefaults.set(testKey, forKey: "511_API_KEY")
         }
 
@@ -60,7 +60,7 @@ final class ConfigurationManagerTests: XCTestCase {
         let testToken = "worker-token-abc123"
         ConfigurationManager.shared.workerToken = testToken
 
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             let storedValue = userDefaults.string(forKey: "WORKER_TOKEN")
             XCTAssertEqual(storedValue, testToken,
                            "Worker token should persist in app group UserDefaults")
@@ -72,7 +72,7 @@ final class ConfigurationManagerTests: XCTestCase {
         let testURL = "https://worker.example.com/api"
         ConfigurationManager.shared.workerBaseURL = testURL
 
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             let storedValue = userDefaults.string(forKey: "WORKER_BASE_URL")
             XCTAssertEqual(storedValue, testURL,
                            "Worker URL should persist in app group UserDefaults")
@@ -88,7 +88,7 @@ final class ConfigurationManagerTests: XCTestCase {
 
         ConfigurationManager.shared.setWorkerConfig(url: testURL, token: testToken)
 
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             let storedURL = userDefaults.string(forKey: "WORKER_BASE_URL")
             let storedToken = userDefaults.string(forKey: "WORKER_TOKEN")
 
@@ -142,7 +142,7 @@ final class ConfigurationManagerTests: XCTestCase {
         // Clear the configuration
         ConfigurationManager.shared.clearWorkerConfig()
 
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             let storedToken = userDefaults.string(forKey: "WORKER_TOKEN") ?? ""
             let storedURL = userDefaults.string(forKey: "WORKER_BASE_URL") ?? ""
 
@@ -201,7 +201,7 @@ final class ConfigurationManagerTests: XCTestCase {
         let testURL = "https://shared-worker.example.com"
         let testToken = "shared-token"
 
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             userDefaults.set(testKey, forKey: "511_API_KEY")
             userDefaults.set(testURL, forKey: "WORKER_BASE_URL")
             userDefaults.set(testToken, forKey: "WORKER_TOKEN")
@@ -220,7 +220,7 @@ final class ConfigurationManagerTests: XCTestCase {
     @MainActor
     func testEmptyStringsWhenNotSet() {
         // Ensure nothing is set
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             userDefaults.removeObject(forKey: "511_API_KEY")
             userDefaults.removeObject(forKey: "WORKER_TOKEN")
             userDefaults.removeObject(forKey: "WORKER_BASE_URL")
@@ -245,7 +245,7 @@ final class ConfigurationManagerTests: XCTestCase {
         XCTAssertEqual(ConfigurationManager.shared.apiKey, "second-key",
                        "Should overwrite API key with new value")
 
-        if let userDefaults = UserDefaults(suiteName: "group.com.rularner.sftransitwatch") {
+        if let userDefaults = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName) {
             XCTAssertEqual(userDefaults.string(forKey: "511_API_KEY"), "second-key",
                            "App group storage should have the updated value")
         }

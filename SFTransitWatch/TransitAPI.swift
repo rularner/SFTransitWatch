@@ -1,44 +1,51 @@
 import Foundation
+
+protocol URLSessionProtocol {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse)
+}
+
+extension URLSession: URLSessionProtocol {}
+
 import SwiftUI
 import SFTransitWatchPackage
 
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
-    @AppStorage("511_API_KEY") private var storedAPIKey = ""
+    // Key synced from the phone to the watch via WatchConnectivity — lives in .standard.
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
-    @AppStorage("WORKER_TOKEN") private var workerToken = ""
-    @AppStorage("WORKER_BASE_URL") private var workerBaseURL = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private var useDirectFallback = false
 
+    var urlSession: URLSessionProtocol = URLSession.shared
+
     private var resolvedKey: String {
-        return phoneAPIKey.isEmpty ? storedAPIKey : phoneAPIKey
+        phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
     }
 
     private var hasUsableKey: Bool {
-        // SnapshotMode: pretend the key is configured so settings/onboarding views render normally.
         if SnapshotMode.isActive { return true }
-
-        return !phoneAPIKey.isEmpty || !storedAPIKey.isEmpty
+        return !phoneAPIKey.isEmpty || !ConfigurationManager.shared.apiKey.isEmpty
     }
 
     private var isDirect511Mode: Bool {
-        return useDirectFallback || workerToken.isEmpty || workerBaseURL.isEmpty
+        return useDirectFallback
+            || ConfigurationManager.shared.workerToken.isEmpty
+            || ConfigurationManager.shared.workerBaseURL.isEmpty
     }
 
     private var baseURL: String {
-        return isDirect511Mode ? defaultBaseURL : workerBaseURL
+        isDirect511Mode ? defaultBaseURL : ConfigurationManager.shared.workerBaseURL
     }
 
     private var apiKey: String {
-        return resolvedKey.isEmpty ? "YOUR_511_API_KEY" : resolvedKey
+        resolvedKey.isEmpty ? "YOUR_511_API_KEY" : resolvedKey
     }
 
     private var appToken: String? {
-        return isDirect511Mode ? nil : workerToken
+        isDirect511Mode ? nil : ConfigurationManager.shared.workerToken
     }
 
     private func makeRequest(url: URL) -> URLRequest {
@@ -105,7 +112,7 @@ class TransitAPI: ObservableObject {
 
         let started = Date()
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -201,7 +208,7 @@ class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
         let started = Date()
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -232,16 +239,16 @@ class TransitAPI: ObservableObject {
 
     // Parse 511.org XML response for arrivals
     private func parse511Arrivals(data: Data) throws -> [BusArrival] {
-        // 511 currently serves JSON for StopMonitoring, but we keep XML fallback
-        // for compatibility with worker/legacy responses.
         if let jsonArrivals = TransitJSON.decodeArrivals(data), !jsonArrivals.isEmpty {
             return jsonArrivals
         }
+        Telemetry.shared.logFetchError(endpoint: "StopMonitoring", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
         return try parseXMLArrivals(data: data)
     }
 
     private func parseXMLArrivals(data: Data) throws -> [BusArrival] {
         let xmlString = String(data: data, encoding: .utf8) ?? ""
+        let alerts = TransitJSON.parseSituationSummaries(from: data)
         var arrivals: [BusArrival] = []
         let pattern = #"<MonitoredVehicleJourney>.*?<LineRef>([^<]+)</LineRef>.*?<DirectionRef>([^<]+)</DirectionRef>.*?<(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>([^<]+)</(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>.*?</MonitoredVehicleJourney>"#
         let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
@@ -251,7 +258,7 @@ class TransitAPI: ObservableObject {
             if let routeRange = Range(match.range(at: 1), in: xmlString),
                let destinationRange = Range(match.range(at: 2), in: xmlString),
                let timeRange = Range(match.range(at: 3), in: xmlString) {
-                let route = String(xmlString[routeRange])
+                let route = TransitJSON.cleanLineRef(String(xmlString[routeRange]))
                 let destination = String(xmlString[destinationRange])
                 let timeString = String(xmlString[timeRange])
                 if let arrivalTime = formatter.date(from: timeString) {
@@ -259,21 +266,22 @@ class TransitAPI: ObservableObject {
                         route: route,
                         destination: destination,
                         arrivalTime: arrivalTime,
-                        isRealTime: true
+                        isRealTime: true,
+                        alerts: alerts
                     ))
                 }
             }
         }
         return arrivals
     }
+
     
     // Parse 511.org XML response for stops
     private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
-        // Direct 511 Stops endpoint returns JSON. Worker/legacy paths may still
-        // return XML StopPlace payloads, so we attempt JSON first then fall back.
         if let jsonStops = TransitJSON.decodeStops(data, agency: agency), !jsonStops.isEmpty {
             return jsonStops
         }
+        Telemetry.shared.logFetchError(endpoint: "Stops", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
         return try parseXMLStops(data: data, agency: agency)
     }
 
@@ -306,10 +314,73 @@ class TransitAPI: ObservableObject {
         return stops
     }
     
-    // Helper method to get API key from user
+    private func fetchAllStops(agency: String) async throws -> [BusStop] {
+        let endpoint = "Stops"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+        var queryItems = [URLQueryItem(name: "operator_id", value: agency)]
+        if isDirect511Mode {
+            queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+        }
+        components?.queryItems = queryItems
+        guard let url = components?.url else { throw APIError.invalidResponse }
+        let request = makeRequest(url: url)
+
+        let started = Date()
+        let (data, response) = try await urlSession.data(for: request)
+        let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+        guard let http = response as? HTTPURLResponse else {
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network",
+                                           httpStatus: nil, latencyMs: latencyMs)
+            throw APIError.invalidResponse
+        }
+        if http.statusCode != 200 {
+            Telemetry.shared.logFetchError(endpoint: endpoint,
+                                           errorKind: errorKind(for: APIError.invalidResponse, status: http.statusCode),
+                                           httpStatus: http.statusCode, latencyMs: latencyMs)
+            throw APIError.invalidResponse
+        }
+        let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
+        Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200,
+                                         latencyMs: latencyMs, cacheStatus: cacheStatus)
+        return try parse511Stops(data: data, agency: agency)
+    }
+
+    func searchStops(query: String, agencies: [String]) async -> [BusStop]? {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !agencies.isEmpty else { return [] }
+        if SnapshotMode.isActive { return [] }
+        if isDirect511Mode && !hasUsableKey { return [] }
+
+        var successCount = 0
+        var all: [BusStop] = []
+
+        await withTaskGroup(of: (stops: [BusStop]?, succeeded: Bool).self) { [self] group in
+            for agency in agencies {
+                group.addTask {
+                    if let stops = try? await self.fetchAllStops(agency: agency) {
+                        return (stops, true)
+                    }
+                    return (nil, false)
+                }
+            }
+            for await result in group {
+                if result.succeeded { successCount += 1 }
+                if let stops = result.stops {
+                    all.append(contentsOf: stops.filter { stop in
+                        stop.code == trimmed || stop.id == trimmed ||
+                        stop.name.localizedCaseInsensitiveContains(trimmed)
+                    })
+                }
+            }
+        }
+
+        guard successCount > 0 else { return nil }
+        var seen = Set<String>()
+        return all.filter { seen.insert("\($0.id)|\($0.agency)").inserted }
+    }
+
     func setAPIKey(_ key: String) {
-        storedAPIKey = key
-        print("API key updated")
+        ConfigurationManager.shared.apiKey = key
     }
     
     // Check if API key is configured

@@ -25,11 +25,17 @@ export default {
 				return new Response(null, { status: 204, headers: corsHeaders() });
 			}
 
+			const url = new URL(request.url);
+
+			// Registration exchange — unauthenticated, must come before the token gate.
+			if (url.pathname === "/worker-token") {
+				return await handleWorkerToken(request, env);
+			}
+
 			const auth = await authorizeClient(request, env);
 			if (!auth.ok) {
 				return jsonError("Missing or invalid X-App-Token.", 401);
 			}
-			const url = new URL(request.url);
 			console.log(JSON.stringify({
 				source: "worker-auth",
 				label: auth.client.label,
@@ -254,6 +260,28 @@ async function tryAcquireRefreshLock(env: Env): Promise<boolean> {
 
 async function releaseRefreshLock(env: Env): Promise<void> {
 	await env.TRANSIT_CACHE.delete(REFRESH_LOCK_KEY);
+}
+
+const REG_CODE_PREFIX = "reg:";
+
+async function handleWorkerToken(request: Request, env: Env): Promise<Response> {
+	if (request.method !== "GET") {
+		return jsonError("Only GET requests are supported.", 405);
+	}
+	const code = new URL(request.url).searchParams.get("code");
+	if (!code) {
+		return jsonError("Missing code parameter.", 400);
+	}
+	const kvKey = `${REG_CODE_PREFIX}${code}`;
+	const token = await env.CLIENT_TOKENS.get(kvKey);
+	if (!token) {
+		return jsonError("Invalid or expired registration code.", 401);
+	}
+	await env.CLIENT_TOKENS.delete(kvKey);
+	return new Response(JSON.stringify({ token }), {
+		status: 200,
+		headers: { ...corsHeaders(), "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+	});
 }
 
 const MAX_LOG_BATCH = 50;

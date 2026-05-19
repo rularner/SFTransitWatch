@@ -6,8 +6,6 @@ Project-specific guidance for Claude working on SFTransitWatch.
 
 The sandbox this repo runs in has **no SSH credentials** for GitHub. Any command that talks to the remote will fail with `Permission denied (publickey)`. The user has to run these themselves.
 
-The sandbox also has limited ability to run xcodebuild since it cannot load the iPhone emulator.
-
 Do not run:
 - `git push`, `git push -u origin …`, `git push --tags`, `git push origin <tag>`
 - `git fetch`, `git fetch origin`, `git pull`, `git pull --rebase origin …`
@@ -67,6 +65,48 @@ If a bundle ID needs to be (re)registered, the fix is always a manual step at ht
 - `CURRENT_PROJECT_VERSION` is overwritten per-build by `ci_scripts/ci_pre_xcodebuild.sh` from `$CI_BUILD_NUMBER`.
 - PR titles are validated by `.github/workflows/validate-pr-title.yml` — `feat|fix|docs|chore|refactor|test|build|ci|perf|style` prefixes, optional `(scope)`, optional `!` for breaking, lowercase subject.
 - Bump mapping: `feat!`/`BREAKING CHANGE:` → major, `feat` → minor, `fix`/`perf` → patch, everything else → no bump. Full docs in `docs/release-process.md`.
+
+## Running tests
+
+### Phone unit tests
+
+Use the `SFTransitWatch` scheme on an iPhone 17 simulator (requires iOS 26.4 — the `SFTransitWatchPhoneTests` deployment target). Via the localdev MCP tool:
+
+```
+scheme: SFTransitWatch
+destination: platform=iOS Simulator,id=BD6ECC50-723A-494E-8705-CC0C5913322F  # iPhone 17, iOS 26.4.1
+code_signing_allowed_no: true
+```
+
+Or raw xcodebuild:
+```bash
+xcodebuild test -scheme SFTransitWatch \
+  -destination 'platform=iOS Simulator,id=BD6ECC50-723A-494E-8705-CC0C5913322F' \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
+```
+
+### Watch unit tests
+
+Use the `SFTransitWatch Watch App` scheme with an Apple Watch SE 3 (44mm) watchOS 26.4 simulator. **The MCP `xcodebuild_test` tool rejects `name=` destinations for watchOS — always use `id=` instead.**
+
+```
+scheme: SFTransitWatch Watch App
+destination: platform=watchOS Simulator,id=BE4F30CB-89F7-45F5-A868-A250522FB4E0
+code_signing_allowed_no: true
+```
+
+Or raw xcodebuild:
+```bash
+xcodebuild test -scheme 'SFTransitWatch Watch App' \
+  -destination 'platform=watchOS Simulator,id=BE4F30CB-89F7-45F5-A868-A250522FB4E0' \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
+```
+
+No special signing setup required — all tests pass with default simulator signing.
+
+### Snapshot tests
+
+See the README for snapshot test instructions — they use the wrapper scripts `bin/run-watch-snapshot-tests.sh` and `bin/run-phone-snapshot-tests.sh`.
 
 ## Planning/spec docs
 

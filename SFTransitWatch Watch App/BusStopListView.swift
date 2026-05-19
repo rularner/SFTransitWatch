@@ -5,7 +5,7 @@ import SFTransitWatchPackage
 struct BusStopListView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var transitAPI = TransitAPI()
-    @StateObject private var favoritesManager = FavoritesManager()
+    @EnvironmentObject var favoritesManager: FavoritesManager
     @AppStorage(EnabledAgencies.storageKey, store: UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName))
     private var enabledAgenciesRaw = EnabledAgencies.default
     @AppStorage(Agency.selectedAgencyKey) private var selectedAgencyRaw: String = ""
@@ -16,12 +16,10 @@ struct BusStopListView: View {
 
     init(
         transitAPI: TransitAPI? = nil,
-        favoritesManager: FavoritesManager? = nil,
         locationManager: LocationManager? = nil,
         initialNearbyStops: [BusStop] = []
     ) {
         _transitAPI = StateObject(wrappedValue: transitAPI ?? TransitAPI())
-        _favoritesManager = StateObject(wrappedValue: favoritesManager ?? FavoritesManager())
         _locationManager = StateObject(wrappedValue: locationManager ?? LocationManager())
         _nearbyStops = State(initialValue: initialNearbyStops)
     }
@@ -86,7 +84,7 @@ struct BusStopListView: View {
         .sheet(isPresented: $showingStopCodeEntry) {
             StopCodeEntryView(
                 transitAPI: transitAPI,
-                defaultAgency: EnabledAgencies.defaultAgency(enabledAgenciesRaw)
+                agencies: EnabledAgencies.parse(enabledAgenciesRaw)
             ) { foundStop in
                 self.foundStop = foundStop
                 showingStopCodeEntry = false
@@ -209,29 +207,12 @@ struct BusStopListView: View {
 
     @ViewBuilder
     private var stopSections: some View {
-        let favoriteStops = favoritesManager.getFavoriteStops(from: nearbyStops)
-        if !favoriteStops.isEmpty {
-            Section(header: Text("Favorites")) {
-                ForEach(favoriteStops) { stop in
-                    NavigationLink(destination: BusArrivalView(stop: stop)) {
-                        BusStopRow(
-                            stop: stop,
-                            currentLocation: locationManager.currentLocation,
-                            favoritesManager: favoritesManager,
-                            showAgencyBadge: showAgencyBadges
-                        )
-                    }
-                }
-            }
-        }
-
         Section(header: Text("Nearby Stops")) {
             ForEach(nearbyStops) { stop in
                 NavigationLink(destination: BusArrivalView(stop: stop)) {
                     BusStopRow(
                         stop: stop,
                         currentLocation: locationManager.currentLocation,
-                        favoritesManager: favoritesManager,
                         showAgencyBadge: showAgencyBadges
                     )
                 }
@@ -263,8 +244,11 @@ struct BusStopListView: View {
 struct BusStopRow: View {
     let stop: BusStop
     let currentLocation: CLLocation?
-    let favoritesManager: FavoritesManager
     var showAgencyBadge: Bool = false
+    @EnvironmentObject var favoritesManager: FavoritesManager
+    @EnvironmentObject var slotsManager: CommuteSlotsManager
+    @State private var commutePromptStop: BusStop? = nil
+    @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
 
     private var agencyBadgeText: String? {
         guard showAgencyBadge else { return nil }
@@ -314,7 +298,15 @@ struct BusStopRow: View {
                     }
 
                     Button(action: {
-                        favoritesManager.toggleFavorite(for: stop.id)
+                        let isAdding = !favoritesManager.isFavorite(stop.id)
+                        favoritesManager.toggleFavorite(stop)
+                        if isAdding {
+                            let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
+                            if !empty.isEmpty {
+                                commuteEmptySlots = empty
+                                commutePromptStop = stop
+                            }
+                        }
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
                             .foregroundColor(stop.isFavorite ? .yellow : .gray)
@@ -323,6 +315,21 @@ struct BusStopRow: View {
                     .buttonStyle(PlainButtonStyle())
                     .accessibilityLabel(stop.isFavorite ? "Remove from favorites" : "Add to favorites")
                 }
+            }
+            .confirmationDialog(
+                "Add to commute?",
+                isPresented: Binding(get: { commutePromptStop != nil }, set: { if !$0 { commutePromptStop = nil } }),
+                presenting: commutePromptStop
+            ) { pendingStop in
+                if commuteEmptySlots.contains(.morning) {
+                    Button("Morning Commute") { slotsManager.setStopId(pendingStop.id, for: .morning) }
+                }
+                if commuteEmptySlots.contains(.afternoon) {
+                    Button("Afternoon Commute") { slotsManager.setStopId(pendingStop.id, for: .afternoon) }
+                }
+                Button("Not Now", role: .cancel) { }
+            } message: { pendingStop in
+                Text("Use \"\(pendingStop.name)\" as a commute stop?")
             }
 
             if !stop.routes.isEmpty {
@@ -380,55 +387,94 @@ struct BusStopRow: View {
 
 struct StopCodeEntryView: View {
     let transitAPI: TransitAPI
-    let defaultAgency: String
+    let agencies: [String]
     let onFound: (BusStop) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var code = ""
+    @State private var query = ""
+    @State private var results: [BusStop] = []
     @State private var isSearching = false
     @State private var errorMessage: String? = nil
+    @State private var hasSearched = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Find Stop by Code")
-                .font(.headline)
+        ScrollView {
+            VStack(spacing: 12) {
+                Text("Find a Stop")
+                    .font(.headline)
 
-            TextField("Stop code (e.g. 15552)", text: $code)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+                TextField("Name or code", text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
 
-            if let error = errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundColor(.red)
-                    .multilineTextAlignment(.center)
-            }
-
-            HStack(spacing: 8) {
-                Button("Cancel") { dismiss() }
-                    .foregroundColor(.secondary)
-
-                Button(isSearching ? "Searching…" : "Find") {
-                    Task { await search() }
+                if isSearching {
+                    ProgressView()
+                } else if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                } else if hasSearched && results.isEmpty {
+                    Text("No stops found")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
+
+                if !results.isEmpty {
+                    Divider()
+                    ForEach(results) { stop in
+                        Button {
+                            onFound(stop)
+                            dismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(stop.name)
+                                    .font(.caption)
+                                    .lineLimit(2)
+                                HStack(spacing: 4) {
+                                    if let agency = Agency.named(stop.agency) {
+                                        Text(agency.badge)
+                                            .font(.caption2)
+                                    }
+                                    Text(stop.code)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.secondary)
+                    Button(isSearching ? "Searching…" : "Find") {
+                        Task { await search() }
+                    }
+                    .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
+                }
             }
+            .padding()
         }
-        .padding()
     }
 
     private func search() async {
-        let trimmed = code.trimmingCharacters(in: .whitespaces)
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         isSearching = true
         errorMessage = nil
+        hasSearched = false
+        results = []
 
-        if let stop = await transitAPI.fetchStop(code: trimmed, agency: defaultAgency) {
-            onFound(stop)
-            dismiss()
+        if let found = await transitAPI.searchStops(query: trimmed, agencies: agencies) {
+            results = found
         } else {
-            errorMessage = "Stop \"\(trimmed)\" not found. Check the code and try again."
+            errorMessage = "Search failed. Check your connection."
         }
+        hasSearched = true
         isSearching = false
     }
 }

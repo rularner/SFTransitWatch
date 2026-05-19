@@ -144,6 +144,66 @@ describe("POST /log", () => {
     });
 });
 
+describe("GET /worker-token", () => {
+    const TEST_TOKEN = "permanent-token-value";
+    const TEST_CODE = "valid-one-time-code";
+
+    beforeAll(async () => {
+        await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+            `reg:${TEST_CODE}`,
+            TEST_TOKEN,
+        );
+    });
+
+    it("returns 400 when code param is missing", async () => {
+        const res = await SELF.fetch("https://example.com/worker-token");
+        expect(res.status).toBe(400);
+        const body = (await res.json()) as { error: string };
+        expect(body.error).toMatch(/code/i);
+    });
+
+    it("returns 401 for an unknown code", async () => {
+        const res = await SELF.fetch("https://example.com/worker-token?code=no-such-code");
+        expect(res.status).toBe(401);
+    });
+
+    it("returns the token for a valid code", async () => {
+        const res = await SELF.fetch(`https://example.com/worker-token?code=${TEST_CODE}`);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { token: string };
+        expect(body.token).toBe(TEST_TOKEN);
+    });
+
+    it("deletes the code after first use (one-time)", async () => {
+        const code = "single-use-code";
+        await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+            `reg:${code}`,
+            "some-token",
+        );
+        const first = await SELF.fetch(`https://example.com/worker-token?code=${code}`);
+        expect(first.status).toBe(200);
+        const second = await SELF.fetch(`https://example.com/worker-token?code=${code}`);
+        expect(second.status).toBe(401);
+    });
+
+    it("returns 405 for non-GET methods", async () => {
+        const res = await SELF.fetch("https://example.com/worker-token?code=x", {
+            method: "POST",
+        });
+        expect(res.status).toBe(405);
+    });
+
+    it("is accessible without an X-App-Token header", async () => {
+        const code = "no-auth-code";
+        await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+            `reg:${code}`,
+            "no-auth-token",
+        );
+        const res = await SELF.fetch(`https://example.com/worker-token?code=${code}`);
+        expect(res.status).toBe(200);
+    });
+});
+
 describe("sha256Hex", () => {
     it("hashes the empty string to the known SHA-256 hex digest", async () => {
         const hash = await sha256Hex("");

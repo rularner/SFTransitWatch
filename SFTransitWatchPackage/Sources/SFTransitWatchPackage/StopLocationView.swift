@@ -55,78 +55,78 @@ public struct StopLocationView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 16) {
-            Text("Stop Location")
-                .font(.headline)
-
+        VStack(spacing: 10) {
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
 
                 Circle()
                     .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                    .padding(20)
+                    .padding(14)
 
                 VStack(spacing: 4) {
                     Text("N")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                     Spacer()
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
-                .padding(.top, 8)
+                .padding(.top, 6)
 
                 VStack {
                     Image(systemName: "location.fill")
-                        .font(.system(size: 28))
+                        .font(.system(size: 20))
                         .foregroundColor(.red)
                 }
                 .rotationEffect(.degrees(bearing))
 
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     Text("\(Int(bearing))°")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     Text(bearingLabel)
-                        .font(.caption)
+                        .font(.caption2)
                         .fontWeight(.semibold)
                 }
                 .rotationEffect(.degrees(headingDegrees ?? 0))
                 .frame(maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 12)
+                .padding(.bottom, 8)
             }
-            .frame(height: 200)
-            .padding()
+            .frame(height: 120)
+            .padding(.horizontal, 8)
             .rotationEffect(.degrees(-(headingDegrees ?? 0)))
             .animation(.easeOut(duration: 0.15), value: headingDegrees)
 
             if isHeadingEnabled && headingDegrees == nil {
                 Text("Compass unavailable")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundColor(.secondary)
             }
 
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Distance")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                     Text(distance)
-                        .font(.headline)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 2) {
                     Text("Stop")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                     Text(stop.code)
-                        .font(.headline)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                         .monospacedDigit()
                 }
             }
-            .padding()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(Color.gray.opacity(0.1))
             .cornerRadius(8)
         }

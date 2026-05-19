@@ -263,6 +263,9 @@ class TransitAPI: ObservableObject {
         if let jsonArrivals = TransitJSON.decodeArrivals(data), !jsonArrivals.isEmpty {
             return jsonArrivals
         }
+        Telemetry.shared.logFetchError(endpoint: "StopMonitoring", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
+
+        let alerts = TransitJSON.parseSituationSummaries(from: data)
 
         let formatter = ISO8601DateFormatter()
         let records = SIRIXMLParser.parseRecords(
@@ -278,10 +281,11 @@ class TransitAPI: ObservableObject {
                 let arrivalTime = formatter.date(from: timeString)
             else { return nil }
             return BusArrival(
-                route: route,
+                route: TransitJSON.cleanLineRef(route),
                 destination: destination,
                 arrivalTime: arrivalTime,
-                isRealTime: true
+                isRealTime: true,
+                alerts: alerts
             )
         }
     }
@@ -290,6 +294,7 @@ class TransitAPI: ObservableObject {
         if let jsonStops = TransitJSON.decodeStops(data, agency: agency), !jsonStops.isEmpty {
             return jsonStops
         }
+        Telemetry.shared.logFetchError(endpoint: "Stops", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
 
         let records = SIRIXMLParser.parseRecords(
             data: data,
@@ -329,51 +334,68 @@ class TransitAPI: ObservableObject {
         return hasUsableKey
     }
 
-    /// Look up a single stop by its 511.org stop code. Returns nil if not found.
-    /// Stop codes are agency-scoped, so the caller must specify which agency.
-    func fetchStop(code: String, agency: String = "SF") async -> BusStop? {
-        // SnapshotMode: StopCodeEntryView's snapshot is the empty form (no successful lookup).
-        if SnapshotMode.isActive { return nil }
-
-        if isDirect511Mode && !hasUsableKey { return nil }
-
+    private func fetchAllStops(agency: String) async throws -> [BusStop] {
         let endpoint = "Stops"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
-        var queryItems = [
-            URLQueryItem(name: "operator_id", value: agency)
-        ]
+        var queryItems = [URLQueryItem(name: "operator_id", value: agency)]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
         }
         components?.queryItems = queryItems
-        guard let url = components?.url else { return nil }
+        guard let url = components?.url else { throw APIError.invalidResponse }
         let request = makeRequest(url: url)
 
         let started = Date()
-        do {
-            let (data, response) = try await self.urlSession.data(for: request)
-            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
-            guard let http = response as? HTTPURLResponse else {
-                Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network", httpStatus: nil, latencyMs: latencyMs)
-                return nil
-            }
-            if http.statusCode != 200 {
-                Telemetry.shared.logFetchError(
-                    endpoint: endpoint,
-                    errorKind: errorKind(for: APIError.invalidResponse, status: http.statusCode),
-                    httpStatus: http.statusCode,
-                    latencyMs: latencyMs
-                )
-                return nil
-            }
-            let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
-            Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            let stops = try parse511Stops(data: data, agency: agency)
-            return stops.first(where: { $0.code == code || $0.id == code })
-        } catch {
-            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
-            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
-            return nil
+        let (data, response) = try await urlSession.data(for: request)
+        let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+        guard let http = response as? HTTPURLResponse else {
+            Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network",
+                                           httpStatus: nil, latencyMs: latencyMs)
+            throw APIError.invalidResponse
         }
+        if http.statusCode != 200 {
+            Telemetry.shared.logFetchError(endpoint: endpoint,
+                                           errorKind: errorKind(for: APIError.invalidResponse, status: http.statusCode),
+                                           httpStatus: http.statusCode, latencyMs: latencyMs)
+            throw APIError.invalidResponse
+        }
+        let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
+        Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200,
+                                         latencyMs: latencyMs, cacheStatus: cacheStatus)
+        return try parse511Stops(data: data, agency: agency)
+    }
+
+    func searchStops(query: String, agencies: [String]) async -> [BusStop]? {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !agencies.isEmpty else { return [] }
+        if SnapshotMode.isActive { return [] }
+        if isDirect511Mode && !hasUsableKey { return [] }
+
+        var successCount = 0
+        var all: [BusStop] = []
+
+        await withTaskGroup(of: (stops: [BusStop]?, succeeded: Bool).self) { group in
+            for agency in agencies {
+                group.addTask {
+                    if let stops = try? await self.fetchAllStops(agency: agency) {
+                        return (stops, true)
+                    }
+                    return (nil, false)
+                }
+            }
+            for await result in group {
+                if result.succeeded { successCount += 1 }
+                if let stops = result.stops {
+                    all.append(contentsOf: stops.filter { stop in
+                        stop.code == trimmed || stop.id == trimmed ||
+                        stop.name.localizedCaseInsensitiveContains(trimmed)
+                    })
+                }
+            }
+        }
+
+        guard successCount > 0 else { return nil }
+        var seen = Set<String>()
+        return all.filter { seen.insert("\($0.id)|\($0.agency)").inserted }
     }
 }

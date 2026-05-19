@@ -1,7 +1,9 @@
 import SwiftUI
 
-struct SiriShortcutsView: View {
-    var body: some View {
+public struct SiriShortcutsView: View {
+    public init() {}
+
+    public var body: some View {
         List {
             Section(header: Text("Say to Siri")) {
                 SiriPhraseRow(phrase: "Find nearby stops in SF Transit Watch")
@@ -29,9 +31,7 @@ private struct SiriPhraseRow: View {
         HStack(spacing: 8) {
             Image(systemName: "mic.fill")
                 .foregroundColor(.blue)
-                .font(.caption)
             Text(phrase)
-                .font(.caption)
         }
         .padding(.vertical, 2)
     }
