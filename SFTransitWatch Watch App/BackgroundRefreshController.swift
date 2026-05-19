@@ -84,7 +84,7 @@ final class BackgroundRefreshController {
             slot: slot,
             stopName: stopName,
             route: first.route,
-            minutesAway: first.minutesAway
+            arrivalTime: first.arrivalTime
         )
         WidgetCenter.shared.reloadAllTimelines()
 
