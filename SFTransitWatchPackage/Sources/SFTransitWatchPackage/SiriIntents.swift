@@ -50,9 +50,14 @@ public struct CheckNearbyStopsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult {
-        UserDefaults.standard.set(agency?.rawValue ?? "", forKey: Agency.selectedAgencyKey)
+        persistSelectedAgency(agency)
         return .result()
     }
+}
+
+@MainActor
+func persistSelectedAgency(_ agency: TransitAgencyChoice?) {
+    UserDefaults.standard.set(agency?.rawValue ?? "", forKey: Agency.selectedAgencyKey)
 }
 
 // MARK: - Check Stop Arrivals Intent
@@ -72,18 +77,22 @@ public struct CheckStopArrivalsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
-        UserDefaults.standard.set(agency?.rawValue ?? "", forKey: Agency.selectedAgencyKey)
+        persistSelectedAgency(agency)
+        let text = Self.dialogText(agency: agency, stopName: stopName)
+        return .result(dialog: IntentDialog(stringLiteral: text))
+    }
 
+    @MainActor
+    static func dialogText(agency: TransitAgencyChoice?, stopName: String?) -> String {
         let key = ConfigurationManager.shared.apiKey
         guard !key.isEmpty else {
-            return .result(dialog: "Please configure your 511.org API key in SF Transit Watch settings.")
+            return "Please configure your 511.org API key in SF Transit Watch settings."
         }
-
         let prefix = agency.map { "\($0.displayName) " } ?? ""
         if let name = stopName {
-            return .result(dialog: "Opening \(prefix)arrivals for \(name) in SF Transit Watch.")
+            return "Opening \(prefix)arrivals for \(name) in SF Transit Watch."
         }
-        return .result(dialog: "Opening SF Transit Watch to show nearby \(prefix)arrivals.")
+        return "Opening SF Transit Watch to show nearby \(prefix)arrivals."
     }
 }
 
