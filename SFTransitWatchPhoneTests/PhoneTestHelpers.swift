@@ -2,12 +2,13 @@ import Foundation
 @testable import SFTransitWatch
 
 class MockURLSession: URLSessionProtocol {
-    var requests: [URLRequest] = []
+    private let lock = NSLock()
+    private var _requests: [URLRequest] = []
     var responses: [URL: (data: Data, response: HTTPURLResponse)] = [:]
     var errors: [URL: Error] = [:]
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        requests.append(request)
+        lock.withLock { _requests.append(request) }
         guard let url = request.url else { throw URLError(.badURL) }
         if let error = errors[url] { throw error }
         if let match = errors.first(where: { $0.key.host == url.host }) { throw match.value }
@@ -25,5 +26,5 @@ class MockURLSession: URLSessionProtocol {
     }
 
     func setMockError(for url: URL, error: Error) { errors[url] = error }
-    func requestCount() -> Int { requests.count }
+    func requestCount() -> Int { lock.withLock { _requests.count } }
 }
