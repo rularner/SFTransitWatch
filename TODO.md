@@ -1,3 +1,6 @@
+Bugs:
+  - What happened to Bus View?
+
 Quick wins (polish / watch-phone parity):
   - Add MUNI metro line colors to phone BusArrivalRow (watch has J/K/L/M/N/T/F/S colors; phone uses generic hash fallback)
   - Stop direction not obvious in list, not easy using voice
