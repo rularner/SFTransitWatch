@@ -7,7 +7,10 @@ struct SettingsView: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var slotsManager: CommuteSlotsManager
     @State private var apiKey = ""
-    @AppStorage("notifications_imminent_arrivals_enabled") private var notificationsEnabled = false
+    @AppStorage(AlertSettingsManager.alertEnabledKey,
+                store: UserDefaults(suiteName: AlertSettingsManager.appGroupSuiteName))
+    private var alertsEnabled = true
+    @StateObject private var alertSettings = AlertSettingsManager()
     @AppStorage(EnabledAgencies.storageKey, store: UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName))
     private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
@@ -123,16 +126,32 @@ struct SettingsView: View {
                     }
                 }
 
-                Toggle("Notify me when bus is ≤2 min away", isOn: $notificationsEnabled)
+                Toggle("Alerts", isOn: $alertsEnabled)
                     .font(.caption)
-                    .onChange(of: notificationsEnabled) { _, newValue in
+                    .onChange(of: alertsEnabled) { _, newValue in
                         if newValue {
                             Task {
                                 let granted = await BackgroundRefreshController.shared.requestNotificationAuthorization()
-                                if !granted { notificationsEnabled = false }
+                                if !granted { alertsEnabled = false }
                             }
                         }
                     }
+
+                ForEach(CommuteSlotsManager.Slot.allCases, id: \.self) { slot in
+                    NavigationLink {
+                        AlertSlotSettingsView(slot: slot, alertSettings: alertSettings)
+                    } label: {
+                        HStack {
+                            Text(slot.displayName)
+                            Spacer()
+                            let travel = alertSettings.travelMinutes(for: slot)
+                            Text(travel > 0 ? "\(travel) min travel" : "Tap to configure")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .font(.caption)
+                }
             }
 
             Section(header: Text("Favorites")) {
