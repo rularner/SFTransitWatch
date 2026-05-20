@@ -28,8 +28,9 @@ public final class LocationProvider: NSObject, CLLocationManagerDelegate {
         didUpdateLocations locations: [CLLocation]
     ) {
         Task { @MainActor [weak self] in
-            self?.continuation?.resume(returning: locations[0])
+            guard let c = self?.continuation else { return }
             self?.continuation = nil
+            c.resume(returning: locations[0])
         }
     }
 
@@ -38,8 +39,9 @@ public final class LocationProvider: NSObject, CLLocationManagerDelegate {
         didFailWithError error: Error
     ) {
         Task { @MainActor [weak self] in
-            self?.continuation?.resume(throwing: error)
+            guard let c = self?.continuation else { return }
             self?.continuation = nil
+            c.resume(throwing: error)
         }
     }
 }

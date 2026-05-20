@@ -71,7 +71,9 @@ final class BackgroundRefreshController {
         guard let candidate = alertSettings.qualifyingArrival(from: arrivals, for: slot) else { return }
 
         // Location check: if the user is already at the stop, suppress for the rest of today.
-        if let stop = pinnedStop, stop.hasValidLocation {
+        if let stop = pinnedStop, stop.hasValidLocation,
+           locationManager.authorizationStatus == .authorizedWhenInUse
+            || locationManager.authorizationStatus == .authorizedAlways {
             if let location = try? await LocationProvider.requestLocation(),
                stop.distance(to: location) <= AlertSettingsManager.atStopRadiusMeters {
                 alertSettings.suppressAtStop(for: slot)
@@ -79,7 +81,12 @@ final class BackgroundRefreshController {
             }
         }
 
-        await fireImminentNotificationIfNeeded(for: candidate, slot: slot, stopName: stopName)
+        await fireImminentNotificationIfNeeded(
+            for: candidate,
+            slot: slot,
+            stopName: stopName,
+            travelMinutes: alertSettings.travelMinutes(for: slot)
+        )
     }
 
     /// Requests notification authorization. Also prompts for location "when in use"
@@ -100,7 +107,8 @@ final class BackgroundRefreshController {
     private func fireImminentNotificationIfNeeded(
         for arrival: BusArrival,
         slot: CommuteSlotsManager.Slot,
-        stopName: String
+        stopName: String,
+        travelMinutes: Int
     ) async {
         let key = Self.lastNotifiedKey(for: slot)
         let lastNotified = defaults.object(forKey: key) as? Date ?? .distantPast
@@ -110,8 +118,7 @@ final class BackgroundRefreshController {
 
         let content = UNMutableNotificationContent()
         content.title = "\(arrival.route) approaching"
-        let travelMins = AlertSettingsManager().travelMinutes(for: slot)
-        if travelMins > 0 {
+        if travelMinutes > 0 {
             content.body = "\(arrival.minutesAway) min to \(stopName) — leave now"
         } else {
             content.body = arrival.minutesAway == 0
