@@ -1,16 +1,15 @@
-// Committed project config. Optionally includes a developer-local override
-// file (Developer.xcconfig) for personal signing settings such as
-// DEVELOPMENT_TEAM. The `?` makes the include silent when the file is absent,
-// so fresh clones build without needing any local setup.
-#include? "Developer.xcconfig"
-
 // Version numbers. MARKETING_VERSION is bumped automatically by
 // .github/workflows/version-bump.yml based on merged PR titles.
 // CURRENT_PROJECT_VERSION is overwritten at Xcode Cloud build time by
-// ci_scripts/ci_pre_xcodebuild.sh using $CI_BUILD_NUMBER.
+// ci_scripts/ci_post_clone.sh using $CI_BUILD_NUMBER.
 MARKETING_VERSION = 1.0.0
 CURRENT_PROJECT_VERSION = 1
 
 // Promote Swift warnings to errors so unused vars, deprecations, etc. fail
 // the build instead of accumulating. Applies to all targets via project base.
 SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+
+// Developer-local overrides (signing, build number for manual TestFlight builds).
+// Included last so values here win over defaults above.
+// File is gitignored — safe to set CURRENT_PROJECT_VERSION here before a GUI archive.
+#include? "Developer.xcconfig"

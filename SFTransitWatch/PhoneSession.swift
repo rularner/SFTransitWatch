@@ -25,13 +25,22 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         // SnapshotMode: skip WCSession calls during snapshot runs.
         if SnapshotMode.isActive { return }
 
-        let key = ConfigurationManager.shared.apiKey
-        let payload = Self.payload(forKey: key)
         do {
-            try WCSession.default.updateApplicationContext(payload)
+            try WCSession.default.updateApplicationContext(Self.buildPayload())
         } catch {
             print("WCSession updateApplicationContext error: \(error.localizedDescription)")
         }
+    }
+
+    static func buildPayload() -> [String: Any] {
+        let agencies = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName)?
+            .string(forKey: EnabledAgencies.storageKey) ?? ""
+        return [
+            "transitKey": ConfigurationManager.shared.apiKey.trimmingCharacters(in: .whitespaces),
+            "workerToken": ConfigurationManager.shared.workerToken,
+            "workerBaseURL": ConfigurationManager.shared.workerBaseURL,
+            "enabledAgencies": agencies,
+        ]
     }
 
     static func payload(forKey key: String?) -> [String: Any] {
