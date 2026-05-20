@@ -5,11 +5,11 @@ import CoreLocation
 /// Throws if location services are disabled or authorization is denied.
 /// BackgroundRefreshController wraps calls in try? so failures are silent.
 @MainActor
-final class LocationProvider: NSObject, CLLocationManagerDelegate {
+public final class LocationProvider: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<CLLocation, Error>?
 
-    static func requestLocation() async throws -> CLLocation {
+    public static func requestLocation() async throws -> CLLocation {
         let provider = LocationProvider()
         return try await provider.fetch()
     }
@@ -23,7 +23,7 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    nonisolated func locationManager(
+    public nonisolated func locationManager(
         _ manager: CLLocationManager,
         didUpdateLocations locations: [CLLocation]
     ) {
@@ -33,7 +33,7 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    nonisolated func locationManager(
+    public nonisolated func locationManager(
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {

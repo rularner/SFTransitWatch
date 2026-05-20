@@ -2,45 +2,27 @@ import Foundation
 import WatchKit
 import UserNotifications
 import WidgetKit
+import CoreLocation
 import SFTransitWatchPackage
 
 /// Drives periodic background work for the watch app:
 /// - keeps the complication's per-slot snapshot fresh while the app is asleep
-/// - fires a local notification when the active commute bus is ≤2 minutes away
-///
-/// Background refresh on watchOS is throttled — schedule the next one each
-/// time we're woken, and trust the system to budget us appropriately.
+/// - fires a local notification when the active commute bus is within the user's
+///   configurable alert window and travel-time lead
 @MainActor
 final class BackgroundRefreshController {
     static let shared = BackgroundRefreshController()
 
-    /// How far out to ask the system to wake us. The OS treats this as a
-    /// hint; effective interval is usually 15+ minutes.
     static let refreshInterval: TimeInterval = 15 * 60
 
-    /// Threshold for "your bus is here" alerting.
-    static let imminentMinutes = 2
-
-    /// Minimum gap between two notifications for the same slot, to guard
-    /// against firing on consecutive refreshes if the user is right at the
-    /// stop while the bus dwells.
     private static let notificationDedupGap: TimeInterval = 5 * 60
-
-    private static let notificationsEnabledKey = "notifications_imminent_arrivals_enabled"
     private static func lastNotifiedKey(for slot: CommuteSlotsManager.Slot) -> String {
         "last_notified_arrival_\(slot.rawValue)"
     }
 
     private let defaults = UserDefaults.standard
+    private let locationManager = CLLocationManager()
 
-    var notificationsEnabled: Bool {
-        get { defaults.bool(forKey: Self.notificationsEnabledKey) }
-        set { defaults.set(newValue, forKey: Self.notificationsEnabledKey) }
-    }
-
-    /// Called on app launch and after each background wake. Always
-    /// reschedules — if the user has no slots configured, the work is a
-    /// no-op but we keep the timer alive for when they do configure one.
     func scheduleNextRefresh() {
         let target = Date().addingTimeInterval(Self.refreshInterval)
         WKApplication.shared().scheduleBackgroundRefresh(
@@ -53,10 +35,6 @@ final class BackgroundRefreshController {
         }
     }
 
-    /// Called from `WKApplicationDelegate` when the system hands us a
-    /// background refresh window. Performs the slot fetch, writes the
-    /// snapshot, optionally fires a local notification, schedules the next
-    /// wake, and signals completion.
     func handleBackgroundRefresh(_ task: WKApplicationRefreshBackgroundTask) async {
         defer {
             scheduleNextRefresh()
@@ -88,17 +66,32 @@ final class BackgroundRefreshController {
         )
         WidgetCenter.shared.reloadAllTimelines()
 
-        if notificationsEnabled, first.minutesAway <= Self.imminentMinutes {
-            await fireImminentNotificationIfNeeded(for: first, slot: slot, stopName: stopName)
+        // Fresh instance always reads latest UserDefaults — same pattern as CommuteSlotsManager above.
+        let alertSettings = AlertSettingsManager()
+        guard let candidate = alertSettings.qualifyingArrival(from: arrivals, for: slot) else { return }
+
+        // Location check: if the user is already at the stop, suppress for the rest of today.
+        if let stop = pinnedStop, stop.hasValidLocation {
+            if let location = try? await LocationProvider.requestLocation(),
+               stop.distance(to: location) <= AlertSettingsManager.atStopRadiusMeters {
+                alertSettings.suppressAtStop(for: slot)
+                return
+            }
         }
+
+        await fireImminentNotificationIfNeeded(for: candidate, slot: slot, stopName: stopName)
     }
 
-    /// Asks for notification authorization. Safe to call repeatedly; the
-    /// system only prompts the first time.
+    /// Requests notification authorization. Also prompts for location "when in use"
+    /// on first call so at-stop detection can work during future background refreshes.
     func requestNotificationAuthorization() async -> Bool {
         do {
-            return try await UNUserNotificationCenter.current()
+            let granted = try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound])
+            if granted, locationManager.authorizationStatus == .notDetermined {
+                locationManager.requestWhenInUseAuthorization()
+            }
+            return granted
         } catch {
             return false
         }
@@ -117,9 +110,14 @@ final class BackgroundRefreshController {
 
         let content = UNMutableNotificationContent()
         content.title = "\(arrival.route) approaching"
-        content.body = arrival.minutesAway == 0
-            ? "Due now at \(stopName)"
-            : "\(arrival.minutesAway) min away at \(stopName)"
+        let travelMins = AlertSettingsManager().travelMinutes(for: slot)
+        if travelMins > 0 {
+            content.body = "\(arrival.minutesAway) min to \(stopName) — leave now"
+        } else {
+            content.body = arrival.minutesAway == 0
+                ? "Due now at \(stopName)"
+                : "\(arrival.minutesAway) min away at \(stopName)"
+        }
         content.sound = .default
 
         let request = UNNotificationRequest(
@@ -136,8 +134,6 @@ final class BackgroundRefreshController {
         }
     }
 
-    /// Best-effort lookup of the user's pinned stop. Returns nil if not found
-    /// (e.g. the slot was set against a stop that's since been unpinned).
     private func pinnedStop(for stopId: String) -> BusStop? {
         guard let data = UserDefaults.standard.data(forKey: "PinnedStops"),
               let pinned = try? JSONDecoder().decode([BusStop].self, from: data) else {
