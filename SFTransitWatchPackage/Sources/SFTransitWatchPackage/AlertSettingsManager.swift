@@ -68,6 +68,7 @@ public class AlertSettingsManager: ObservableObject {
         defaults.set(formatHHMM(dc), forKey: Self.windowStartKey(slot))
         // Clamp end so that end >= start.
         if minuteOfDay(windowEnd(for: slot)) < minuteOfDay(dc) {
+            objectWillChange.send()
             defaults.set(formatHHMM(dc), forKey: Self.windowEndKey(slot))
         }
     }

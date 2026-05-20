@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import SFTransitWatchPackage
+import SFTransitWatchPackage
 
 @Suite struct AlertSettingsManagerTests {
     @MainActor
@@ -230,5 +230,17 @@ import Foundation
         let arrivals = [BusArrival(route: "38", destination: "Downtown",
                                    arrivalTime: now.addingTimeInterval(3 * 60), now: now)]
         #expect(m.qualifyingArrival(from: arrivals, for: .morning) != nil)
+    }
+
+    @Test @MainActor
+    func qualifyingArrival_emptyArrivals_returnsNil() {
+        #expect(makeManager().qualifyingArrival(from: [], for: .morning) == nil)
+    }
+
+    @Test @MainActor
+    func setTravelMinutes_negativeClampsToZero() {
+        let m = makeManager()
+        m.setTravelMinutes(-5, for: .morning)
+        #expect(m.travelMinutes(for: .morning) == 0)
     }
 }
