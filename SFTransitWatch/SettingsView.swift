@@ -13,7 +13,11 @@ struct SettingsView: View {
     @State private var showingClearFavoritesAlert = false
     @State private var showingMorningPicker = false
     @State private var showingAfternoonPicker = false
-    
+    @AppStorage(AlertSettingsManager.alertEnabledKey,
+                store: UserDefaults(suiteName: AlertSettingsManager.appGroupSuiteName))
+    private var alertsEnabled = true
+    @StateObject private var alertSettings = AlertSettingsManager()
+
     var body: some View {
         List {
             Section(header: Text("511.org API Configuration")) {
@@ -125,6 +129,27 @@ struct SettingsView: View {
                         allFavorites: favoriteStopsForPicker,
                         slotsManager: slotsManager
                     )
+                }
+            }
+
+            Section(header: Text("Alerts")) {
+                Toggle("Notify me of upcoming commute arrivals", isOn: $alertsEnabled)
+
+                if slotsManager.morningStopId != nil || slotsManager.afternoonStopId != nil {
+                    ForEach(CommuteSlotsManager.Slot.allCases, id: \.self) { slot in
+                        NavigationLink {
+                            AlertSlotSettingsView(slot: slot, alertSettings: alertSettings)
+                        } label: {
+                            HStack {
+                                Text(slot.displayName)
+                                Spacer()
+                                let travel = alertSettings.travelMinutes(for: slot)
+                                Text(travel > 0 ? "\(travel) min travel" : "Tap to configure")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 }
             }
 
