@@ -385,3 +385,31 @@ describe("GET /Stops (stops cache)", () => {
         expect(res.status).toBe(502);
     });
 });
+
+describe("timetable endpoint routing", () => {
+    it("accepts /StopTimetable and returns non-400, non-401 with valid token", async () => {
+        const res = await SELF.fetch(
+            "https://example.com/StopTimetable?operatorref=SF&monitoringref=15725",
+            { headers: { "X-App-Token": VALID_TOKEN } },
+        );
+        expect(res.status).not.toBe(400);
+        expect(res.status).not.toBe(401);
+    });
+
+    it("accepts /Timetable and returns non-400, non-401 with valid token", async () => {
+        const res = await SELF.fetch(
+            "https://example.com/Timetable?operator_id=SF&line_id=38",
+            { headers: { "X-App-Token": VALID_TOKEN } },
+        );
+        expect(res.status).not.toBe(400);
+        expect(res.status).not.toBe(401);
+    });
+
+    it("rejects /TripUpdates (not in allowlist) with 400", async () => {
+        const res = await SELF.fetch(
+            "https://example.com/TripUpdates?agency=SF",
+            { headers: { "X-App-Token": VALID_TOKEN } },
+        );
+        expect(res.status).toBe(400);
+    });
+});
