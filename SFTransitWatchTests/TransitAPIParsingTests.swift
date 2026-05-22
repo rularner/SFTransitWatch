@@ -186,4 +186,105 @@ final class TransitAPIParsingTests: XCTestCase {
 
         XCTAssertNil(results, "Should return nil when all agency fetches fail")
     }
+
+    func testDecodeScheduledDepartures_validPayload() {
+        let isoIn5min = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let isoIn15min = ISO8601DateFormatter().string(from: Date().addingTimeInterval(900))
+        let json = """
+        {
+          "Siri": {
+            "ServiceDelivery": {
+              "StopTimetableDelivery": {
+                "TimetabledStopVisit": [
+                  {
+                    "MonitoringRef": "70021",
+                    "TargetedVehicleJourney": {
+                      "LineRef": "Local Weekday",
+                      "DirectionRef": "N",
+                      "VehicleJourneyName": "San Francisco",
+                      "TargetedCall": {
+                        "AimedArrivalTime": "\(isoIn5min)",
+                        "DestinationDisplay": "San Francisco"
+                      }
+                    }
+                  },
+                  {
+                    "MonitoringRef": "70021",
+                    "TargetedVehicleJourney": {
+                      "LineRef": "Limited Weekday",
+                      "DirectionRef": "N",
+                      "VehicleJourneyName": "San Francisco",
+                      "TargetedCall": {
+                        "AimedDepartureTime": "\(isoIn15min)",
+                        "DestinationDisplay": "San Francisco"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeScheduledDepartures(json)
+
+        XCTAssertNotNil(arrivals)
+        XCTAssertEqual(arrivals?.count, 2)
+        XCTAssertEqual(arrivals?[0].route, "Local Weekday")
+        XCTAssertFalse(arrivals?[0].isRealTime ?? true, "Must be isRealTime: false")
+        XCTAssertEqual(arrivals?[0].destination, "San Francisco")
+        XCTAssertEqual(arrivals?[1].route, "Limited Weekday")
+        XCTAssertFalse(arrivals?[1].isRealTime ?? true)
+    }
+
+    func testDecodeScheduledDepartures_emptyVisits() {
+        let json = """
+        {
+          "Siri": {
+            "ServiceDelivery": {
+              "StopTimetableDelivery": {
+                "TimetabledStopVisit": []
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeScheduledDepartures(json)
+        XCTAssertNotNil(arrivals)
+        XCTAssertEqual(arrivals?.count, 0)
+    }
+
+    func testDecodeScheduledDepartures_malformedJSON() {
+        let arrivals = TransitJSON.decodeScheduledDepartures("not json".data(using: .utf8)!)
+        XCTAssertNil(arrivals)
+    }
+
+    func testDecodeScheduledDepartures_missingTime_skipsVisit() {
+        let json = """
+        {
+          "Siri": {
+            "ServiceDelivery": {
+              "StopTimetableDelivery": {
+                "TimetabledStopVisit": [
+                  {
+                    "MonitoringRef": "70021",
+                    "TargetedVehicleJourney": {
+                      "LineRef": "Local Weekday",
+                      "DirectionRef": "N",
+                      "TargetedCall": {}
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeScheduledDepartures(json)
+        XCTAssertNotNil(arrivals)
+        XCTAssertEqual(arrivals?.count, 0, "Visit with no time must be skipped")
+    }
 }

@@ -58,6 +58,29 @@ public enum TransitJSON {
         }
     }
 
+    /// Decodes a SIRI `/StopTimetable` response into BusArrivals with `isRealTime: false`.
+    /// Returns nil if the payload doesn't decode; returns [] if it decodes but has no visits.
+    public static func decodeScheduledDepartures(_ data: Data) -> [BusArrival]? {
+        guard let payload = try? JSONDecoder().decode(StopTimetableResponse.self, from: data) else {
+            return nil
+        }
+        let formatter = ISO8601DateFormatter()
+        return payload.siri.serviceDelivery.stopTimetableDelivery.timetabledStopVisit.compactMap { visit in
+            let journey = visit.targetedVehicleJourney
+            let rawTime = journey.targetedCall.aimedArrivalTime ?? journey.targetedCall.aimedDepartureTime
+            guard let rawTime, let arrivalTime = formatter.date(from: rawTime) else { return nil }
+            let destination = journey.targetedCall.destinationDisplay
+                ?? journey.vehicleJourneyName
+                ?? journey.directionRef
+            return BusArrival(
+                route: cleanLineRef(journey.lineRef),
+                destination: destination,
+                arrivalTime: arrivalTime,
+                isRealTime: false
+            )
+        }
+    }
+
     /// Decodes a `/StopMonitoring` JSON payload into BusArrivals.
     /// Returns nil if it doesn't decode.
     public static func decodeArrivals(_ data: Data) -> [BusArrival]? {
@@ -338,5 +361,66 @@ struct OnwardCall: Decodable {
         case expectedDepartureTime = "ExpectedDepartureTime"
         case aimedArrivalTime      = "AimedArrivalTime"
         case aimedDepartureTime    = "AimedDepartureTime"
+    }
+}
+
+// MARK: - Stop Timetable shapes
+
+struct StopTimetableResponse: Decodable {
+    let siri: StopTimetableSiri
+    enum CodingKeys: String, CodingKey { case siri = "Siri" }
+}
+
+struct StopTimetableSiri: Decodable {
+    let serviceDelivery: StopTimetableServiceDelivery
+    enum CodingKeys: String, CodingKey { case serviceDelivery = "ServiceDelivery" }
+}
+
+struct StopTimetableServiceDelivery: Decodable {
+    let stopTimetableDelivery: StopTimetableDelivery
+    enum CodingKeys: String, CodingKey { case stopTimetableDelivery = "StopTimetableDelivery" }
+}
+
+struct StopTimetableDelivery: Decodable {
+    let timetabledStopVisit: [TimetabledStopVisit]
+    enum CodingKeys: String, CodingKey { case timetabledStopVisit = "TimetabledStopVisit" }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decodeIfPresent([TimetabledStopVisit].self, forKey: .timetabledStopVisit) {
+            timetabledStopVisit = arr
+        } else if let single = try? c.decodeIfPresent(TimetabledStopVisit.self, forKey: .timetabledStopVisit) {
+            timetabledStopVisit = [single]
+        } else {
+            timetabledStopVisit = []
+        }
+    }
+}
+
+struct TimetabledStopVisit: Decodable {
+    let targetedVehicleJourney: TargetedVehicleJourney
+    enum CodingKeys: String, CodingKey { case targetedVehicleJourney = "TargetedVehicleJourney" }
+}
+
+struct TargetedVehicleJourney: Decodable {
+    let lineRef: String
+    let directionRef: String
+    let vehicleJourneyName: String?
+    let targetedCall: TargetedCall
+    enum CodingKeys: String, CodingKey {
+        case lineRef            = "LineRef"
+        case directionRef       = "DirectionRef"
+        case vehicleJourneyName = "VehicleJourneyName"
+        case targetedCall       = "TargetedCall"
+    }
+}
+
+struct TargetedCall: Decodable {
+    let aimedArrivalTime: String?
+    let aimedDepartureTime: String?
+    let destinationDisplay: String?
+    enum CodingKeys: String, CodingKey {
+        case aimedArrivalTime   = "AimedArrivalTime"
+        case aimedDepartureTime = "AimedDepartureTime"
+        case destinationDisplay = "DestinationDisplay"
     }
 }
