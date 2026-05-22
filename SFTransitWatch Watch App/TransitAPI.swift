@@ -137,7 +137,11 @@ class TransitAPI: ObservableObject {
 
             let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            return try parse511Arrivals(data: data)
+            let realTimeArrivals = try parse511Arrivals(data: data)
+            if realTimeArrivals.isEmpty {
+                return await fetchScheduledDepartures(for: stopId, agency: agency)
+            }
+            return realTimeArrivals
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
@@ -146,6 +150,32 @@ class TransitAPI: ObservableObject {
         }
     }
     
+    func fetchScheduledDepartures(for stopId: String, agency: String) async -> [BusArrival] {
+        let endpoint = "StopTimetable"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+        var queryItems = [
+            URLQueryItem(name: "operatorref", value: agency),
+            URLQueryItem(name: "monitoringref", value: stopId)
+        ]
+        if isDirect511Mode {
+            queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+        }
+        components?.queryItems = queryItems
+        guard let url = components?.url else { return [] }
+        let request = makeRequest(url: url)
+        let started = Date()
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
+            let cacheStatus = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "X-Cache-Status")
+            Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
+            return TransitJSON.decodeScheduledDepartures(data) ?? []
+        } catch {
+            return []
+        }
+    }
+
     /// Fans out the StopPlace lookup across each enabled agency in parallel
     /// and merges the results, tagging every returned stop with its agency.
     /// Sets errorMessage when all agencies fail or some are degraded.
