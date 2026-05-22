@@ -150,7 +150,6 @@ function xmlResponse(cached: CachedResponse, cacheStatus: string, ttl: TtlPair):
 const UPSTREAM_PATHS: Record<string, string> = {
 	StopMonitoring: "StopMonitoring",
 	StopPlace: "StopPlace",
-	Stops: "Stops",
 	StopTimetable: "stoptimetable",
 	Timetable: "timetable",
 };
@@ -259,14 +258,14 @@ async function fetchAndCacheUpstream(
 			expirationTtl: ttl.stale,
 		});
 		await env.TRANSIT_CACHE.put(LAST_UPSTREAM_FETCH_KEY, String(nowMs), {
-			expirationTtl: ttl.stale,
+			expirationTtl: STALE_TTL_SECONDS,
 		});
 		return { ok: true, value: cached };
 	}
 
 	// Persist throttling metadata even for upstream errors to avoid a retry storm.
 	await env.TRANSIT_CACHE.put(LAST_UPSTREAM_FETCH_KEY, String(nowMs), {
-		expirationTtl: ttl.stale,
+		expirationTtl: STALE_TTL_SECONDS,
 	});
 	return { ok: false, error: `Upstream responded with HTTP ${response.status}.` };
 }
