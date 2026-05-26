@@ -185,4 +185,71 @@ final class PhoneTransitAPITests: XCTestCase {
         XCTAssertTrue(arrivals[0].isRealTime)
         XCTAssertEqual(mockSession.requestCount(), 1)
     }
+
+    func testFetchJourneyStops_returnsStopsFromTimetable() async {
+        let now = Date()
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.hour, .minute], from: now.addingTimeInterval(300))
+        let h = comps.hour ?? 10
+        let m = comps.minute ?? 5
+        let pad = { (n: Int) in String(format: "%02d", n) }
+        let t1 = "\(pad(h)):\(pad(m)):00"
+        let t2 = "\(pad((h * 60 + m + 5) / 60 % 24)):\(pad((m + 5) % 60)):00"
+
+        let timetableData = """
+        {
+          "Content": {
+            "TimetableFrame": [{
+              "Name": "38:IB:WEEKDAY",
+              "vehicleJourneys": {
+                "ServiceJourney": [{
+                  "JourneyPatternView": {"DirectionRef":{"ref":"IB"}},
+                  "calls": {"Call": [
+                    {"ScheduledStopPointRef":{"ref":"15725"},"Arrival":{"Time":"\(t1)","DaysOffset":"0"},"Departure":{"Time":"\(t1)","DaysOffset":"0"},"order":"1"},
+                    {"ScheduledStopPointRef":{"ref":"15730"},"Arrival":{"Time":"\(t2)","DaysOffset":"0"},"Departure":{"Time":"\(t2)","DaysOffset":"0"},"order":"2"}
+                  ]},
+                  "id": "trip-1"
+                }]
+              }
+            }]
+          }
+        }
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/Timetable")!,
+            data: timetableData
+        )
+
+        let stops = await api.fetchJourneyStops(
+            route: "38",
+            destination: "IB",
+            boardingStopId: "15725",
+            boardingTime: now.addingTimeInterval(300),
+            agency: "SF"
+        )
+
+        XCTAssertEqual(stops.count, 2)
+        XCTAssertEqual(stops[0].id, "15725")
+        XCTAssertFalse(stops[0].isRealTime)
+    }
+
+    func testFetchJourneyStops_noMatch_returnsEmpty() async {
+        let timetableData = """
+        {"Content": {"TimetableFrame": [{"Name": "38:IB:WEEKDAY","vehicleJourneys":{"ServiceJourney":[]}}]}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/Timetable")!,
+            data: timetableData
+        )
+
+        let stops = await api.fetchJourneyStops(
+            route: "38",
+            destination: "IB",
+            boardingStopId: "99999",
+            boardingTime: Date(),
+            agency: "SF"
+        )
+
+        XCTAssertEqual(stops.count, 0)
+    }
 }

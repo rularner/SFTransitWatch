@@ -376,6 +376,42 @@ class TransitAPI: ObservableObject {
         return try parse511Stops(data: data, agency: agency)
     }
 
+    func fetchJourneyStops(
+        route: String,
+        destination: String,
+        boardingStopId: String,
+        boardingTime: Date,
+        agency: String
+    ) async -> [OnwardStop] {
+        let endpoint = "Timetable"
+        var components = URLComponents(string: "\(baseURL)/\(endpoint)")
+        var queryItems = [
+            URLQueryItem(name: "operator_id", value: agency),
+            URLQueryItem(name: "line_id", value: route)
+        ]
+        if isDirect511Mode {
+            queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
+        }
+        components?.queryItems = queryItems
+        guard let url = components?.url else { return [] }
+        let request = makeRequest(url: url)
+        let started = Date()
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
+            let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
+            Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
+            return TransitJSON.decodeTimetableJourneyStops(
+                data: data,
+                boardingStopId: boardingStopId,
+                boardingTime: boardingTime
+            ) ?? []
+        } catch {
+            return []
+        }
+    }
+
     func searchStops(query: String, agencies: [String]) async -> [BusStop]? {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, !agencies.isEmpty else { return [] }
