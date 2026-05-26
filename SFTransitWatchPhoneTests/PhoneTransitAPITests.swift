@@ -136,4 +136,53 @@ final class PhoneTransitAPITests: XCTestCase {
 
         XCTAssertEqual(mockSession.requestCount(), 0, "Cancelled task should not complete any requests")
     }
+
+    func testEmptyStopMonitoringTriggersTimetableFallback() async {
+        let emptyMonitoring = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopMonitoring")!,
+            data: emptyMonitoring
+        )
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetableData = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"Local Weekday","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"San Francisco"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopTimetable")!,
+            data: timetableData
+        )
+
+        let arrivals = await api.fetchArrivals(for: "70021", agency: "CT")
+
+        XCTAssertEqual(arrivals.count, 1)
+        XCTAssertFalse(arrivals[0].isRealTime)
+        XCTAssertEqual(mockSession.requestCount(), 2)
+    }
+
+    func testNonEmptyStopMonitoringSkipsTimetable() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{
+            "LineRef":"SF:38","DirectionRef":"IB","VehicleRef":null,
+            "MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},
+            "OnwardCalls":{}
+          }}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopMonitoring")!,
+            data: realtime
+        )
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertEqual(arrivals.count, 1)
+        XCTAssertTrue(arrivals[0].isRealTime)
+        XCTAssertEqual(mockSession.requestCount(), 1)
+    }
 }
