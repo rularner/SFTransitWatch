@@ -18,6 +18,10 @@ class MockURLSession: URLSessionProtocol {
         if let error = errors[url] { throw error }
         if let match = errors.first(where: { $0.key.host == url.host }) { throw match.value }
         if let (data, response) = responses[url] { return (data, response) }
+        // Try to match by host + path (ignores query params — allows multiple endpoints on same host)
+        if let match = responses.first(where: { $0.key.host == url.host && $0.key.path == url.path }) {
+            return match.value
+        }
         if let match = responses.first(where: { $0.key.host == url.host }) {
             return match.value
         }

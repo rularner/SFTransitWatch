@@ -107,7 +107,7 @@ def main():
           {"operator_id": "SF", "line_id": "38", "api_key": api_key},
           "SF route 38 (Geary)", "probe-timetable-SF-38")
     probe("timetable",
-          {"operator_id": "CT", "line_id": "Local", "api_key": api_key},
+          {"operator_id": "CT", "line_id": "Local Weekday", "api_key": api_key},
           "CT route Local", "probe-timetable-CT-Local")
 
 
