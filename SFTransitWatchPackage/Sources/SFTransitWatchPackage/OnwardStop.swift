@@ -5,11 +5,13 @@ public struct OnwardStop: Identifiable, Codable, Sendable {
     public let name: String
     public let arrivalTime: Date
     public let minutesAway: Int
+    public let isRealTime: Bool
 
-    public init(id: String, name: String, arrivalTime: Date, now: Date = Date()) {
+    public init(id: String, name: String, arrivalTime: Date, isRealTime: Bool = true, now: Date = Date()) {
         self.id = id
         self.name = name
         self.arrivalTime = arrivalTime
+        self.isRealTime = isRealTime
         self.minutesAway = max(0, Int(arrivalTime.timeIntervalSince(now) / 60))
     }
 
@@ -19,6 +21,7 @@ public struct OnwardStop: Identifiable, Codable, Sendable {
         name        = try  c.decode(String.self, forKey: .name)
         arrivalTime = try  c.decode(Date.self,   forKey: .arrivalTime)
         minutesAway = try  c.decode(Int.self,    forKey: .minutesAway)
+        isRealTime  = (try? c.decodeIfPresent(Bool.self, forKey: .isRealTime)) ?? true
     }
 
     public var minutesString: String {

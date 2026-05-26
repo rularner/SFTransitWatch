@@ -5,6 +5,19 @@ const MIN_UPSTREAM_INTERVAL_MS = 60_000;
 const LAST_UPSTREAM_FETCH_KEY = "meta:last_upstream_fetch_ms";
 const REFRESH_LOCK_KEY = "meta:refresh_lock";
 const STOPS_FRESH_TTL_SECONDS = 24 * 60 * 60;
+const TIMETABLE_FRESH_TTL_SECONDS = 24 * 60 * 60;
+const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+type TtlPair = { fresh: number; stale: number };
+
+const DEFAULT_TTL: TtlPair = { fresh: FRESH_TTL_SECONDS, stale: STALE_TTL_SECONDS };
+const TIMETABLE_TTL: TtlPair = { fresh: TIMETABLE_FRESH_TTL_SECONDS, stale: TIMETABLE_STALE_TTL_SECONDS };
+
+function ttlForEndpoint(endpoint: string): TtlPair {
+    return endpoint === "StopTimetable" || endpoint === "Timetable"
+        ? TIMETABLE_TTL
+        : DEFAULT_TTL;
+}
 
 interface Env {
 	API_511_KEY: string;
@@ -67,15 +80,16 @@ export default {
 			const cacheKey = cacheKeyFor(upstream.url);
 			const cached = await readCachedResponse(env, cacheKey);
 			const now = Date.now();
+			const ttl = ttlForEndpoint(endpoint);
 
-			if (cached && now - cached.fetchedAtMs < FRESH_TTL_SECONDS * 1000) {
-				return xmlResponse(cached, "HIT");
+			if (cached && now - cached.fetchedAtMs < ttl.fresh * 1000) {
+				return xmlResponse(cached, "HIT", ttl);
 			}
 
 			const canRefreshNow = await canMakeUpstreamRequest(env, now);
 			if (!canRefreshNow && cached) {
-				const didSchedule = await scheduleBackgroundRefresh(env, ctx, upstream.url, cacheKey, now);
-				return xmlResponse(cached, didSchedule ? "STALE-REVALIDATE" : "STALE");
+				const didSchedule = await scheduleBackgroundRefresh(env, ctx, upstream.url, cacheKey, now, ttl);
+				return xmlResponse(cached, didSchedule ? "STALE-REVALIDATE" : "STALE", ttl);
 			}
 
 			if (!canRefreshNow && !cached) {
@@ -84,13 +98,13 @@ export default {
 				});
 			}
 
-			const refreshed = await fetchAndCacheUpstream(env, upstream.url, cacheKey, now);
+			const refreshed = await fetchAndCacheUpstream(env, upstream.url, cacheKey, now, ttl);
 			if (refreshed.ok) {
-				return xmlResponse(refreshed.value, "MISS");
+				return xmlResponse(refreshed.value, "MISS", ttl);
 			}
 
 			if (cached) {
-				return xmlResponse(cached, "STALE-UPSTREAM-ERROR");
+				return xmlResponse(cached, "STALE-UPSTREAM-ERROR", ttl);
 			}
 			return jsonError(refreshed.error, 502);
 		} catch (error) {
@@ -120,18 +134,25 @@ function jsonError(message: string, status: number, extraHeaders: HeadersInit = 
 	});
 }
 
-function xmlResponse(cached: CachedResponse, cacheStatus: string): Response {
+function xmlResponse(cached: CachedResponse, cacheStatus: string, ttl: TtlPair): Response {
 	return new Response(cached.body, {
 		status: cached.status,
 		headers: {
 			...corsHeaders(),
 			"Content-Type": cached.contentType,
-			"Cache-Control": `public, max-age=${FRESH_TTL_SECONDS}, stale-if-error=${STALE_TTL_SECONDS}`,
+			"Cache-Control": `public, max-age=${ttl.fresh}, stale-if-error=${ttl.stale}`,
 			"X-Cache-Status": cacheStatus,
 			"X-Cached-At": new Date(cached.fetchedAtMs).toISOString(),
 		},
 	});
 }
+
+const UPSTREAM_PATHS: Record<string, string> = {
+	StopMonitoring: "StopMonitoring",
+	StopPlace: "StopPlace",
+	StopTimetable: "stoptimetable",
+	Timetable: "timetable",
+};
 
 function buildUpstreamUrl(
 	requestUrl: string,
@@ -141,11 +162,11 @@ function buildUpstreamUrl(
 	const segments = incoming.pathname.split("/").filter(Boolean);
 	const endpoint = segments[segments.length - 1];
 
-	if (!endpoint || !["StopMonitoring", "StopPlace", "Stops"].includes(endpoint)) {
-		return { ok: false, error: "Path must end with /StopMonitoring, /StopPlace, or /Stops." };
+	if (!endpoint || !Object.keys(UPSTREAM_PATHS).includes(endpoint)) {
+		return { ok: false, error: "Path must end with /StopMonitoring, /StopPlace, /Stops, /StopTimetable, or /Timetable." };
 	}
 
-	const upstream = new URL(`${UPSTREAM_BASE_URL}/${endpoint}`);
+	const upstream = new URL(`${UPSTREAM_BASE_URL}/${UPSTREAM_PATHS[endpoint]}`);
 	for (const [key, value] of incoming.searchParams.entries()) {
 		if (key !== "api_key") {
 			upstream.searchParams.set(key, value);
@@ -191,20 +212,17 @@ async function scheduleBackgroundRefresh(
 	upstreamUrl: URL,
 	cacheKey: string,
 	nowMs: number,
+	ttl: TtlPair,
 ): Promise<boolean> {
 	const gotLock = await tryAcquireRefreshLock(env);
-	if (!gotLock) {
-		return false;
-	}
+	if (!gotLock) return false;
 
 	ctx.waitUntil(
 		(async () => {
 			try {
 				const allowed = await canMakeUpstreamRequest(env, nowMs);
-				if (!allowed) {
-					return;
-				}
-				await fetchAndCacheUpstream(env, upstreamUrl, cacheKey, Date.now());
+				if (!allowed) return;
+				await fetchAndCacheUpstream(env, upstreamUrl, cacheKey, Date.now(), ttl);
 			} finally {
 				await releaseRefreshLock(env);
 			}
@@ -218,14 +236,13 @@ async function fetchAndCacheUpstream(
 	upstreamUrl: URL,
 	cacheKey: string,
 	nowMs: number,
+	ttl: TtlPair,
 ): Promise<{ ok: true; value: CachedResponse } | { ok: false; error: string }> {
 	let response: Response;
 	try {
 		response = await fetch(upstreamUrl, {
 			method: "GET",
-			headers: {
-				Accept: "application/xml,text/xml,*/*",
-			},
+			headers: { Accept: "application/xml,text/xml,*/*" },
 		});
 	} catch (error) {
 		console.error("Upstream fetch failed:", error);
@@ -234,16 +251,11 @@ async function fetchAndCacheUpstream(
 
 	const contentType = response.headers.get("content-type") ?? "application/xml; charset=utf-8";
 	const body = await response.text();
-	const cached: CachedResponse = {
-		body,
-		status: response.status,
-		contentType,
-		fetchedAtMs: nowMs,
-	};
+	const cached: CachedResponse = { body, status: response.status, contentType, fetchedAtMs: nowMs };
 
 	if (response.ok) {
 		await env.TRANSIT_CACHE.put(cacheKey, JSON.stringify(cached), {
-			expirationTtl: STALE_TTL_SECONDS,
+			expirationTtl: ttl.stale,
 		});
 		await env.TRANSIT_CACHE.put(LAST_UPSTREAM_FETCH_KEY, String(nowMs), {
 			expirationTtl: STALE_TTL_SECONDS,

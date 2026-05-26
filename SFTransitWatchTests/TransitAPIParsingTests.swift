@@ -186,4 +186,192 @@ final class TransitAPIParsingTests: XCTestCase {
 
         XCTAssertNil(results, "Should return nil when all agency fetches fail")
     }
+
+    func testDecodeScheduledDepartures_validPayload() {
+        let isoIn5min = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let isoIn15min = ISO8601DateFormatter().string(from: Date().addingTimeInterval(900))
+        let json = """
+        {
+          "Siri": {
+            "ServiceDelivery": {
+              "StopTimetableDelivery": {
+                "TimetabledStopVisit": [
+                  {
+                    "MonitoringRef": "70021",
+                    "TargetedVehicleJourney": {
+                      "LineRef": "Local Weekday",
+                      "DirectionRef": "N",
+                      "VehicleJourneyName": "San Francisco",
+                      "TargetedCall": {
+                        "AimedArrivalTime": "\(isoIn5min)",
+                        "DestinationDisplay": "San Francisco"
+                      }
+                    }
+                  },
+                  {
+                    "MonitoringRef": "70021",
+                    "TargetedVehicleJourney": {
+                      "LineRef": "Limited Weekday",
+                      "DirectionRef": "N",
+                      "VehicleJourneyName": "San Francisco",
+                      "TargetedCall": {
+                        "AimedDepartureTime": "\(isoIn15min)",
+                        "DestinationDisplay": "San Francisco"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeScheduledDepartures(json)
+
+        XCTAssertNotNil(arrivals)
+        XCTAssertEqual(arrivals?.count, 2)
+        XCTAssertEqual(arrivals?[0].route, "Local Weekday")
+        XCTAssertFalse(arrivals?[0].isRealTime ?? true, "Must be isRealTime: false")
+        XCTAssertEqual(arrivals?[0].destination, "San Francisco")
+        XCTAssertEqual(arrivals?[1].route, "Limited Weekday")
+        XCTAssertFalse(arrivals?[1].isRealTime ?? true)
+    }
+
+    func testDecodeScheduledDepartures_emptyVisits() {
+        let json = """
+        {
+          "Siri": {
+            "ServiceDelivery": {
+              "StopTimetableDelivery": {
+                "TimetabledStopVisit": []
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeScheduledDepartures(json)
+        XCTAssertNotNil(arrivals)
+        XCTAssertEqual(arrivals?.count, 0)
+    }
+
+    func testDecodeScheduledDepartures_malformedJSON() {
+        let arrivals = TransitJSON.decodeScheduledDepartures("not json".data(using: .utf8)!)
+        XCTAssertNil(arrivals)
+    }
+
+    func testDecodeScheduledDepartures_missingTime_skipsVisit() {
+        let json = """
+        {
+          "Siri": {
+            "ServiceDelivery": {
+              "StopTimetableDelivery": {
+                "TimetabledStopVisit": [
+                  {
+                    "MonitoringRef": "70021",
+                    "TargetedVehicleJourney": {
+                      "LineRef": "Local Weekday",
+                      "DirectionRef": "N",
+                      "TargetedCall": {}
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeScheduledDepartures(json)
+        XCTAssertNotNil(arrivals)
+        XCTAssertEqual(arrivals?.count, 0, "Visit with no time must be skipped")
+    }
+
+    func testDecodeTimetableJourneyStops_returnsStopsAfterBoarding() {
+        let now = Date()
+        let cal = Calendar.current
+        // Build times relative to now's HH:MM so the reconstruction logic finds them
+        let boardingComponents = cal.dateComponents([.hour, .minute], from: now.addingTimeInterval(300))
+        let h = boardingComponents.hour ?? 10
+        let m = boardingComponents.minute ?? 5
+        let pad = { (n: Int) in String(format: "%02d", n) }
+        let t1 = "\(pad(h)):\(pad(m)):00"                                  // boarding stop time
+        let t2 = "\(pad((h * 60 + m + 5) / 60 % 24)):\(pad((m + 5) % 60)):00"  // onward +5 min
+        let t3 = "\(pad((h * 60 + m + 10) / 60 % 24)):\(pad((m + 10) % 60)):00" // onward +10 min
+
+        let json = """
+        {
+          "Content": {
+            "TimetableFrame": [{
+              "Name": "38:IB:WEEKDAY",
+              "vehicleJourneys": {
+                "ServiceJourney": [{
+                  "JourneyPatternView": { "DirectionRef": { "ref": "IB" } },
+                  "calls": { "Call": [
+                    {"ScheduledStopPointRef":{"ref":"15720"},"Arrival":{"Time":"\(t1)","DaysOffset":"0"},"Departure":{"Time":"\(t1)","DaysOffset":"0"},"order":"1"},
+                    {"ScheduledStopPointRef":{"ref":"15725"},"Arrival":{"Time":"\(t1)","DaysOffset":"0"},"Departure":{"Time":"\(t1)","DaysOffset":"0"},"order":"2"},
+                    {"ScheduledStopPointRef":{"ref":"15730"},"Arrival":{"Time":"\(t2)","DaysOffset":"0"},"Departure":{"Time":"\(t2)","DaysOffset":"0"},"order":"3"},
+                    {"ScheduledStopPointRef":{"ref":"15735"},"Arrival":{"Time":"\(t3)","DaysOffset":"0"},"Departure":{"Time":"\(t3)","DaysOffset":"0"},"order":"4"}
+                  ]},
+                  "id": "trip-1"
+                }]
+              }
+            }]
+          }
+        }
+        """.data(using: .utf8)!
+
+        let stops = TransitJSON.decodeTimetableJourneyStops(
+            data: json,
+            boardingStopId: "15725",
+            boardingTime: now.addingTimeInterval(300)
+        )
+
+        XCTAssertNotNil(stops)
+        XCTAssertEqual(stops?.count, 3, "boarding stop + 2 onward stops")
+        XCTAssertEqual(stops?[0].id, "15725")
+        XCTAssertEqual(stops?[1].id, "15730")
+        XCTAssertEqual(stops?[2].id, "15735")
+        XCTAssertFalse(stops?[0].isRealTime ?? true)
+    }
+
+    func testDecodeTimetableJourneyStops_noMatchingTrip_returnsEmpty() {
+        let json = """
+        {
+          "Content": {
+            "TimetableFrame": [{
+              "Name": "38:IB:WEEKDAY",
+              "vehicleJourneys": {
+                "ServiceJourney": [{
+                  "JourneyPatternView": { "DirectionRef": { "ref": "IB" } },
+                  "calls": { "Call": [
+                    {"ScheduledStopPointRef":{"ref":"15730"},"Arrival":{"Time":"10:00:00","DaysOffset":"0"},"Departure":{"Time":"10:00:00","DaysOffset":"0"},"order":"1"}
+                  ]},
+                  "id": "trip-1"
+                }]
+              }
+            }]
+          }
+        }
+        """.data(using: .utf8)!
+
+        let stops = TransitJSON.decodeTimetableJourneyStops(
+            data: json,
+            boardingStopId: "99999",
+            boardingTime: Date()
+        )
+
+        XCTAssertNotNil(stops)
+        XCTAssertEqual(stops?.count, 0)
+    }
+
+    func testDecodeTimetableJourneyStops_malformedJSON_returnsNil() {
+        let stops = TransitJSON.decodeTimetableJourneyStops(
+            data: "bad".data(using: .utf8)!,
+            boardingStopId: "15725",
+            boardingTime: Date()
+        )
+        XCTAssertNil(stops)
+    }
 }

@@ -58,6 +58,92 @@ public enum TransitJSON {
         }
     }
 
+    /// Decodes a SIRI `/StopTimetable` response into BusArrivals with `isRealTime: false`.
+    /// Returns nil if the payload doesn't decode; returns [] if it decodes but has no visits.
+    public static func decodeScheduledDepartures(_ data: Data) -> [BusArrival]? {
+        guard let payload = try? JSONDecoder().decode(StopTimetableResponse.self, from: data) else {
+            return nil
+        }
+        let formatter = ISO8601DateFormatter()
+        return payload.siri.serviceDelivery.stopTimetableDelivery.timetabledStopVisit.compactMap { visit in
+            let journey = visit.targetedVehicleJourney
+            let rawTime = journey.targetedCall.aimedArrivalTime ?? journey.targetedCall.aimedDepartureTime
+            guard let rawTime, let arrivalTime = formatter.date(from: rawTime) else { return nil }
+            let destination = journey.targetedCall.destinationDisplay
+                ?? journey.vehicleJourneyName
+                ?? journey.directionRef
+            return BusArrival(
+                route: cleanLineRef(journey.lineRef),
+                destination: destination,
+                arrivalTime: arrivalTime,
+                isRealTime: false
+            )
+        }
+    }
+
+    /// Parses a NeTEx Route Timetable response. Finds the trip whose stop at
+    /// `boardingStopId` is closest to `boardingTime` (within ±30 min), then
+    /// returns all stops from that point onward as `[OnwardStop]` with `isRealTime: false`.
+    /// Returns nil if the payload does not decode; returns [] if no matching trip.
+    public static func decodeTimetableJourneyStops(
+        data: Data,
+        boardingStopId: String,
+        boardingTime: Date
+    ) -> [OnwardStop]? {
+        guard let payload = try? JSONDecoder().decode(TimetableResponse.self, from: data) else {
+            return nil
+        }
+        let windowSeconds: TimeInterval = 30 * 60
+        var bestJourney: TimetableServiceJourney?
+        var bestDelta: TimeInterval = .infinity
+
+        for frame in payload.content.timetableFrame {
+            for journey in frame.vehicleJourneys.serviceJourney {
+                let sorted = journey.calls.call.sorted { (Int($0.order) ?? 0) < (Int($1.order) ?? 0) }
+                guard let boardingCall = sorted.first(where: { $0.scheduledStopPointRef.ref == boardingStopId }) else { continue }
+                let timeSource = boardingCall.arrival ?? boardingCall.departure
+                guard let timeSource,
+                      let callDate = nearestScheduledDate(timeString: timeSource.time, to: boardingTime) else { continue }
+                let delta = abs(callDate.timeIntervalSince(boardingTime))
+                if delta < bestDelta && delta <= windowSeconds {
+                    bestDelta = delta
+                    bestJourney = journey
+                }
+            }
+        }
+
+        guard let trip = bestJourney else { return [] }
+        let sorted = trip.calls.call.sorted { (Int($0.order) ?? 0) < (Int($1.order) ?? 0) }
+        guard let boardingIndex = sorted.firstIndex(where: { $0.scheduledStopPointRef.ref == boardingStopId }) else { return [] }
+
+        return sorted[boardingIndex...].compactMap { call in
+            let timeSource = call.arrival ?? call.departure
+            guard let timeSource,
+                  let arrivalTime = nearestScheduledDate(timeString: timeSource.time, to: boardingTime) else { return nil }
+            return OnwardStop(
+                id: call.scheduledStopPointRef.ref,
+                name: call.scheduledStopPointRef.ref,
+                arrivalTime: arrivalTime,
+                isRealTime: false
+            )
+        }
+    }
+
+    /// Converts an "HH:MM:SS" time string to a Date by trying yesterday/today/tomorrow
+    /// relative to `reference` and returning the candidate closest to `reference`.
+    private static func nearestScheduledDate(timeString: String, to reference: Date) -> Date? {
+        let parts = timeString.split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return nil }
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.year, .month, .day], from: reference)
+        comps.hour = parts[0]
+        comps.minute = parts[1]
+        comps.second = parts.count > 2 ? parts[2] : 0
+        guard let base = cal.date(from: comps) else { return nil }
+        let candidates = [-1, 0, 1].compactMap { cal.date(byAdding: .day, value: $0, to: base) }
+        return candidates.min(by: { abs($0.timeIntervalSince(reference)) < abs($1.timeIntervalSince(reference)) })
+    }
+
     /// Decodes a `/StopMonitoring` JSON payload into BusArrivals.
     /// Returns nil if it doesn't decode.
     public static func decodeArrivals(_ data: Data) -> [BusArrival]? {
@@ -339,4 +425,147 @@ struct OnwardCall: Decodable {
         case aimedArrivalTime      = "AimedArrivalTime"
         case aimedDepartureTime    = "AimedDepartureTime"
     }
+}
+
+// MARK: - Stop Timetable shapes
+
+struct StopTimetableResponse: Decodable {
+    let siri: StopTimetableSiri
+    enum CodingKeys: String, CodingKey { case siri = "Siri" }
+}
+
+struct StopTimetableSiri: Decodable {
+    let serviceDelivery: StopTimetableServiceDelivery
+    enum CodingKeys: String, CodingKey { case serviceDelivery = "ServiceDelivery" }
+}
+
+struct StopTimetableServiceDelivery: Decodable {
+    let stopTimetableDelivery: StopTimetableDelivery
+    enum CodingKeys: String, CodingKey { case stopTimetableDelivery = "StopTimetableDelivery" }
+}
+
+struct StopTimetableDelivery: Decodable {
+    let timetabledStopVisit: [TimetabledStopVisit]
+    enum CodingKeys: String, CodingKey { case timetabledStopVisit = "TimetabledStopVisit" }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decodeIfPresent([TimetabledStopVisit].self, forKey: .timetabledStopVisit) {
+            timetabledStopVisit = arr
+        } else if let single = try? c.decodeIfPresent(TimetabledStopVisit.self, forKey: .timetabledStopVisit) {
+            timetabledStopVisit = [single]
+        } else {
+            timetabledStopVisit = []
+        }
+    }
+}
+
+struct TimetabledStopVisit: Decodable {
+    let targetedVehicleJourney: TargetedVehicleJourney
+    enum CodingKeys: String, CodingKey { case targetedVehicleJourney = "TargetedVehicleJourney" }
+}
+
+struct TargetedVehicleJourney: Decodable {
+    let lineRef: String
+    let directionRef: String
+    let vehicleJourneyName: String?
+    let targetedCall: TargetedCall
+    enum CodingKeys: String, CodingKey {
+        case lineRef            = "LineRef"
+        case directionRef       = "DirectionRef"
+        case vehicleJourneyName = "VehicleJourneyName"
+        case targetedCall       = "TargetedCall"
+    }
+}
+
+struct TargetedCall: Decodable {
+    let aimedArrivalTime: String?
+    let aimedDepartureTime: String?
+    let destinationDisplay: String?
+    enum CodingKeys: String, CodingKey {
+        case aimedArrivalTime   = "AimedArrivalTime"
+        case aimedDepartureTime = "AimedDepartureTime"
+        case destinationDisplay = "DestinationDisplay"
+    }
+}
+
+// MARK: - Route Timetable shapes (NeTEx)
+
+struct TimetableResponse: Decodable {
+    let content: TimetableContent
+    enum CodingKeys: String, CodingKey { case content = "Content" }
+}
+
+struct TimetableContent: Decodable {
+    let timetableFrame: [TimetableFrame]
+    enum CodingKeys: String, CodingKey { case timetableFrame = "TimetableFrame" }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decodeIfPresent([TimetableFrame].self, forKey: .timetableFrame) {
+            timetableFrame = arr
+        } else if let single = try? c.decodeIfPresent(TimetableFrame.self, forKey: .timetableFrame) {
+            timetableFrame = [single]
+        } else { timetableFrame = [] }
+    }
+}
+
+struct TimetableFrame: Decodable {
+    let name: String
+    let vehicleJourneys: TimetableVehicleJourneys
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case vehicleJourneys
+    }
+}
+
+struct TimetableVehicleJourneys: Decodable {
+    let serviceJourney: [TimetableServiceJourney]
+    enum CodingKeys: String, CodingKey { case serviceJourney = "ServiceJourney" }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decodeIfPresent([TimetableServiceJourney].self, forKey: .serviceJourney) {
+            serviceJourney = arr
+        } else if let single = try? c.decodeIfPresent(TimetableServiceJourney.self, forKey: .serviceJourney) {
+            serviceJourney = [single]
+        } else { serviceJourney = [] }
+    }
+}
+
+struct TimetableServiceJourney: Decodable {
+    let calls: TimetableCalls
+    enum CodingKeys: String, CodingKey { case calls }
+}
+
+struct TimetableCalls: Decodable {
+    let call: [TimetableCall]
+    enum CodingKeys: String, CodingKey { case call = "Call" }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decodeIfPresent([TimetableCall].self, forKey: .call) {
+            call = arr
+        } else if let single = try? c.decodeIfPresent(TimetableCall.self, forKey: .call) {
+            call = [single]
+        } else { call = [] }
+    }
+}
+
+struct TimetableCall: Decodable {
+    let scheduledStopPointRef: TimetableStopRef
+    let arrival: TimetableCallTime?
+    let departure: TimetableCallTime?
+    let order: String
+    enum CodingKeys: String, CodingKey {
+        case scheduledStopPointRef = "ScheduledStopPointRef"
+        case arrival = "Arrival"
+        case departure = "Departure"
+        case order
+    }
+}
+
+struct TimetableStopRef: Decodable {
+    let ref: String
+}
+
+struct TimetableCallTime: Decodable {
+    let time: String
+    enum CodingKeys: String, CodingKey { case time = "Time" }
 }

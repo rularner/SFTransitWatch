@@ -6,12 +6,43 @@ struct BusJourneyView: View {
     let originStopId: String
     let agency: String
 
+    @StateObject private var transitAPI = TransitAPI()
+    @State private var scheduledStops: [OnwardStop] = []
+    @State private var isLoadingSchedule = false
+
+    private var displayedStops: [OnwardStop] {
+        arrival.onwardStops.isEmpty ? scheduledStops : arrival.onwardStops
+    }
+
+    private var isScheduled: Bool {
+        arrival.onwardStops.isEmpty && !scheduledStops.isEmpty
+    }
+
     var body: some View {
         List {
-            if arrival.onwardStops.isEmpty {
+            if isScheduled {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.clock")
+                        .foregroundColor(.secondary)
+                    Text("Scheduled times — no real-time tracking")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .listRowBackground(Color.clear)
+            }
+
+            if isLoadingSchedule {
+                HStack {
+                    ProgressView()
+                    Text("Loading schedule…")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .listRowBackground(Color.clear)
+            } else if displayedStops.isEmpty {
                 emptyState
             } else {
-                ForEach(arrival.onwardStops) { stop in
+                ForEach(displayedStops) { stop in
                     NavigationLink(destination: BusArrivalView(stop: busStop(from: stop))) {
                         JourneyStopRow(stop: stop, isOrigin: stop.id == originStopId)
                     }
@@ -19,6 +50,19 @@ struct BusJourneyView: View {
             }
         }
         .navigationTitle("Route \(arrival.route) → \(arrival.destination)")
+        .task {
+            if arrival.onwardStops.isEmpty {
+                isLoadingSchedule = true
+                scheduledStops = await transitAPI.fetchJourneyStops(
+                    route: arrival.route,
+                    destination: arrival.destination,
+                    boardingStopId: originStopId,
+                    boardingTime: arrival.arrivalTime,
+                    agency: agency
+                )
+                isLoadingSchedule = false
+            }
+        }
     }
 
     private func busStop(from stop: OnwardStop) -> BusStop {
@@ -90,7 +134,8 @@ struct JourneyStopRow: View {
 
     private var accessibilityLabel: String {
         let location = isOrigin ? "current stop, " : ""
-        return "\(location)\(stop.name), \(stop.minutesString)"
+        let timing = stop.isRealTime ? "" : ", scheduled"
+        return "\(location)\(stop.name), \(stop.minutesString)\(timing)"
     }
 }
 
