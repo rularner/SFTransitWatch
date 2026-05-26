@@ -21,14 +21,12 @@ struct BusJourneyView: View {
     var body: some View {
         List {
             if isScheduled {
-                Section {
-                    HStack(spacing: 6) {
-                        Image(systemName: "calendar.clock")
-                            .foregroundColor(.secondary)
-                        Text("Scheduled times — no real-time tracking")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.clock")
+                        .foregroundColor(.secondary)
+                    Text("Scheduled times — no real-time tracking")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 .listRowBackground(Color.clear)
             }
