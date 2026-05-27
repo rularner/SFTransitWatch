@@ -204,9 +204,6 @@ class TransitAPI: ObservableObject {
             }
         }
 
-        if allStops.isEmpty {
-            errorMessage = "No nearby stops found"
-        }
         return allStops
     }
     
@@ -218,6 +215,7 @@ class TransitAPI: ObservableObject {
         radius: Int
     ) async throws -> [BusStop] {
         let endpoint = "Stops"
+        let effectiveRadius = max(radius, Agency.named(agencyCode)?.nearbyRadius ?? radius)
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
             URLQueryItem(name: "operator_id", value: agencyCode),
@@ -225,7 +223,7 @@ class TransitAPI: ObservableObject {
             URLQueryItem(name: "lon",         value: String(longitude)),
             URLQueryItem(name: "latitude",    value: String(latitude)),
             URLQueryItem(name: "longitude",   value: String(longitude)),
-            URLQueryItem(name: "radius",      value: String(radius))
+            URLQueryItem(name: "radius",      value: String(effectiveRadius))
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))

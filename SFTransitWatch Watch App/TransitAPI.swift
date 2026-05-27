@@ -225,8 +225,6 @@ class TransitAPI: ObservableObject {
             errorMessage = "Couldn't reach 511.org for any agency"
         } else if failureCount > 0 {
             errorMessage = "Some agencies unavailable"
-        } else if merged.isEmpty {
-            errorMessage = "No nearby stops found"
         }
 
         return merged
@@ -237,6 +235,7 @@ class TransitAPI: ObservableObject {
     /// results.
     private func fetchNearbyStops(latitude: Double, longitude: Double, radius: Int, agency: String) async throws -> [BusStop] {
         let endpoint = "Stops"
+        let effectiveRadius = max(radius, Agency.named(agency)?.nearbyRadius ?? radius)
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
             URLQueryItem(name: "operator_id", value: agency),
@@ -246,7 +245,7 @@ class TransitAPI: ObservableObject {
             // Send both forms so geofiltering works consistently.
             URLQueryItem(name: "latitude", value: String(latitude)),
             URLQueryItem(name: "longitude", value: String(longitude)),
-            URLQueryItem(name: "radius", value: String(radius))
+            URLQueryItem(name: "radius", value: String(effectiveRadius))
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))

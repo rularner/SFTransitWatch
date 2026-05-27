@@ -11,22 +11,26 @@ public struct Agency: Hashable, Codable, Identifiable, Sendable {
     public let displayName: String
     /// 2-3 char tag for compact UI rows when more than one agency is enabled.
     public let badge: String
+    /// Radius in meters used when searching for nearby stops. Commuter rail
+    /// agencies have widely spaced stations and need a much larger default.
+    public let nearbyRadius: Int
 
     public var id: String { code }
 
-    public init(code: String, displayName: String, badge: String) {
+    public init(code: String, displayName: String, badge: String, nearbyRadius: Int = 1_000) {
         self.code = code
         self.displayName = displayName
         self.badge = badge
+        self.nearbyRadius = nearbyRadius
     }
 
-    public static let muni        = Agency(code: "SF", displayName: "Muni",            badge: "MUNI")
-    public static let bart        = Agency(code: "BA", displayName: "BART",            badge: "BART")
-    public static let acTransit   = Agency(code: "AC", displayName: "AC Transit",      badge: "AC")
-    public static let caltrain    = Agency(code: "CT", displayName: "Caltrain",        badge: "CT")
-    public static let goldenGate  = Agency(code: "GG", displayName: "Golden Gate",     badge: "GG")
-    public static let samTrans    = Agency(code: "SM", displayName: "SamTrans",        badge: "SM")
-    public static let vta         = Agency(code: "SC", displayName: "VTA",             badge: "VTA")
+    public static let muni        = Agency(code: "SF", displayName: "Muni",            badge: "MUNI", nearbyRadius: 1_000)
+    public static let bart        = Agency(code: "BA", displayName: "BART",            badge: "BART", nearbyRadius: 1_500)
+    public static let acTransit   = Agency(code: "AC", displayName: "AC Transit",      badge: "AC",   nearbyRadius: 1_000)
+    public static let caltrain    = Agency(code: "CT", displayName: "Caltrain",        badge: "CT",   nearbyRadius: 10_000)
+    public static let goldenGate  = Agency(code: "GG", displayName: "Golden Gate",     badge: "GG",   nearbyRadius: 10_000)
+    public static let samTrans    = Agency(code: "SM", displayName: "SamTrans",        badge: "SM",   nearbyRadius: 3_000)
+    public static let vta         = Agency(code: "SC", displayName: "VTA",             badge: "VTA",  nearbyRadius: 2_000)
 
     /// Order matters: it's the order shown in Settings.
     public static let known: [Agency] = [.muni, .bart, .acTransit, .caltrain, .goldenGate, .samTrans, .vta]
