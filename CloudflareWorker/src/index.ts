@@ -267,6 +267,9 @@ async function fetchAndCacheUpstream(
 	await env.TRANSIT_CACHE.put(LAST_UPSTREAM_FETCH_KEY, String(nowMs), {
 		expirationTtl: STALE_TTL_SECONDS,
 	});
+	const safeUrl = new URL(upstreamUrl);
+	safeUrl.searchParams.delete("api_key");
+	console.error(`Upstream error: HTTP ${response.status} for ${safeUrl} — body: ${body.slice(0, 300)}`);
 	return { ok: false, error: `Upstream responded with HTTP ${response.status}.` };
 }
 
