@@ -184,7 +184,8 @@ struct ComplicationWidgetEntryView: View {
     private var inlineView: some View {
         Group {
             if let arrivalTime = entry.arrivalTime {
-                (Text(entry.route + " ") + Text(arrivalTime, style: .relative))
+                let shortRoute = entry.route.split(separator: " ").first.map(String.init) ?? entry.route
+                (Text(shortRoute + " ") + Text(arrivalTime, style: .relative))
                     .widgetAccentable()
             } else {
                 Text(entry.route)
