@@ -185,24 +185,41 @@ struct BusStopListView: View {
 
     @ViewBuilder
     private var locationPromptSection: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "location.slash")
-                .font(.system(size: 40))
-                .foregroundColor(.secondary)
-            Text("No nearby stops found")
-                .font(.headline)
-            Text("Make sure location services are enabled")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Enable Location") {
-                locationManager.requestLocationPermission()
+        if locationManager.currentLocation != nil {
+            VStack(spacing: 12) {
+                Image(systemName: "tram")
+                    .font(.system(size: 40))
+                    .foregroundColor(.secondary)
+                Text("No stops nearby")
+                    .font(.headline)
+                Text("No stops within 1 km for the selected \(queryAgencies.count == 1 ? "agency" : "agencies")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.bordered)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .listRowBackground(Color.clear)
+        } else {
+            VStack(spacing: 12) {
+                Image(systemName: "location.slash")
+                    .font(.system(size: 40))
+                    .foregroundColor(.secondary)
+                Text("Location unavailable")
+                    .font(.headline)
+                Text("Make sure location services are enabled")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Enable Location") {
+                    locationManager.requestLocationPermission()
+                }
+                .buttonStyle(.bordered)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .listRowBackground(Color.clear)
         }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .listRowBackground(Color.clear)
     }
 
     @ViewBuilder
