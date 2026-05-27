@@ -339,7 +339,7 @@ async function handleLog(request: Request): Promise<Response> {
 }
 
 async function handleStopsRequest(url: URL, env: Env): Promise<Response> {
-	const agency = url.searchParams.get("agency");
+	const agency = url.searchParams.get("agency") ?? url.searchParams.get("operator_id");
 	if (!agency) {
 		return jsonError("agency parameter required.", 400);
 	}
