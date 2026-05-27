@@ -53,11 +53,13 @@ export default {
 			if (!auth.ok) {
 				return jsonError("Missing or invalid X-App-Token.", 401);
 			}
+			const keyHashPrefix = (await sha256Hex(env.API_511_KEY)).slice(0, 12);
 			console.log(JSON.stringify({
 				source: "worker-auth",
 				label: auth.client.label,
 				method: request.method,
 				path: url.pathname,
+				keyHashPrefix,
 			}));
 			if (url.pathname === "/log") {
 				return await handleLog(request);
@@ -269,7 +271,8 @@ async function fetchAndCacheUpstream(
 	});
 	const safeUrl = new URL(upstreamUrl);
 	safeUrl.searchParams.delete("api_key");
-	console.error(`Upstream error: HTTP ${response.status} for ${safeUrl} — body: ${body.slice(0, 300)}`);
+	const keyHashPrefix = (await sha256Hex(env.API_511_KEY)).slice(0, 12);
+	console.error(`Upstream error: HTTP ${response.status} for ${safeUrl} — key_hash_prefix: ${keyHashPrefix} — body: ${body.slice(0, 300)}`);
 	return { ok: false, error: `Upstream responded with HTTP ${response.status}.` };
 }
 
@@ -389,17 +392,20 @@ async function fetchAndCacheAllStops(
 	nowMs: number,
 ): Promise<{ ok: true; value: CachedStops } | { ok: false; error: string }> {
 	const upstreamUrl = new URL(`${UPSTREAM_BASE_URL}/Stops`);
-	upstreamUrl.searchParams.set("agency", agency);
+	upstreamUrl.searchParams.set("operator_id", agency);
 	upstreamUrl.searchParams.set("api_key", env.API_511_KEY);
 
 	let response: Response;
 	try {
 		response = await fetch(upstreamUrl, { headers: { Accept: "application/json" } });
-	} catch {
+	} catch (err) {
+		console.error(`Stops upstream fetch failed for ${agency}:`, err);
 		return { ok: false, error: "Failed to contact 511 upstream." };
 	}
 
 	if (!response.ok) {
+		const body = await response.text();
+		console.error(`Stops upstream error: HTTP ${response.status} for ${agency} — body: ${body.slice(0, 300)}`);
 		return { ok: false, error: `Upstream responded with HTTP ${response.status}.` };
 	}
 
