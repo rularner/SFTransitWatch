@@ -9,6 +9,9 @@ CURRENT_PROJECT_VERSION = 1
 // the build instead of accumulating. Applies to all targets via project base.
 SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 
+// Base URL for the Cloudflare Worker proxy. Seeded into UserDefaults on first launch.
+WORKER_BASE_URL = https://sftransitwatch.rustylarner.workers.dev
+
 // Developer-local overrides (signing, build number for manual TestFlight builds).
 // Included last so values here win over defaults above.
 // File is gitignored — safe to set CURRENT_PROJECT_VERSION here before a GUI archive.

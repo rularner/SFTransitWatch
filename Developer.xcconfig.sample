@@ -1,10 +1,20 @@
-// Copy this file to Developer.xcconfig and set your Apple Developer team ID.
-// Your team ID is shown in Xcode under Settings > Accounts, or at
+// Copy this file to Developer.xcconfig and fill in the values below.
+// Your Apple Developer team ID is shown in Xcode under Settings > Accounts, or at
 // https://developer.apple.com/account in the Membership section.
 
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
 
-// Worker URLs and tokens are no longer baked into the build. Each device
-// pastes a worker bootstrap link (carries both URL and token) into iOS
-// Settings, or receives it via a /wt universal link on the watch. See the
-// "Worker proxy" section of the README.
+// EC P-256 private key for worker self-provisioning (Base64-encoded SEC1 or PKCS8 DER).
+// Generate with:
+//   openssl ecparam -name prime256v1 -genkey -noout -out /tmp/provision.pem
+//   openssl ec -in /tmp/provision.pem -outform DER | base64 | tr -d '\n'
+//   rm /tmp/provision.pem
+// The corresponding public key (SPKI DER base64) goes into the Cloudflare Worker
+// secret SELF_PROVISION_PUBLIC_KEY:
+//   openssl ec -in /tmp/provision.pem -pubout -outform DER | base64 | tr -d '\n'
+// Leave blank for simulator builds (makeFromBundle() returns nil, Connect button is hidden).
+
+SELF_PROVISION_PRIVATE_KEY =
+
+// Worker proxy base URL (already set in Config.xcconfig; override here only if needed).
+// WORKER_BASE_URL = https://your-worker.your-account.workers.dev
