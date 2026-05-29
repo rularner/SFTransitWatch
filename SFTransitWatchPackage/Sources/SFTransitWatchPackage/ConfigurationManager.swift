@@ -18,6 +18,14 @@ public class ConfigurationManager: @unchecked Sendable {
         }
         self.userDefaults = userDefaults
         migrateIfNeeded()
+        seedWorkerBaseURLIfNeeded()
+    }
+
+    private func seedWorkerBaseURLIfNeeded() {
+        guard (userDefaults.string(forKey: workerBaseURLKey) ?? "").isEmpty,
+              let bundleURL = Bundle.main.infoDictionary?["WORKER_BASE_URL"] as? String,
+              !bundleURL.isEmpty else { return }
+        userDefaults.set(bundleURL, forKey: workerBaseURLKey)
     }
 
     /// One-time migration from the old App Group and from UserDefaults.standard
@@ -59,6 +67,10 @@ public class ConfigurationManager: @unchecked Sendable {
 
     public var isWorkerConfigured: Bool {
         !workerToken.isEmpty && !workerBaseURL.isEmpty
+    }
+
+    public var isConfigured: Bool {
+        isWorkerConfigured || !apiKey.isEmpty
     }
 
     public func setWorkerConfig(url: String, token: String) {

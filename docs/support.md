@@ -5,18 +5,32 @@ title: Support
 
 # Support
 
-## Getting a 511.org API key
+## Getting started
 
-SF Transit Watch uses the free [511.org Open Data API](https://511.org/open-data) for real-time arrivals. You'll need a free API token:
+### Option A — Connect to the SF Transit Watch server (recommended)
+
+On first launch, the app will ask if you want to connect to the SF Transit
+Watch proxy server. Tap **Connect** and the app configures itself
+automatically — no API key required.
+
+The proxy is optional and free. It caches 511.org requests so your watch
+gets faster responses. See the privacy policy for what data is exchanged
+during the one-time setup.
+
+### Option B — Use a 511.org API key directly
+
+SF Transit Watch also works with a free [511.org Open Data API](https://511.org/open-data) key. This mode sends requests directly from the app to 511.org, bypassing the proxy entirely.
+
+**Getting a key:**
 
 1. Go to [https://511.org/open-data/token](https://511.org/open-data/token).
 2. Fill out the short registration form.
 3. You'll receive an API token by email, usually within a few minutes.
 
-## Entering your API key
+**Entering your key:**
 
-1. Open the SF Transit Watch app on your iPhone.
-2. Go to **Settings** and paste your token into the **511.org API Key** field.
+1. On the first-launch prompt, tap **Use 511.org key instead**.
+2. In the Settings screen that opens, paste your token into the **511.org API Key** field.
 3. The watch app picks up the key automatically the next time it connects to the phone.
 
 You can also enter the key directly on the watch under **Settings → API Key**, but setting it on the phone is easier.
@@ -53,9 +67,14 @@ Note that many email and message clients won't auto-linkify non-`https` URLs, so
 
 ## Troubleshooting
 
-### The watch shows "Please configure your 511.org API key"
+### The app shows "A 511.org API key or registered server is required"
 
-Either the key hasn't synced from the phone yet, or it hasn't been set at all. Open the iPhone app, confirm the key is in Settings, then open the watch app and give it a few seconds to receive the update.
+The app hasn't been configured yet. Open the app on iPhone (or watch), and either:
+
+- Tap **Connect** to connect to the SF Transit Watch proxy server automatically, or
+- Go to **Settings** and paste a 511.org API key into the **511.org API Key** field.
+
+If the iPhone app is installed and the watch shows this message, open the iPhone app first and configure it there. The watch picks up the configuration automatically via Watch Connectivity.
 
 ### No nearby stops appear
 

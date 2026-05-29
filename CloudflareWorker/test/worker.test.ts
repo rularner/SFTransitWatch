@@ -413,3 +413,190 @@ describe("timetable endpoint routing", () => {
         expect(res.status).toBe(400);
     });
 });
+
+// ---------------------------------------------------------------------------
+// POST /self-provision
+// ---------------------------------------------------------------------------
+
+describe("POST /self-provision", () => {
+    const TEST_ENV = env as unknown as {
+        CLIENT_TOKENS: KVNamespace;
+        TEST_PROVISION_PRIVATE_KEY: string;
+    };
+
+    let testPrivateKey: CryptoKey;
+
+    async function signJWT(
+        payload: Record<string, unknown>,
+        overrideKey?: CryptoKey,
+    ): Promise<string> {
+        const key = overrideKey ?? testPrivateKey;
+        const header = { alg: "ES256", typ: "JWT" };
+        const b64url = (data: ArrayBuffer | string) => {
+            const bytes =
+                typeof data === "string"
+                    ? new TextEncoder().encode(data)
+                    : new Uint8Array(data);
+            let str = "";
+            for (const b of bytes) str += String.fromCharCode(b);
+            return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+        };
+        const encodedHeader = b64url(JSON.stringify(header));
+        const encodedPayload = b64url(JSON.stringify(payload));
+        const signingInput = `${encodedHeader}.${encodedPayload}`;
+        const sig = await crypto.subtle.sign(
+            { name: "ECDSA", hash: "SHA-256" },
+            key,
+            new TextEncoder().encode(signingInput),
+        );
+        return `${signingInput}.${b64url(sig)}`;
+    }
+
+    function validPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+        const now = Math.floor(Date.now() / 1000);
+        return {
+            iss: "org.larner.SFTransitWatch",
+            install_id: "aabbccdd-1234-5678-abcd-ef0123456789",
+            platform: "ios",
+            app_version: "1.0.0",
+            iat: now,
+            exp: now + 60,
+            ...overrides,
+        };
+    }
+
+    beforeAll(async () => {
+        const pkcs8 = Uint8Array.from(
+            atob(TEST_ENV.TEST_PROVISION_PRIVATE_KEY),
+            (c) => c.charCodeAt(0),
+        );
+        testPrivateKey = await crypto.subtle.importKey(
+            "pkcs8",
+            pkcs8,
+            { name: "ECDSA", namedCurve: "P-256" },
+            false,
+            ["sign"],
+        );
+    });
+
+    it("returns 400 when body is missing", async () => {
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when body is not valid JSON", async () => {
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "not json",
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when jwt field is absent", async () => {
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ other: "field" }),
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it("returns 401 when JWT signature is invalid", async () => {
+        const wrongKeyPair = await crypto.subtle.generateKey(
+            { name: "ECDSA", namedCurve: "P-256" },
+            true,
+            ["sign", "verify"],
+        );
+        const jwt = await signJWT(validPayload(), wrongKeyPair.privateKey);
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
+        });
+        expect(res.status).toBe(401);
+    });
+
+    it("returns 401 when exp is in the past", async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const jwt = await signJWT(validPayload({ iat: now - 120, exp: now - 60 }));
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
+        });
+        expect(res.status).toBe(401);
+    });
+
+    it("returns 401 when iss does not match the expected bundle ID", async () => {
+        const jwt = await signJWT(validPayload({ iss: "com.evil.app" }));
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
+        });
+        expect(res.status).toBe(401);
+    });
+
+    it("returns 200 with a token for a valid JWT", async () => {
+        const jwt = await signJWT(validPayload());
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
+        });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { token: string };
+        expect(typeof body.token).toBe("string");
+        expect(body.token.length).toBeGreaterThan(8);
+    });
+
+    it("stores the token in CLIENT_TOKENS under sha256(token)", async () => {
+        const jwt = await signJWT(validPayload({ install_id: "store-test-id", platform: "ios", app_version: "1.0.0" }));
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
+        });
+        const { token } = (await res.json()) as { token: string };
+        const hash = await sha256Hex(token);
+        const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { label: string } | null;
+        expect(stored).not.toBeNull();
+        expect(stored!.label).toContain("self-prov");
+        expect(stored!.label).toContain("ios");
+    });
+
+    it("label contains the platform and first 8 chars of install_id", async () => {
+        const installId = "12345678-abcd-ef01-2345-678901234567";
+        const jwt = await signJWT(validPayload({ install_id: installId, platform: "watchos", app_version: "2.0.0" }));
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
+        });
+        const { token } = (await res.json()) as { token: string };
+        const hash = await sha256Hex(token);
+        const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { label: string } | null;
+        expect(stored!.label).toBe("self-prov:watchos:12345678:2.0.0");
+    });
+
+    it("is accessible without an X-App-Token header", async () => {
+        const jwt = await signJWT(validPayload({ install_id: "no-token-test-id" }));
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
+        });
+        expect(res.status).not.toBe(401);
+    });
+
+    it("returns 405 for non-POST methods", async () => {
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "GET",
+        });
+        expect(res.status).toBe(405);
+    });
+});

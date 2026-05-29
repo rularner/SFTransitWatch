@@ -357,10 +357,8 @@ class TransitAPI: ObservableObject {
     
     // Check if API key is configured
     var isAPIKeyConfigured: Bool {
-        // SnapshotMode: pretend the key is configured so settings/onboarding views
-        // render their post-configuration state in App Store screenshots.
         if SnapshotMode.isActive { return true }
-        return hasUsableKey
+        return hasUsableKey || ConfigurationManager.shared.isWorkerConfigured
     }
 
     private func fetchAllStops(agency: String) async throws -> [BusStop] {

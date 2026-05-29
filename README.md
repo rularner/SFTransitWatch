@@ -146,20 +146,21 @@ The app intelligently learns your route preferences:
 2. **(Optional) Override signing locally**:
    ```bash
    cp Developer.xcconfig.sample Developer.xcconfig
-   # Edit Developer.xcconfig and replace YOUR_TEAM_ID with your team ID
+   # Edit Developer.xcconfig and fill in YOUR_TEAM_ID and SELF_PROVISION_PRIVATE_KEY
    ```
    `Developer.xcconfig` is gitignored and optional — `Config.xcconfig` pulls it
    in with an optional `#include?` directive, so the project builds fine
    without it. Create it only if you want to override signing settings like
-   `DEVELOPMENT_TEAM` without editing the project file.
+   `DEVELOPMENT_TEAM` or provide the self-provision private key for device
+   builds. See `Developer.xcconfig.sample` for key-generation instructions.
 
-   **Worker proxy (optional):** by default the app calls 511.org directly
-   with the API key you paste — no further setup needed. If you (or a
-   family member) run a Cloudflare Worker proxy, you can route through
-   it for caching and telemetry. The worker URL and per-device token are
-   bundled into a single bootstrap link:
+   **Worker proxy (optional):** by default the app prompts on first launch to
+   connect to the SF Transit Watch proxy server (auto-provisioned, no operator
+   action required) or enter a direct 511.org API key. If you prefer to
+   distribute tokens manually (e.g. to specific family members without the
+   first-launch prompt), you can mint a bootstrap link:
 
-   1. The worker operator mints a link for your device:
+   1. The worker operator mints a link for a specific device:
       ```bash
       cd CloudflareWorker
       WORKER_URL=https://your-worker.workers.dev ./scripts/issue-token.sh <your-device-label>
@@ -188,29 +189,22 @@ The app intelligently learns your route preferences:
    - Select your Apple Watch as the target device
    - Press Cmd+R to build and run
 
-5. **Configure API Key**:
+5. **Configure data source**:
 
-   Pick whichever of these is easiest:
+   On first launch the app will prompt you. Pick whichever is easiest:
 
-   - **On the iPhone app** (recommended): open **Settings** and paste the
-     token into **511.org API Key**. The watch picks it up the next time it
-     connects.
-   - **On the watch**: open the app, tap the settings gear, select
-     **Enter API Key**, and paste or dictate the key.
-   - **Via text or email**: send yourself a Messages or Mail message
-     containing the link
+   - **Connect to the proxy server** (recommended): tap **Connect** on the
+     first-launch prompt. The app self-provisions a token automatically —
+     no API key needed.
+   - **Direct 511.org**: on the first-launch prompt, tap
+     **Use 511.org key instead**, then paste your API key in the Settings
+     sheet that opens.
+   - **Via text or email (watch/phone)**: send yourself a link
      `https://rularner.github.io/sftransitwatch/key?k=YOUR_API_KEY`
-     (replace `YOUR_API_KEY` with the token from 511.org), then open
-     that message **on your Apple Watch** and tap the link. The watch
-     app is registered as the handler for that URL via Universal
-     Links, so the app opens and saves the key automatically. Tapping
-     the link on the iPhone just shows a short fallback page — the
-     link has to be opened on the watch itself. If the universal link
-     isn't active yet, the app also accepts a custom-scheme fallback
-     (`sftransitwatch://key/YOUR_API_KEY`).
+     and open it on your Apple Watch to load the key directly. The app
+     also accepts `sftransitwatch://key/YOUR_API_KEY` as a fallback.
 
-   See [docs/support.md](docs/support.md#loading-your-api-key-via-text-or-email)
-   for more detail on the link method.
+   See [docs/support.md](docs/support.md) for more detail.
 
 6. **Set Up Siri**:
    - Go to Settings > Siri Integration

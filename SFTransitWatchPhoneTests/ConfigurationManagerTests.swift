@@ -268,4 +268,28 @@ final class ConfigurationManagerTests: XCTestCase {
         XCTAssertEqual(ConfigurationManager.shared.workerBaseURL, "https://updated.example.com")
         XCTAssertEqual(ConfigurationManager.shared.workerToken, "updated-token")
     }
+
+    // MARK: - isConfigured Tests
+
+    @MainActor
+    func testIsConfiguredWhenWorkerIsConfigured() {
+        ConfigurationManager.shared.setWorkerConfig(
+            url: "https://worker.example.com",
+            token: "valid-token"
+        )
+        XCTAssertTrue(ConfigurationManager.shared.isConfigured)
+    }
+
+    @MainActor
+    func testIsConfiguredWhenAPIKeySet() {
+        ConfigurationManager.shared.apiKey = "my-511-key"
+        XCTAssertTrue(ConfigurationManager.shared.isConfigured)
+    }
+
+    @MainActor
+    func testIsNotConfiguredWhenNeitherSet() {
+        ConfigurationManager.shared.clearWorkerConfig()
+        ConfigurationManager.shared.apiKey = ""
+        XCTAssertFalse(ConfigurationManager.shared.isConfigured)
+    }
 }
