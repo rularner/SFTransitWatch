@@ -1,4 +1,5 @@
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
+const EXPECTED_ISS = "org.larner.SFTransitWatch";
 const FRESH_TTL_SECONDS = 60;
 const STALE_TTL_SECONDS = 6 * 60 * 60;
 const MIN_UPSTREAM_INTERVAL_MS = 60_000;
@@ -48,6 +49,11 @@ export default {
 			// Registration exchange — unauthenticated, must come before the token gate.
 			if (url.pathname === "/worker-token") {
 				return await handleWorkerToken(request, env);
+			}
+
+			// Self-provision — unauthenticated, must come before the token gate.
+			if (url.pathname === "/self-provision") {
+				return await handleSelfProvision(request, env);
 			}
 
 			const auth = await authorizeClient(request, env);
@@ -481,6 +487,103 @@ export function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: n
 		Math.sin(dLat / 2) ** 2 +
 		Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
 	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function handleSelfProvision(request: Request, env: Env): Promise<Response> {
+    if (request.method !== "POST") {
+        return jsonError("Only POST requests are supported.", 405);
+    }
+
+    let parsed: unknown;
+    try {
+        parsed = await request.json();
+    } catch {
+        return jsonError("Body must be valid JSON.", 400);
+    }
+
+    if (!parsed || typeof parsed !== "object" || typeof (parsed as Record<string, unknown>).jwt !== "string") {
+        return jsonError('Body must be {"jwt": "<compact-jwt>"}', 400);
+    }
+
+    const jwt = (parsed as { jwt: string }).jwt;
+    const parts = jwt.split(".");
+    if (parts.length !== 3) {
+        return jsonError("Malformed JWT.", 400);
+    }
+
+    const [encodedHeader, encodedPayload, encodedSig] = parts;
+
+    let payload: Record<string, unknown>;
+    try {
+        const payloadJson = atob(encodedPayload.replace(/-/g, "+").replace(/_/g, "/"));
+        payload = JSON.parse(payloadJson) as Record<string, unknown>;
+    } catch {
+        return jsonError("JWT payload is not valid Base64url JSON.", 400);
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (typeof payload.exp !== "number" || payload.exp <= nowSec) {
+        return jsonError("JWT has expired.", 401);
+    }
+    if (typeof payload.iat !== "number" || payload.iat > nowSec + 5) {
+        return jsonError("JWT iat is in the future.", 401);
+    }
+
+    if (payload.iss !== EXPECTED_ISS) {
+        return jsonError("JWT issuer mismatch.", 401);
+    }
+
+    let sigValid: boolean;
+    try {
+        const spkiBytes = Uint8Array.from(atob(env.SELF_PROVISION_PUBLIC_KEY), (c) => c.charCodeAt(0));
+        const publicKey = await crypto.subtle.importKey(
+            "spki",
+            spkiBytes,
+            { name: "ECDSA", namedCurve: "P-256" },
+            false,
+            ["verify"],
+        );
+        const sigBytes = Uint8Array.from(
+            atob(encodedSig.replace(/-/g, "+").replace(/_/g, "/")),
+            (c) => c.charCodeAt(0),
+        );
+        const signingInputBytes = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
+        sigValid = await crypto.subtle.verify(
+            { name: "ECDSA", hash: "SHA-256" },
+            publicKey,
+            sigBytes,
+            signingInputBytes,
+        );
+    } catch {
+        return jsonError("JWT signature verification failed.", 401);
+    }
+
+    if (!sigValid) {
+        return jsonError("JWT signature is invalid.", 401);
+    }
+
+    const rawToken = crypto.randomUUID();
+    const hash = await sha256Hex(rawToken);
+    const platform = typeof payload.platform === "string" ? payload.platform : "unknown";
+    const installId = typeof payload.install_id === "string" ? payload.install_id : "unknown";
+    const appVersion = typeof payload.app_version === "string" ? payload.app_version : "unknown";
+    const label = `self-prov:${platform}:${installId.slice(0, 8)}:${appVersion}`;
+
+    await env.CLIENT_TOKENS.put(
+        hash,
+        JSON.stringify({ label, createdAt: new Date().toISOString() }),
+    );
+
+    console.log(JSON.stringify({ source: "self-provision", label }));
+
+    return new Response(JSON.stringify({ token: rawToken }), {
+        status: 200,
+        headers: {
+            ...corsHeaders(),
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+        },
+    });
 }
 
 export async function sha256Hex(input: string): Promise<string> {
