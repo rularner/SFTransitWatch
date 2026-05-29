@@ -23,6 +23,7 @@ interface Env {
 	API_511_KEY: string;
 	TRANSIT_CACHE: KVNamespace;
 	CLIENT_TOKENS: KVNamespace;
+	SELF_PROVISION_PUBLIC_KEY: string;
 }
 
 type CachedResponse = {
