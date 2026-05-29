@@ -13,6 +13,7 @@ struct SFTransitWatchApp: App {
 
     init() {
         PhoneSession.shared.activate()
+        SFTransitAppShortcuts.updateAppShortcutParameters()
     }
 
     var body: some Scene {

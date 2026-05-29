@@ -16,6 +16,7 @@ struct SFTransitWatchApp: App {
 
     init() {
         WatchSession.shared.activate()
+        SFTransitAppShortcuts.updateAppShortcutParameters()
     }
 
     var body: some Scene {

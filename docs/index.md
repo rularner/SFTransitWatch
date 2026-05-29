@@ -30,7 +30,7 @@ SF Transit Watch covers every transit stop served by the 511.org feed — all ni
 
 ## Privacy
 
-SF Transit Watch does not collect, store, or transmit any personal data. Your location is used only on-device to find nearby stops. Your 511.org API key is stored locally on your devices and synced between phone and watch via Apple's encrypted WatchConnectivity framework.
+See the [privacy page](privacy_policy.html)
 
 ---
 
