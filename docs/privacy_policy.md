@@ -17,7 +17,7 @@ using the 511.org Transit API.
 ## Who we are
 
 SF Transit Watch is published by Rusty Larner. You can reach us at
-**rlarner@gmail.com** for any privacy questions or requests.
+**sftransitwatch@larner.org** for any privacy questions or requests.
 
 ## Summary
 
@@ -26,10 +26,17 @@ SF Transit Watch is published by Rusty Larner. You can reach us at
   third-party analytics SDKs.
 - We do **not** require an account, sign-in, email address, or any other
   personal identifier to use the App.
-- Your location is used on-device to look up nearby stops and is sent only
-  to the 511.org Transit API (or our optional Cloudflare-hosted proxy in
-  front of it). It is not stored by us.
-- Your favorites, pinned stops, commute stops, and 511.org API key are
+- The App offers two data-source modes: **direct 511.org** (your API key
+  goes straight to 511.org, no server of ours is involved) and **remote
+  server** (optional, described below). You choose at first launch.
+- If the remote server is enabled, your location is sent to our
+  Cloudflare-hosted proxy, which forwards it to 511.org. Your location is
+  not stored by us.
+- If you connect to the remote server, the App sends your install ID,
+  platform, app version, and bundle identifier once on first launch to
+  obtain an access credential. This data is not stored beyond the
+  credential record.
+- Your favorites, pinned stops, commute stops, and any 511.org API key are
   stored only on your device.
 
 ## Information we handle
@@ -50,21 +57,38 @@ up bus and rail stops near you.
   work for stops you have already saved, but it will not be able to
   discover new nearby stops.
 
-### 2. Your 511.org API key
+### 2. Data source configuration
 
-To fetch transit data, the App uses an API key issued to you by
-[511.org](https://511.org/developers/). You enter this key yourself in
-Settings (or load it via a one-time link).
+The App supports two modes for fetching transit data. You choose at first
+launch and can change it in Settings.
 
-- The key is stored locally on your device in the system preference store
-  (`UserDefaults` / `@AppStorage`).
-- If you use both the iPhone and Apple Watch app, the key may be
-  transferred between the two over Apple's encrypted Watch Connectivity
-  channel so the watch can make requests on its own.
-- The key is sent only to 511.org (or our proxy, see below) as part of
-  normal API requests. It is not transmitted anywhere else and is not
-  included in telemetry.
+**Direct 511.org (API key mode)**
+
+You enter a free API key from [511.org](https://511.org/developers/).
+
+- The key is stored locally on your device (`UserDefaults` / `@AppStorage`).
+- If you use both the iPhone and Apple Watch app, the key may be transferred
+  between the two over Apple's encrypted Watch Connectivity channel.
+- The key is sent only to 511.org as part of normal API requests. It is not
+  transmitted anywhere else and is not included in telemetry.
 - You can clear the key at any time from the in-app Settings screen.
+
+**Remote server (self-provision mode, optional)**
+
+On first launch, if no API key is set, the App prompts you to connect to our
+optional Cloudflare-hosted proxy server. If you tap "Connect":
+
+- The App sends your **install ID** (a random UUID), **platform**
+  (`ios` or `watchos`), **app version**, and **bundle identifier** to our
+  server to obtain a short-lived access credential. This one-time exchange
+  uses an asymmetric cryptographic signature embedded in the app binary to
+  prove the request comes from a genuine install of this app.
+- The server issues an opaque access token stored only on your device. The
+  token is used on every subsequent request to authenticate with the proxy.
+- If you prefer not to connect, tap "Use 511.org key instead" to enter an
+  API key directly, or tap Cancel. If you cancel without entering a key,
+  the App will show a message on the home screen until you configure one
+  of the two options.
 
 ### 3. Favorites, pinned stops, and commute stops
 
@@ -133,7 +157,7 @@ not collect them automatically.
 | Recipient | What is sent | Why |
 |-----------|--------------|-----|
 | **511.org Transit API** (operated by the Metropolitan Transportation Commission) | Your latitude/longitude when looking up nearby stops, the stop code when looking up arrivals, and your 511.org API key. | To fetch transit data. Governed by the [511.org terms of use](https://511.org/about/terms-of-use). |
-| **Cloudflare (optional proxy)** | The same requests above, with your device's IP address as part of normal HTTP transit, plus an app token header. The proxy adds short-lived caching and forwards to 511.org. | To reduce load on 511.org and add caching. The proxy does not log request bodies or your API key beyond what is required to forward the request. |
+| **Cloudflare (optional proxy)** | On first connection: install ID, platform, app version, bundle identifier (to obtain an access token). During normal use: the same location and stop-code requests as 511.org above, plus your device's IP address as part of normal HTTP transit and an app token header. | One-time credential issuance; then to reduce load on 511.org and add caching. The proxy does not log request bodies or your API key beyond what is required to forward the request. If you do not enable the proxy, no data is ever sent here. |
 | **Apple** | Location permission, Siri intents, Watch Connectivity messages, push of complication updates. | Standard Apple platform services, governed by Apple's Privacy Policy. |
 
 We do not share, sell, rent, or trade any information with advertisers or
