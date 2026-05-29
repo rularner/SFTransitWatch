@@ -13,7 +13,23 @@ jobs:
     name: Validate PR title follows Conventional Commits
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if app code changed
+        id: app_changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qvE '^(CloudflareWorker/|docs/)'; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            echo "result=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check PR title matches Conventional Commits
+        if: steps.app_changed.outputs.result == 'true'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
