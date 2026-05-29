@@ -239,6 +239,27 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
+
+            Section(header: Text("Privacy")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Remote Server (Optional)")
+                        .font(.headline)
+                    Text("The remote server is optional. The app works with a direct 511.org API key and never contacts the server in that mode.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("If the remote server is enabled:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 2)
+                    Text("• On first launch, your install ID, platform, app version, and bundle identifier are sent to obtain an access credential.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("• During normal use, your approximate location (latitude and longitude) is sent to find nearby stops.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
         }
         .navigationTitle("Settings")
         .onAppear {
