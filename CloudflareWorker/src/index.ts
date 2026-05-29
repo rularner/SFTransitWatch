@@ -515,8 +515,8 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
 
     let payload: Record<string, unknown>;
     try {
-        const payloadJson = atob(encodedPayload.replace(/-/g, "+").replace(/_/g, "/"));
-        payload = JSON.parse(payloadJson) as Record<string, unknown>;
+        const payloadBytes = fromBase64Url(encodedPayload);
+        payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
     } catch {
         return jsonError("JWT payload is not valid Base64url JSON.", 400);
     }
@@ -527,6 +527,9 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
     }
     if (typeof payload.iat !== "number" || payload.iat > nowSec + 5) {
         return jsonError("JWT iat is in the future.", 401);
+    }
+    if (payload.exp - (payload.iat as number) > 300) {
+        return jsonError("JWT lifetime too long.", 401);
     }
 
     if (payload.iss !== EXPECTED_ISS) {
@@ -543,10 +546,7 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
             false,
             ["verify"],
         );
-        const sigBytes = Uint8Array.from(
-            atob(encodedSig.replace(/-/g, "+").replace(/_/g, "/")),
-            (c) => c.charCodeAt(0),
-        );
+        const sigBytes = fromBase64Url(encodedSig);
         const signingInputBytes = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
         sigValid = await crypto.subtle.verify(
             { name: "ECDSA", hash: "SHA-256" },
@@ -572,6 +572,7 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
     await env.CLIENT_TOKENS.put(
         hash,
         JSON.stringify({ label, createdAt: new Date().toISOString() }),
+        { expirationTtl: 90 * 24 * 60 * 60 },
     );
 
     console.log(JSON.stringify({ source: "self-provision", label }));
@@ -584,6 +585,12 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
             "Cache-Control": "no-store",
         },
     });
+}
+
+function fromBase64Url(s: string): Uint8Array {
+	const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
+	const str = atob(b64);
+	return Uint8Array.from(str, c => c.charCodeAt(0));
 }
 
 export async function sha256Hex(input: string): Promise<string> {
