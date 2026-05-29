@@ -8,6 +8,9 @@ const REFRESH_LOCK_KEY = "meta:refresh_lock";
 const STOPS_FRESH_TTL_SECONDS = 24 * 60 * 60;
 const TIMETABLE_FRESH_TTL_SECONDS = 24 * 60 * 60;
 const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
+const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
+const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
 
 type TtlPair = { fresh: number; stale: number };
 
@@ -58,6 +61,7 @@ export default {
 
 			const auth = await authorizeClient(request, env);
 			if (!auth.ok) {
+				console.warn(JSON.stringify({ source: "worker-auth", outcome: "rejected", path: url.pathname }));
 				return jsonError("Missing or invalid X-App-Token.", 401);
 			}
 			const keyHashPrefix = (await sha256Hex(env.API_511_KEY)).slice(0, 12);
@@ -69,7 +73,7 @@ export default {
 				keyHashPrefix,
 			}));
 			if (url.pathname === "/log") {
-				return await handleLog(request);
+				return await handleLog(request, env);
 			}
 
 			if (request.method !== "GET") {
@@ -302,6 +306,12 @@ async function handleWorkerToken(request: Request, env: Env): Promise<Response> 
 	if (request.method !== "GET") {
 		return jsonError("Only GET requests are supported.", 405);
 	}
+	const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
+	const allowed = await checkRateLimit(env, "token", clientIp, TOKEN_EXCHANGE_RATE_LIMIT.maxRequests, TOKEN_EXCHANGE_RATE_LIMIT.windowSeconds);
+	if (!allowed) {
+		console.warn(JSON.stringify({ source: "worker-token", outcome: "rate_limited" }));
+		return jsonError("Too many requests.", 429, { "Retry-After": String(TOKEN_EXCHANGE_RATE_LIMIT.windowSeconds) });
+	}
 	const code = new URL(request.url).searchParams.get("code");
 	if (!code) {
 		return jsonError("Missing code parameter.", 400);
@@ -309,6 +319,7 @@ async function handleWorkerToken(request: Request, env: Env): Promise<Response> 
 	const kvKey = `${REG_CODE_PREFIX}${code}`;
 	const token = await env.CLIENT_TOKENS.get(kvKey);
 	if (!token) {
+		console.warn(JSON.stringify({ source: "worker-token", outcome: "rejected", reason: "invalid_code" }));
 		return jsonError("Invalid or expired registration code.", 401);
 	}
 	await env.CLIENT_TOKENS.delete(kvKey);
@@ -320,9 +331,16 @@ async function handleWorkerToken(request: Request, env: Env): Promise<Response> 
 
 const MAX_LOG_BATCH = 50;
 
-async function handleLog(request: Request): Promise<Response> {
+async function handleLog(request: Request, env: Env): Promise<Response> {
 	if (request.method !== "POST") {
 		return jsonError("POST required.", 405);
+	}
+
+	const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
+	const allowed = await checkRateLimit(env, "log", clientIp, LOG_RATE_LIMIT.maxRequests, LOG_RATE_LIMIT.windowSeconds);
+	if (!allowed) {
+		console.warn(JSON.stringify({ source: "log", outcome: "rate_limited" }));
+		return jsonError("Too many requests.", 429, { "Retry-After": String(LOG_RATE_LIMIT.windowSeconds) });
 	}
 
 	let parsed: unknown;
@@ -342,7 +360,12 @@ async function handleLog(request: Request): Promise<Response> {
 	}
 
 	for (const event of events) {
-		console.log(JSON.stringify({ source: "app-telemetry", ...(event as object) }));
+		const { install_id: rawId, ...rest } = event as Record<string, unknown>;
+		const entry: Record<string, unknown> = { source: "app-telemetry", ...rest };
+		if (typeof rawId === "string") {
+			entry.install_id_hash = (await sha256Hex(rawId)).slice(0, 16);
+		}
+		console.log(JSON.stringify(entry));
 	}
 
 	return new Response(null, { status: 204, headers: corsHeaders() });
@@ -420,6 +443,7 @@ async function fetchAndCacheAllStops(
 	try {
 		data = await response.json();
 	} catch {
+		console.error(JSON.stringify({ source: "stops-fetch", outcome: "error", reason: "json_parse_failed", agency }));
 		return { ok: false, error: "Failed to parse stops JSON from upstream." };
 	}
 
@@ -489,25 +513,52 @@ export function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: n
 	return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+async function checkRateLimit(
+	env: Env,
+	prefix: string,
+	ip: string,
+	maxRequests: number,
+	windowSeconds: number,
+): Promise<boolean> {
+	const bucket = String(Math.floor(Date.now() / 1000 / windowSeconds));
+	const ipHash = (await sha256Hex(ip)).slice(0, 16);
+	const key = `ratelimit:${prefix}:${ipHash}:${bucket}`;
+	const raw = await env.TRANSIT_CACHE.get(key);
+	const count = raw ? parseInt(raw, 10) : 0;
+	if (count >= maxRequests) return false;
+	await env.TRANSIT_CACHE.put(key, String(count + 1), { expirationTtl: windowSeconds * 2 });
+	return true;
+}
+
 async function handleSelfProvision(request: Request, env: Env): Promise<Response> {
     if (request.method !== "POST") {
         return jsonError("Only POST requests are supported.", 405);
+    }
+
+    const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const allowed = await checkRateLimit(env, "provision", clientIp, PROVISION_RATE_LIMIT.maxRequests, PROVISION_RATE_LIMIT.windowSeconds);
+    if (!allowed) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rate_limited" }));
+        return jsonError("Too many requests.", 429, { "Retry-After": String(PROVISION_RATE_LIMIT.windowSeconds) });
     }
 
     let parsed: unknown;
     try {
         parsed = await request.json();
     } catch {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "invalid_json" }));
         return jsonError("Body must be valid JSON.", 400);
     }
 
     if (!parsed || typeof parsed !== "object" || typeof (parsed as Record<string, unknown>).jwt !== "string") {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_jwt_field" }));
         return jsonError('Body must be {"jwt": "<compact-jwt>"}', 400);
     }
 
     const jwt = (parsed as { jwt: string }).jwt;
     const parts = jwt.split(".");
     if (parts.length !== 3) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "malformed_jwt" }));
         return jsonError("Malformed JWT.", 400);
     }
 
@@ -518,26 +569,35 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         const payloadBytes = fromBase64Url(encodedPayload);
         payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
     } catch {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "payload_decode_failed" }));
         return jsonError("JWT payload is not valid Base64url JSON.", 400);
     }
 
     const nowSec = Math.floor(Date.now() / 1000);
     if (typeof payload.exp !== "number" || payload.exp <= nowSec) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_expired", exp: payload.exp, now: nowSec }));
         return jsonError("JWT has expired.", 401);
     }
     if (typeof payload.iat !== "number" || payload.iat > nowSec + 5) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_iat_future", iat: payload.iat, now: nowSec }));
         return jsonError("JWT iat is in the future.", 401);
     }
     if (payload.exp - (payload.iat as number) > 300) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_lifetime_too_long" }));
         return jsonError("JWT lifetime too long.", 401);
     }
 
     if (payload.iss !== EXPECTED_ISS) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "iss_mismatch" }));
         return jsonError("JWT issuer mismatch.", 401);
     }
 
     let sigValid: boolean;
     try {
+        if (!env.SELF_PROVISION_PUBLIC_KEY) {
+            console.error(JSON.stringify({ source: "self-provision", outcome: "error", reason: "public_key_not_configured" }));
+            return jsonError("Server misconfiguration.", 500);
+        }
         const spkiBytes = Uint8Array.from(atob(env.SELF_PROVISION_PUBLIC_KEY), (c) => c.charCodeAt(0));
         const publicKey = await crypto.subtle.importKey(
             "spki",
@@ -554,11 +614,13 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
             sigBytes,
             signingInputBytes,
         );
-    } catch {
+    } catch (err) {
+        console.error(JSON.stringify({ source: "self-provision", outcome: "error", reason: "sig_verify_threw", detail: String(err) }));
         return jsonError("JWT signature verification failed.", 401);
     }
 
     if (!sigValid) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "sig_invalid" }));
         return jsonError("JWT signature is invalid.", 401);
     }
 
@@ -575,7 +637,7 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         { expirationTtl: 90 * 24 * 60 * 60 },
     );
 
-    console.log(JSON.stringify({ source: "self-provision", label }));
+    console.log(JSON.stringify({ source: "self-provision", outcome: "ok", label }));
 
     return new Response(JSON.stringify({ token: rawToken }), {
         status: 200,

@@ -1,5 +1,5 @@
 /// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { SELF, env } from "cloudflare:test";
 import { sha256Hex, parseStopsFromApi, distanceMeters } from "../src/index";
 
@@ -422,9 +422,15 @@ describe("POST /self-provision", () => {
     const TEST_ENV = env as unknown as {
         CLIENT_TOKENS: KVNamespace;
         TEST_PROVISION_PRIVATE_KEY: string;
+        TRANSIT_CACHE: KVNamespace;
     };
 
     let testPrivateKey: CryptoKey;
+
+    beforeEach(async () => {
+        const { keys } = await TEST_ENV.TRANSIT_CACHE.list({ prefix: "ratelimit:" });
+        await Promise.all(keys.map((k) => TEST_ENV.TRANSIT_CACHE.delete(k.name)));
+    });
 
     async function signJWT(
         payload: Record<string, unknown>,
