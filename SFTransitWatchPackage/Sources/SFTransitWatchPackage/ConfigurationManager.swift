@@ -17,33 +17,19 @@ public class ConfigurationManager: @unchecked Sendable {
             fatalError("Failed to initialize UserDefaults with app group '\(Self.appGroupSuiteName)'. Verify entitlements.")
         }
         self.userDefaults = userDefaults
-        migrateIfNeeded()
         seedWorkerBaseURLIfNeeded()
     }
 
     private func seedWorkerBaseURLIfNeeded() {
-        guard (userDefaults.string(forKey: workerBaseURLKey) ?? "").isEmpty,
-              let bundleURL = Bundle.main.infoDictionary?["WORKER_BASE_URL"] as? String,
-              !bundleURL.isEmpty else { return }
+        guard let bundleHost = Bundle.main.infoDictionary?["WORKER_BASE_URL"] as? String,
+              !bundleHost.isEmpty else { return }
+        let bundleURL = "https://\(bundleHost)"
+        let stored = userDefaults.string(forKey: workerBaseURLKey) ?? ""
+        guard stored != bundleURL else { return }
+        // A provisioned token means the URL was explicitly set via deep-link; leave it alone.
+        let hasToken = !(userDefaults.string(forKey: workerTokenKey) ?? "").isEmpty
+        guard !hasToken else { return }
         userDefaults.set(bundleURL, forKey: workerBaseURLKey)
-    }
-
-    /// One-time migration from the old App Group and from UserDefaults.standard
-    /// (where @AppStorage was inadvertently writing config values).
-    private func migrateIfNeeded() {
-        let sources: [UserDefaults?] = [
-            UserDefaults(suiteName: "group.com.rularner.sftransitwatch"),
-            .standard,
-        ]
-        for key in [apiKeyKey, workerTokenKey, workerBaseURLKey] {
-            guard (userDefaults.string(forKey: key) ?? "").isEmpty else { continue }
-            for source in sources.compactMap({ $0 }) {
-                if let value = source.string(forKey: key), !value.isEmpty {
-                    userDefaults.set(value, forKey: key)
-                    break
-                }
-            }
-        }
     }
 
     // MARK: - API Key

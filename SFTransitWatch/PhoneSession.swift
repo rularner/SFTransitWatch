@@ -22,7 +22,6 @@ final class PhoneSession: NSObject, WCSessionDelegate {
               WCSession.default.isPaired,
               WCSession.default.isWatchAppInstalled else { return }
 
-        // SnapshotMode: skip WCSession calls during snapshot runs.
         if SnapshotMode.isActive { return }
 
         do {
@@ -33,13 +32,19 @@ final class PhoneSession: NSObject, WCSessionDelegate {
     }
 
     static func buildPayload() -> [String: Any] {
-        let agencies = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName)?
-            .string(forKey: EnabledAgencies.storageKey) ?? ""
+        let appGroup = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName)
+        let agencies = appGroup?.string(forKey: EnabledAgencies.storageKey) ?? ""
+        let morningId = appGroup?.string(forKey: CommuteSlotsManager.Slot.morning.storageKey) ?? ""
+        let afternoonId = appGroup?.string(forKey: CommuteSlotsManager.Slot.afternoon.storageKey) ?? ""
+        let favoritesData = UserDefaults.standard.data(forKey: "FavoriteStops") ?? Data()
         return [
             "transitKey": ConfigurationManager.shared.apiKey.trimmingCharacters(in: .whitespaces),
             "workerToken": ConfigurationManager.shared.workerToken,
             "workerBaseURL": ConfigurationManager.shared.workerBaseURL,
             "enabledAgencies": agencies,
+            "commuteMorning": morningId,
+            "commuteAfternoon": afternoonId,
+            "favoriteStops": favoritesData,
         ]
     }
 
@@ -61,6 +66,55 @@ final class PhoneSession: NSObject, WCSessionDelegate {
 
     @objc private func defaultsChanged() {
         pushCurrentKey()
+    }
+
+    // MARK: - Receiving from watch
+
+    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        DispatchQueue.main.async {
+            self.applyWatchContext(applicationContext)
+        }
+    }
+
+    // `appGroup` is injectable for testing; production always uses the real suite.
+    func applyWatchContext(_ context: [String: Any],
+                           appGroup: UserDefaults? = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName)) {
+        let appGroup = appGroup
+
+        if let agencies = context["enabledAgencies"] as? String {
+            let current = appGroup?.string(forKey: EnabledAgencies.storageKey) ?? ""
+            if agencies != current {
+                appGroup?.set(agencies, forKey: EnabledAgencies.storageKey)
+            }
+        }
+
+        let morningKey = CommuteSlotsManager.Slot.morning.storageKey
+        if let morningId = context["commuteMorning"] as? String {
+            let current = appGroup?.string(forKey: morningKey) ?? ""
+            if morningId != current {
+                morningId.isEmpty
+                    ? appGroup?.removeObject(forKey: morningKey)
+                    : appGroup?.set(morningId, forKey: morningKey)
+            }
+        }
+
+        let afternoonKey = CommuteSlotsManager.Slot.afternoon.storageKey
+        if let afternoonId = context["commuteAfternoon"] as? String {
+            let current = appGroup?.string(forKey: afternoonKey) ?? ""
+            if afternoonId != current {
+                afternoonId.isEmpty
+                    ? appGroup?.removeObject(forKey: afternoonKey)
+                    : appGroup?.set(afternoonId, forKey: afternoonKey)
+            }
+        }
+
+        if let favoritesData = context["favoriteStops"] as? Data {
+            let current = UserDefaults.standard.data(forKey: "FavoriteStops") ?? Data()
+            if favoritesData != current {
+                UserDefaults.standard.set(favoritesData.isEmpty ? nil : favoritesData,
+                                          forKey: "FavoriteStops")
+            }
+        }
     }
 
     // MARK: - WCSessionDelegate
