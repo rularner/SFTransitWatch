@@ -264,6 +264,7 @@ struct BusStopRow: View {
     var showAgencyBadge: Bool = false
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var slotsManager: CommuteSlotsManager
+    @AppStorage("showCommutePromptOnFavorite") private var showCommutePrompt = true
     @State private var commutePromptStop: BusStop? = nil
     @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
 
@@ -317,7 +318,7 @@ struct BusStopRow: View {
                     Button(action: {
                         let isAdding = !favoritesManager.isFavorite(stop.id)
                         favoritesManager.toggleFavorite(stop)
-                        if isAdding {
+                        if isAdding && showCommutePrompt {
                             let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
                             if !empty.isEmpty {
                                 commuteEmptySlots = empty
@@ -332,21 +333,6 @@ struct BusStopRow: View {
                     .buttonStyle(PlainButtonStyle())
                     .accessibilityLabel(stop.isFavorite ? "Remove from favorites" : "Add to favorites")
                 }
-            }
-            .confirmationDialog(
-                "Add to commute?",
-                isPresented: Binding(get: { commutePromptStop != nil }, set: { if !$0 { commutePromptStop = nil } }),
-                presenting: commutePromptStop
-            ) { pendingStop in
-                if commuteEmptySlots.contains(.morning) {
-                    Button("Morning Commute") { slotsManager.setStopId(pendingStop.id, for: .morning) }
-                }
-                if commuteEmptySlots.contains(.afternoon) {
-                    Button("Afternoon Commute") { slotsManager.setStopId(pendingStop.id, for: .afternoon) }
-                }
-                Button("Not Now", role: .cancel) { }
-            } message: { pendingStop in
-                Text("Use \"\(pendingStop.name)\" as a commute stop?")
             }
 
             if !stop.routes.isEmpty {
@@ -373,6 +359,22 @@ struct BusStopRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
         .accessibilityHint("Tap to view arrivals")
+        .confirmationDialog(
+            "Add to commute?",
+            isPresented: Binding(get: { commutePromptStop != nil }, set: { if !$0 { commutePromptStop = nil } }),
+            presenting: commutePromptStop
+        ) { pendingStop in
+            if commuteEmptySlots.contains(.morning) {
+                Button("Morning Commute") { slotsManager.setStopId(pendingStop.id, for: .morning) }
+            }
+            if commuteEmptySlots.contains(.afternoon) {
+                Button("Afternoon Commute") { slotsManager.setStopId(pendingStop.id, for: .afternoon) }
+            }
+            Button("Never Ask") { showCommutePrompt = false }
+            Button("Not Now", role: .cancel) { }
+        } message: { pendingStop in
+            Text("Use \"\(pendingStop.name)\" as a commute stop?")
+        }
     }
 
     private var accessibilityDescription: String {
