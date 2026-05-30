@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		CAFE000000000000PRIV002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
 		CAFE000000000000PRIV003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
+		CAFE000000000000PRIV004 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
 		8437B6052FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
 		8437B6062FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
 		8437B6072FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
@@ -645,6 +646,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CAFE000000000000PRIV004 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
