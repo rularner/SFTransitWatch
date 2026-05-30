@@ -20,6 +20,19 @@ public class SharedAgenciesManager: ObservableObject {
         } else {
             self.enabledCodes = Set(EnabledAgencies.parse(stored))
         }
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reloadFromDefaults() }
+        }
+    }
+
+    private func reloadFromDefaults() {
+        let stored = userDefaults.string(forKey: EnabledAgencies.storageKey) ?? ""
+        let newCodes = stored.isEmpty ? Set(Agency.known.map(\.code)) : Set(EnabledAgencies.parse(stored))
+        if newCodes != enabledCodes { enabledCodes = newCodes }
     }
 
     public func isEnabled(_ agencyCode: String) -> Bool {

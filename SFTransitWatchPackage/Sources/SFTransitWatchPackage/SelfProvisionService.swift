@@ -1,5 +1,8 @@
 import Foundation
 import CryptoKit
+import os
+
+private let logger = Logger(subsystem: "org.larner.SFTransitWatch", category: "self-provision")
 
 public enum SelfProvisionError: Error, Equatable {
     case networkError
@@ -18,10 +21,19 @@ public final class SelfProvisionService: SelfProvisionServiceProtocol {
     public static func makeFromBundle(session: URLSessionProtocol = URLSession.shared) -> SelfProvisionService? {
         guard
             let keyBase64 = Bundle.main.infoDictionary?["SELF_PROVISION_PRIVATE_KEY"] as? String,
-            !keyBase64.isEmpty,
-            let keyData = Data(base64Encoded: keyBase64),
-            let key = try? P256.Signing.PrivateKey(derRepresentation: keyData)
-        else { return nil }
+            !keyBase64.isEmpty
+        else {
+            logger.error("self-provision key absent or empty in Info.plist")
+            return nil
+        }
+        guard let keyData = Data(base64Encoded: keyBase64) else {
+            logger.error("SELF_PROVISION_PRIVATE_KEY is not valid base64")
+            return nil
+        }
+        guard let key = try? P256.Signing.PrivateKey(derRepresentation: keyData) else {
+            logger.error("SELF_PROVISION_PRIVATE_KEY is not a valid P-256 DER private key")
+            return nil
+        }
         return SelfProvisionService(privateKey: key, session: session)
     }
 
@@ -31,18 +43,27 @@ public final class SelfProvisionService: SelfProvisionServiceProtocol {
     }
 
     public func provision(workerURL: String) async -> Result<Void, SelfProvisionError> {
+        logger.info("provision: starting, workerURL=\(workerURL, privacy: .public)")
+
         let jwt: String
         do {
             jwt = try buildJWT()
         } catch {
+            logger.error("provision: JWT build failed: \(error, privacy: .public)")
             return .failure(.networkError)
         }
 
         guard var components = URLComponents(string: workerURL) else {
+            logger.error("provision: could not parse workerURL as URLComponents: \(workerURL, privacy: .public)")
             return .failure(.networkError)
         }
         components.path = "/self-provision"
-        guard let url = components.url else { return .failure(.networkError) }
+        guard let url = components.url else {
+            logger.error("provision: URLComponents.url was nil after setting path")
+            return .failure(.networkError)
+        }
+
+        logger.info("provision: sending POST to \(url.absoluteString, privacy: .public)")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -53,16 +74,22 @@ public final class SelfProvisionService: SelfProvisionServiceProtocol {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
+                logger.error("provision: response was not HTTPURLResponse")
                 return .failure(.networkError)
             }
+            logger.info("provision: HTTP \(http.statusCode, privacy: .public)")
             guard http.statusCode == 200 else {
+                let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+                logger.error("provision: server rejected (HTTP \(http.statusCode, privacy: .public)): \(body, privacy: .public)")
                 return .failure(.serverRejected)
             }
             struct ProvisionResponse: Decodable { let token: String }
             let decoded = try JSONDecoder().decode(ProvisionResponse.self, from: data)
             ConfigurationManager.shared.setWorkerConfig(url: workerURL, token: decoded.token)
+            logger.info("provision: success, token stored")
             return .success(())
         } catch {
+            logger.error("provision: network error: \(error, privacy: .public)")
             return .failure(.networkError)
         }
     }

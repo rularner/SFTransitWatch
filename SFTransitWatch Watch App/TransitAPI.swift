@@ -13,26 +13,29 @@ extension URLSession: URLSessionProtocol {}
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
+    @AppStorage("511_API_KEY", store: UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName))
+    private var localAPIKey = ""
+    @AppStorage("WORKER_TOKEN", store: UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName))
+    private var workerToken = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
     var urlSession: URLSessionProtocol = URLSession.shared
-
 
     private var useDirectFallback = false
 
     init() {}
 
     private var resolvedKey: String {
-        return phoneAPIKey.isEmpty ? ConfigurationManager.shared.apiKey : phoneAPIKey
+        return phoneAPIKey.isEmpty ? localAPIKey : phoneAPIKey
     }
 
     private var hasUsableKey: Bool {
-        return !phoneAPIKey.isEmpty || !ConfigurationManager.shared.apiKey.isEmpty
+        return !phoneAPIKey.isEmpty || !localAPIKey.isEmpty
     }
 
     private var isDirect511Mode: Bool {
-        return useDirectFallback || ConfigurationManager.shared.workerToken.isEmpty || ConfigurationManager.shared.workerBaseURL.isEmpty
+        return useDirectFallback || workerToken.isEmpty || ConfigurationManager.shared.workerBaseURL.isEmpty
     }
 
     private var baseURL: String {
@@ -358,7 +361,7 @@ class TransitAPI: ObservableObject {
     // Check if API key is configured
     var isAPIKeyConfigured: Bool {
         if SnapshotMode.isActive { return true }
-        return hasUsableKey || ConfigurationManager.shared.isWorkerConfigured
+        return hasUsableKey || !workerToken.isEmpty
     }
 
     private func fetchAllStops(agency: String) async throws -> [BusStop] {

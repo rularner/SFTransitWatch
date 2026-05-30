@@ -38,8 +38,23 @@ public class CommuteSlotsManager: ObservableObject {
     private let userDefaults: UserDefaults
 
     public init(userDefaultsSuiteName: String? = CommuteSlotsManager.appGroupSuiteName) {
-        self.userDefaults = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+        let ud = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+        self.userDefaults = ud
         load()
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reloadFromDefaults() }
+        }
+    }
+
+    private func reloadFromDefaults() {
+        let newMorning = userDefaults.string(forKey: Slot.morning.storageKey)
+        let newAfternoon = userDefaults.string(forKey: Slot.afternoon.storageKey)
+        if newMorning != morningStopId { morningStopId = newMorning }
+        if newAfternoon != afternoonStopId { afternoonStopId = newAfternoon }
     }
 
     public func stopId(for slot: Slot) -> String? {

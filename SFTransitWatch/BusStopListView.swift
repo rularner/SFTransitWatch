@@ -238,6 +238,7 @@ struct BusStopRow: View {
     let currentLocation: CLLocation?
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var slotsManager: CommuteSlotsManager
+    @AppStorage("showCommutePromptOnFavorite") private var showCommutePrompt = true
     @State private var commutePromptStop: BusStop? = nil
     @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
 
@@ -275,7 +276,7 @@ struct BusStopRow: View {
                     Button(action: {
                         let isAdding = !favoritesManager.isFavorite(stop.id)
                         favoritesManager.toggleFavorite(stop)
-                        if isAdding {
+                        if isAdding && showCommutePrompt {
                             let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
                             if !empty.isEmpty {
                                 commuteEmptySlots = empty
@@ -301,6 +302,7 @@ struct BusStopRow: View {
                 if commuteEmptySlots.contains(.afternoon) {
                     Button("Afternoon Commute") { slotsManager.setStopId(pendingStop.id, for: .afternoon) }
                 }
+                Button("Never Ask") { showCommutePrompt = false }
                 Button("Not Now", role: .cancel) { }
             } message: { pendingStop in
                 Text("Use \"\(pendingStop.name)\" as a commute stop?")

@@ -20,11 +20,33 @@ public class FavoritesManager: ObservableObject {
     }
 
     public init(userDefaultsSuiteName: String? = nil) {
-        self.userDefaults = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+        let ud = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+        self.userDefaults = ud
         loadFavorites()
         if SnapshotMode.isActive {
             favoriteStopIds = SnapshotMode.favoriteStopIDs
         }
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reloadFavoritesIfChanged() }
+        }
+    }
+
+    private func reloadFavoritesIfChanged() {
+        guard let data = userDefaults.data(forKey: favoritesKey),
+              let persisted = try? JSONDecoder().decode([PersistedFavorite].self, from: data) else {
+            if !favoriteStops.isEmpty { applyStops([]) }
+            return
+        }
+        let newIds = Set(persisted.map(\.id))
+        guard newIds != favoriteStopIds else { return }
+        applyStops(persisted.map {
+            BusStop(id: $0.id, name: $0.name, code: $0.code,
+                    latitude: $0.latitude, longitude: $0.longitude, agency: $0.agency)
+        })
     }
 
     public func toggleFavorite(_ stop: BusStop) {

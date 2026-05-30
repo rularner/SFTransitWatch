@@ -79,6 +79,44 @@ final class FavoritesManagerTests: XCTestCase {
         XCTAssertEqual(second.favoriteStops[0].name, stop.name)
     }
 
+    // MARK: - External reload (WatchConnectivity sync)
+
+    func testExternalWriteReloadsPublishedProperties() async throws {
+        let suite = "FavoritesManagerTests-external-\(UUID().uuidString)"
+        let ud = UserDefaults(suiteName: suite)!
+        let mgr = FavoritesManager(userDefaultsSuiteName: suite)
+
+        XCTAssertTrue(mgr.favoriteStops.isEmpty)
+
+        // Encode a stop and write directly, simulating WC delivery
+        let stop = makeStops()[0]
+        struct Persisted: Codable { let id, name, code, agency: String; let latitude, longitude: Double }
+        let data = try JSONEncoder().encode([Persisted(id: stop.id, name: stop.name, code: stop.code,
+                                                       agency: stop.agency, latitude: stop.latitude,
+                                                       longitude: stop.longitude)])
+        ud.set(data, forKey: "FavoriteStops")
+
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(mgr.favoriteStops.count, 1)
+        XCTAssertTrue(mgr.isFavorite(stop.id))
+    }
+
+    func testExternalClearReloadsPublishedProperties() async throws {
+        let suite = "FavoritesManagerTests-clear-\(UUID().uuidString)"
+        let ud = UserDefaults(suiteName: suite)!
+        let mgr = FavoritesManager(userDefaultsSuiteName: suite)
+        mgr.toggleFavorite(makeStops()[0])
+        XCTAssertEqual(mgr.favoriteStops.count, 1)
+
+        // External clear (e.g. watch cleared its favorites)
+        ud.removeObject(forKey: "FavoriteStops")
+
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertTrue(mgr.favoriteStops.isEmpty)
+    }
+
     func testRoutesAreNotPersisted() {
         let suiteName = "FavoritesManagerTests-routes-\(UUID().uuidString)"
         let stop = makeStops()[0] // has routes: ["38"]
