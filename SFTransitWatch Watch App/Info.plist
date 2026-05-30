@@ -41,8 +41,6 @@
 	<string>org.larner.SFTransitWatch</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<true/>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>SELF_PROVISION_PRIVATE_KEY</key>
 	<string>$(SELF_PROVISION_PRIVATE_KEY)</string>
 	<key>WORKER_BASE_URL</key>
