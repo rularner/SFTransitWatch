@@ -8,7 +8,6 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.rularner.sftransitwatch</string>
 		<string>group.org.larner.SFTransitWatch</string>
 	</array>
 </dict>

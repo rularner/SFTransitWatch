@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CAFE000000000000PRIV002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
+		CAFE000000000000PRIV003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
 		8437B6052FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
 		8437B6062FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
 		8437B6072FB57FFD00311D70 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
@@ -117,6 +119,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = file.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		8477FCC42FB16F9000C98E73 /* SFTransitWatchPhoneTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchPhoneTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8477FCD12FB16F9E00C98E73 /* SFTransitWatchPhoneUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchPhoneUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		84C1B1DA2F9DE3D700833749 /* SFTransitWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -250,6 +253,7 @@
 		CAFE000000000000000018A0 = {
 			isa = PBXGroup;
 			children = (
+				CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */,
 				CAFE000000000000000020C0 /* SFTransitWatch */,
 				CAFE0000000000000000T020 /* SFTransitWatchTests */,
 				CAFE0000000000000000C020 /* SFTransitWatch Complication */,
@@ -621,6 +625,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CAFE000000000000PRIV002 /* PrivacyInfo.xcprivacy in Resources */,
 				CAFE000000000000000012E0 /* Assets.xcassets in Resources */,
 				CAFE000000000000000013A0 /* Preview Assets.xcassets in Resources */,
 			);
@@ -630,6 +635,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CAFE000000000000PRIV003 /* PrivacyInfo.xcprivacy in Resources */,
 				CAFE000000000000000020AC /* Assets.xcassets in Resources */,
 				CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */,
 			);
