@@ -36,6 +36,7 @@
 		CAFE000000000000000020AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BC /* Assets.xcassets */; };
 		CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BD /* Preview Assets.xcassets */; };
 		CAFE000000000000000020AE /* SFTransitWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CAFE0000000000000000S001 /* WatchSiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S002 /* WatchSiriManager.swift */; };
 		CAFE000000000000000020F8 /* WatchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020F9 /* WatchSession.swift */; };
 		CAFE000000000000000020FA /* PhoneSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020FB /* PhoneSession.swift */; };
 		CAFE0000000000000000B002 /* BackgroundRefreshController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000B001 /* BackgroundRefreshController.swift */; };
@@ -146,6 +147,7 @@
 		CAFE000000000000000020BD /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		CAFE000000000000000020BE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE000000000000000020BF /* SFTransitWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFTransitWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAFE0000000000000000S002 /* WatchSiriManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSiriManager.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020F9 /* WatchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSession.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020FB /* PhoneSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSession.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020FC /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
@@ -282,6 +284,7 @@
 				CAFE0000000000000000B001 /* BackgroundRefreshController.swift */,
 				CAFE0000000000000000B003 /* AppDelegate.swift */,
 				CAFE000000000000000020F9 /* WatchSession.swift */,
+				CAFE0000000000000000S002 /* WatchSiriManager.swift */,
 				CAFE000000000000000012F0 /* Assets.xcassets */,
 				CAFE000000000000000020FD /* SFTransitWatch Watch App.entitlements */,
 				CAFE000000000000000019A0 /* Preview Content */,
@@ -479,7 +482,6 @@
 			);
 			name = "SFTransitWatch Watch App";
 			packageProductDependencies = (
-				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 				84F0010100000000000010B1 /* SFTransitWatchPackage */,
 			);
 			productName = "SFTransitWatch Watch App";
@@ -695,6 +697,7 @@
 				CAFE0000000000000000B002 /* BackgroundRefreshController.swift in Sources */,
 				CAFE0000000000000000B004 /* AppDelegate.swift in Sources */,
 				CAFE000000000000000020F8 /* WatchSession.swift in Sources */,
+				CAFE0000000000000000S001 /* WatchSiriManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
