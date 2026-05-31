@@ -10,7 +10,7 @@ CURRENT_PROJECT_VERSION = 1
 SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 
 // Base URL for the Cloudflare Worker proxy. Seeded into UserDefaults on first launch.
-WORKER_BASE_URL = sftransitwatch.rusty-cloudflare.workers.dev
+WORKER_BASE_URL = api.sftransitwatch.com
 
 // Developer-local overrides (signing, build number for manual TestFlight builds).
 // Included last so values here win over defaults above.
