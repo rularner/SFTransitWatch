@@ -25,5 +25,6 @@
 			"id": "__CLIENT_TOKENS_KV_ID__"
 		}
 	],
-	"compatibility_flags": ["nodejs_compat"]
+	"compatibility_flags": ["nodejs_compat"],
+	"custom_domains": ["__WORKER_HOSTNAME__"]
 }
