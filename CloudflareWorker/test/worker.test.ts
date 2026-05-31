@@ -1,7 +1,7 @@
 /// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { SELF, env } from "cloudflare:test";
-import { sha256Hex, parseStopsFromApi, distanceMeters } from "../src/index";
+import { sha256Hex, parseStopsFromApi, distanceMeters, PROXY_RATE_LIMIT } from "../src/index";
 
 const VALID_TOKEN = "test-token";
 let VALID_HASH = "";
@@ -383,6 +383,75 @@ describe("GET /Stops (stops cache)", () => {
             headers: { "X-App-Token": VALID_TOKEN },
         });
         expect(res.status).toBe(502);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Per-token rate limiting on proxy routes
+// ---------------------------------------------------------------------------
+
+describe("per-token rate limiting on proxy routes", () => {
+    const CACHE = () => (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE;
+
+    // Dedicated token so pre-filling its rate limit doesn't pollute VALID_TOKEN across tests.
+    const RL_TOKEN = "rate-limit-test-token-proxy";
+
+    beforeAll(async () => {
+        const hash = await sha256Hex(RL_TOKEN);
+        await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+            hash,
+            JSON.stringify({ label: "rl-test", createdAt: "2026-05-01T00:00:00Z" }),
+        );
+    });
+
+    async function rateLimitKeyForToken(token: string): Promise<string> {
+        const tokenHash = await sha256Hex(token);
+        const idHash = (await sha256Hex(tokenHash)).slice(0, 16);
+        const bucket = String(Math.floor(Date.now() / 1000 / PROXY_RATE_LIMIT.windowSeconds));
+        return `ratelimit:proxy-token:${idHash}:${bucket}`;
+    }
+
+    beforeEach(async () => {
+        const key = await rateLimitKeyForToken(RL_TOKEN);
+        await CACHE().delete(key);
+    });
+
+    it("returns 429 when the per-token request count has reached the limit", async () => {
+        const key = await rateLimitKeyForToken(RL_TOKEN);
+        await CACHE().put(key, String(PROXY_RATE_LIMIT.maxRequests), {
+            expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2,
+        });
+
+        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+            headers: { "X-App-Token": RL_TOKEN },
+        });
+        expect(res.status).toBe(429);
+    });
+
+    it("includes Retry-After header in the 429 response", async () => {
+        const key = await rateLimitKeyForToken(RL_TOKEN);
+        await CACHE().put(key, String(PROXY_RATE_LIMIT.maxRequests), {
+            expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2,
+        });
+
+        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+            headers: { "X-App-Token": RL_TOKEN },
+        });
+        expect(res.headers.get("Retry-After")).toBe(String(PROXY_RATE_LIMIT.windowSeconds));
+    });
+
+    it("does not rate limit a different token when one token is at the limit", async () => {
+        const key = await rateLimitKeyForToken(RL_TOKEN);
+        await CACHE().put(key, String(PROXY_RATE_LIMIT.maxRequests), {
+            expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2,
+        });
+
+        // VALID_TOKEN is clean — use it as the "other" token
+        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        expect(res.status).not.toBe(429);
+        expect(res.status).not.toBe(401);
     });
 });
 

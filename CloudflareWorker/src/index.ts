@@ -11,6 +11,7 @@ const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
+export const PROXY_RATE_LIMIT = { maxRequests: 30, windowSeconds: 60 };
 
 type TtlPair = { fresh: number; stale: number };
 
@@ -72,6 +73,13 @@ export default {
 				path: url.pathname,
 				keyHashPrefix,
 			}));
+
+			const tokenAllowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+			if (!tokenAllowed) {
+				console.warn(JSON.stringify({ source: "proxy-rate-limit", outcome: "rate_limited", label: auth.client.label }));
+				return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+			}
+
 			if (url.pathname === "/log") {
 				return await handleLog(request, env);
 			}
@@ -665,7 +673,7 @@ export async function sha256Hex(input: string): Promise<string> {
 	return out;
 }
 
-type ClientInfo = { label: string };
+type ClientInfo = { label: string; tokenHash: string };
 
 export async function authorizeClient(
 	request: Request,
@@ -675,8 +683,8 @@ export async function authorizeClient(
 	if (!token) return { ok: false };
 	const hash = await sha256Hex(token);
 	const value = await env.CLIENT_TOKENS.get(hash, "json");
-	if (!value || typeof (value as ClientInfo).label !== "string") {
+	if (!value || typeof (value as { label: string }).label !== "string") {
 		return { ok: false };
 	}
-	return { ok: true, client: { label: (value as ClientInfo).label } };
+	return { ok: true, client: { label: (value as { label: string }).label, tokenHash: hash } };
 }
