@@ -779,6 +779,12 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
+				// Override the project-wide SWIFT_TREAT_WARNINGS_AS_ERRORS (Config.xcconfig).
+				// StoreKitTest's module map triggers a deprecation warning
+				// (SKPaymentTransactionState) that fails precompilation when
+				// warnings are promoted to errors. This is an Apple SDK issue,
+				// not something fixable in our source.
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -802,6 +808,9 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
+				// See Debug config comment: StoreKitTest's module map fails to
+				// precompile with SWIFT_TREAT_WARNINGS_AS_ERRORS = YES (Apple SDK issue).
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
