@@ -10,6 +10,7 @@ struct SFTransitWatchApp: App {
     @State private var showingKeyEntry = false
     @State private var provisionError: String?
     private let provisionService = SelfProvisionService.makeFromBundle()
+    private let subscriptionManager = SubscriptionManager()
 
     init() {
         PhoneSession.shared.activate()
@@ -39,8 +40,8 @@ struct SFTransitWatchApp: App {
                     titleVisibility: .visible
                 ) {
                     if provisionService != nil {
-                        Button("Connect") {
-                            Task { await handleSelfProvision() }
+                        Button("Subscribe") {
+                            Task { await handleSubscribeAndProvision() }
                         }
                     }
                     Button("Use 511.org key instead") {
@@ -60,7 +61,7 @@ struct SFTransitWatchApp: App {
                     set: { if !$0 { provisionError = nil } }
                 )) {
                     Button("Try Again") {
-                        Task { await handleSelfProvision() }
+                        Task { await handleSubscribeAndProvision() }
                     }
                     Button("Use 511.org key instead") {
                         provisionError = nil
@@ -92,20 +93,41 @@ struct SFTransitWatchApp: App {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 Telemetry.shared.flush()
+                Task { await refreshSubscriptionIfNeeded() }
             }
         }
     }
 
-    private func handleSelfProvision() async {
+    private func handleSubscribeAndProvision() async {
         guard let service = provisionService else { return }
-        let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL)
-        switch result {
-        case .success:
+        do {
+            let originalTransactionId: String
+            if let existing = await subscriptionManager.activeOriginalTransactionId() {
+                originalTransactionId = existing
+            } else {
+                originalTransactionId = try await subscriptionManager.purchase()
+            }
+
+            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            switch result {
+            case .success:
+                showingProvisionPrompt = false
+            case .failure:
+                showingProvisionPrompt = false
+                provisionError = "Could not connect to the transit server. Check your internet connection and try again."
+            }
+        } catch SubscriptionManagerError.purchaseCancelled {
             showingProvisionPrompt = false
-        case .failure:
+        } catch {
             showingProvisionPrompt = false
-            provisionError = "Could not connect to the transit server. Check your internet connection and try again."
+            provisionError = "Could not complete the subscription purchase. Check your internet connection and try again."
         }
+    }
+
+    private func refreshSubscriptionIfNeeded() async {
+        guard let service = provisionService, ConfigurationManager.shared.isWorkerConfigured else { return }
+        guard let originalTransactionId = await subscriptionManager.activeOriginalTransactionId() else { return }
+        _ = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
     }
 
     private func handleWorkerBootstrap(_ bootstrap: PendingBootstrap) async {
