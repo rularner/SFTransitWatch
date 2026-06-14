@@ -1,5 +1,6 @@
 import SwiftUI
 import WatchKit
+import StoreKit
 import SFTransitWatchPackage
 
 struct SettingsView: View {
@@ -14,6 +15,8 @@ struct SettingsView: View {
     @AppStorage(EnabledAgencies.storageKey, store: UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName))
     private var enabledAgenciesRaw = EnabledAgencies.default
     @State private var showingAPIKeyEntry = false
+    @State private var hasActiveSubscription = false
+    private let subscriptionManager = SubscriptionManager()
 
     var body: some View {
         List {
@@ -79,6 +82,12 @@ struct SettingsView: View {
                     Text("Not configured")
                         .foregroundColor(.secondary)
                         .font(.caption)
+                }
+
+                if hasActiveSubscription {
+                    Button("Manage Subscription") {
+                        openManageSubscriptions()
+                    }
                 }
             }
 
@@ -210,6 +219,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAPIKeyEntry) {
             APIKeyEntryView(apiKey: $apiKey)
         }
+        .task {
+            hasActiveSubscription = await subscriptionManager.activeOriginalTransactionId() != nil
+        }
     }
 
     private var appVersion: String {
@@ -218,6 +230,11 @@ struct SettingsView: View {
 
     private var workerHostDisplay: String {
         return URL(string: ConfigurationManager.shared.workerBaseURL)?.host ?? ConfigurationManager.shared.workerBaseURL
+    }
+
+    private func openManageSubscriptions() {
+        guard let url = URL(string: "itms-apps://apps.apple.com/account/subscriptions") else { return }
+        WKExtension.shared().openSystemURL(url)
     }
 
     private func currentStopName(for slot: CommuteSlotsManager.Slot) -> String {

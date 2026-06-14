@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import StoreKit
 import SFTransitWatchPackage
 
 struct SettingsView: View {
@@ -13,6 +14,9 @@ struct SettingsView: View {
     @State private var showingClearFavoritesAlert = false
     @State private var showingMorningPicker = false
     @State private var showingAfternoonPicker = false
+    @State private var showingManageSubscriptions = false
+    @State private var hasActiveSubscription = false
+    private let subscriptionManager = SubscriptionManager()
     @AppStorage(AlertSettingsManager.alertEnabledKey,
                 store: UserDefaults(suiteName: AlertSettingsManager.appGroupSuiteName))
     private var alertsEnabled = true
@@ -61,7 +65,7 @@ struct SettingsView: View {
 
             Section(
                 header: Text("Worker proxy (optional)"),
-                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…. Leave blank to call 511.org directly with your own API key.")
+                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…, or subscribe to connect automatically. Leave blank to call 511.org directly with your own API key.")
             ) {
                 if ConfigurationManager.shared.isWorkerConfigured {
                     HStack {
@@ -79,6 +83,12 @@ struct SettingsView: View {
                     Text("Open a bootstrap link to configure")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+
+                if hasActiveSubscription {
+                    Button("Manage Subscription") {
+                        showingManageSubscriptions = true
+                    }
                 }
             }
 
@@ -283,6 +293,10 @@ struct SettingsView: View {
         } message: {
             Text("This will remove all your favorite stops. This action cannot be undone.")
         }
+        .task {
+            hasActiveSubscription = await subscriptionManager.activeOriginalTransactionId() != nil
+        }
+        .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
     }
     
     private var workerHostDisplay: String {
