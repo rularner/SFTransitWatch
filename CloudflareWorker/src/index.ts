@@ -1,3 +1,5 @@
+import { verifySubscription } from "./appstore";
+
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
 const EXPECTED_ISS = "org.larner.SFTransitWatch";
 const FRESH_TTL_SECONDS = 60;
@@ -12,6 +14,7 @@ const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
 export const PROXY_RATE_LIMIT = { maxRequests: 30, windowSeconds: 60 };
+const SUBSCRIPTION_GRACE_SECONDS = 3 * 24 * 60 * 60;
 
 type TtlPair = { fresh: number; stale: number };
 
@@ -29,6 +32,10 @@ interface Env {
 	TRANSIT_CACHE: KVNamespace;
 	CLIENT_TOKENS: KVNamespace;
 	SELF_PROVISION_PUBLIC_KEY: string;
+	APPSTORE_KEY_ID: string;
+	APPSTORE_ISSUER_ID: string;
+	APPSTORE_PRIVATE_KEY: string;
+	APPSTORE_BUNDLE_ID: string;
 }
 
 type CachedResponse = {
@@ -558,12 +565,18 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         return jsonError("Body must be valid JSON.", 400);
     }
 
-    if (!parsed || typeof parsed !== "object" || typeof (parsed as Record<string, unknown>).jwt !== "string") {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_jwt_field" }));
-        return jsonError('Body must be {"jwt": "<compact-jwt>"}', 400);
+    if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        typeof (parsed as Record<string, unknown>).jwt !== "string" ||
+        typeof (parsed as Record<string, unknown>).originalTransactionId !== "string"
+    ) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_required_field" }));
+        return jsonError('Body must be {"jwt": "<compact-jwt>", "originalTransactionId": "<string>"}', 400);
     }
 
     const jwt = (parsed as { jwt: string }).jwt;
+    const originalTransactionId = (parsed as { originalTransactionId: string }).originalTransactionId;
     const parts = jwt.split(".");
     if (parts.length !== 3) {
         console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "malformed_jwt" }));
@@ -632,17 +645,29 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         return jsonError("JWT signature is invalid.", 401);
     }
 
+    const subscription = await verifySubscription(env, originalTransactionId);
+    if (!subscription.active) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "no_active_subscription" }));
+        return jsonError("No active subscription.", 403);
+    }
+
     const rawToken = crypto.randomUUID();
     const hash = await sha256Hex(rawToken);
     const platform = typeof payload.platform === "string" ? payload.platform : "unknown";
     const installId = typeof payload.install_id === "string" ? payload.install_id : "unknown";
     const appVersion = typeof payload.app_version === "string" ? payload.app_version : "unknown";
     const label = `self-prov:${platform}:${installId.slice(0, 8)}:${appVersion}`;
+    const ttlSeconds = Math.floor((subscription.expiresAtMs - Date.now()) / 1000) + SUBSCRIPTION_GRACE_SECONDS;
 
     await env.CLIENT_TOKENS.put(
         hash,
-        JSON.stringify({ label, createdAt: new Date().toISOString() }),
-        { expirationTtl: 90 * 24 * 60 * 60 },
+        JSON.stringify({
+            label,
+            tier: "paid",
+            createdAt: new Date().toISOString(),
+            subExpiresAt: new Date(subscription.expiresAtMs).toISOString(),
+        }),
+        { expirationTtl: ttlSeconds },
     );
 
     console.log(JSON.stringify({ source: "self-provision", outcome: "ok", label }));

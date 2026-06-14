@@ -1,5 +1,5 @@
 /// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { SELF, env } from "cloudflare:test";
 import { sha256Hex, parseStopsFromApi, distanceMeters, PROXY_RATE_LIMIT } from "../src/index";
 
@@ -487,12 +487,15 @@ describe("timetable endpoint routing", () => {
 // POST /self-provision
 // ---------------------------------------------------------------------------
 
+
 describe("POST /self-provision", () => {
     const TEST_ENV = env as unknown as {
         CLIENT_TOKENS: KVNamespace;
         TEST_PROVISION_PRIVATE_KEY: string;
         TRANSIT_CACHE: KVNamespace;
     };
+
+    const VALID_ORIGINAL_TRANSACTION_ID = "1000000000000001";
 
     let testPrivateKey: CryptoKey;
 
@@ -501,21 +504,26 @@ describe("POST /self-provision", () => {
         await Promise.all(keys.map((k) => TEST_ENV.TRANSIT_CACHE.delete(k.name)));
     });
 
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    function b64url(data: ArrayBuffer | string): string {
+        const bytes =
+            typeof data === "string"
+                ? new TextEncoder().encode(data)
+                : new Uint8Array(data);
+        let str = "";
+        for (const b of bytes) str += String.fromCharCode(b);
+        return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    }
+
     async function signJWT(
         payload: Record<string, unknown>,
         overrideKey?: CryptoKey,
     ): Promise<string> {
         const key = overrideKey ?? testPrivateKey;
         const header = { alg: "ES256", typ: "JWT" };
-        const b64url = (data: ArrayBuffer | string) => {
-            const bytes =
-                typeof data === "string"
-                    ? new TextEncoder().encode(data)
-                    : new Uint8Array(data);
-            let str = "";
-            for (const b of bytes) str += String.fromCharCode(b);
-            return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-        };
         const encodedHeader = b64url(JSON.stringify(header));
         const encodedPayload = b64url(JSON.stringify(payload));
         const signingInput = `${encodedHeader}.${encodedPayload}`;
@@ -538,6 +546,26 @@ describe("POST /self-provision", () => {
             exp: now + 60,
             ...overrides,
         };
+    }
+
+    function activeSubscriptionResponse(expiresAtMs = Date.now() + 30 * 24 * 60 * 60 * 1000): Response {
+        const jws = `${b64url(JSON.stringify({ alg: "ES256" }))}.${b64url(JSON.stringify({ expiresDate: expiresAtMs }))}.sig`;
+        return new Response(
+            JSON.stringify({ data: [{ lastTransactions: [{ status: 1, signedTransactionInfo: jws }] }] }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+    }
+
+    function expiredSubscriptionResponse(): Response {
+        const jws = `${b64url(JSON.stringify({ alg: "ES256" }))}.${b64url(JSON.stringify({ expiresDate: Date.now() - 1000 }))}.sig`;
+        return new Response(
+            JSON.stringify({ data: [{ lastTransactions: [{ status: 2, signedTransactionInfo: jws }] }] }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+    }
+
+    function stubActiveSubscription(expiresAtMs?: number): void {
+        vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => activeSubscriptionResponse(expiresAtMs)));
     }
 
     beforeAll(async () => {
@@ -575,7 +603,17 @@ describe("POST /self-provision", () => {
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ other: "field" }),
+            body: JSON.stringify({ originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when originalTransactionId field is absent", async () => {
+        const jwt = await signJWT(validPayload());
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt }),
         });
         expect(res.status).toBe(400);
     });
@@ -590,7 +628,7 @@ describe("POST /self-provision", () => {
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
         });
         expect(res.status).toBe(401);
     });
@@ -601,7 +639,7 @@ describe("POST /self-provision", () => {
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
         });
         expect(res.status).toBe(401);
     });
@@ -611,17 +649,29 @@ describe("POST /self-provision", () => {
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
         });
         expect(res.status).toBe(401);
     });
 
-    it("returns 200 with a token for a valid JWT", async () => {
+    it("returns 403 when there is no active subscription", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => expiredSubscriptionResponse()));
         const jwt = await signJWT(validPayload());
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
+        });
+        expect(res.status).toBe(403);
+    });
+
+    it("returns 200 with a token for a valid JWT and active subscription", async () => {
+        stubActiveSubscription();
+        const jwt = await signJWT(validPayload());
+        const res = await SELF.fetch("https://example.com/self-provision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
         });
         expect(res.status).toBe(200);
         const body = (await res.json()) as { token: string };
@@ -629,28 +679,32 @@ describe("POST /self-provision", () => {
         expect(body.token.length).toBeGreaterThan(8);
     });
 
-    it("stores the token in CLIENT_TOKENS under sha256(token)", async () => {
+    it("stores the token in CLIENT_TOKENS under sha256(token) with tier 'paid'", async () => {
+        stubActiveSubscription();
         const jwt = await signJWT(validPayload({ install_id: "store-test-id", platform: "ios", app_version: "1.0.0" }));
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
         });
         const { token } = (await res.json()) as { token: string };
         const hash = await sha256Hex(token);
-        const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { label: string } | null;
+        const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { label: string; tier: string; subExpiresAt: string } | null;
         expect(stored).not.toBeNull();
         expect(stored!.label).toContain("self-prov");
         expect(stored!.label).toContain("ios");
+        expect(stored!.tier).toBe("paid");
+        expect(new Date(stored!.subExpiresAt).getTime()).toBeGreaterThan(Date.now());
     });
 
     it("label contains the platform and first 8 chars of install_id", async () => {
+        stubActiveSubscription();
         const installId = "12345678-abcd-ef01-2345-678901234567";
         const jwt = await signJWT(validPayload({ install_id: installId, platform: "watchos", app_version: "2.0.0" }));
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
         });
         const { token } = (await res.json()) as { token: string };
         const hash = await sha256Hex(token);
@@ -659,11 +713,12 @@ describe("POST /self-provision", () => {
     });
 
     it("is accessible without an X-App-Token header", async () => {
+        stubActiveSubscription();
         const jwt = await signJWT(validPayload({ install_id: "no-token-test-id" }));
         const res = await SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
+            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
         });
         expect(res.status).not.toBe(401);
     });
