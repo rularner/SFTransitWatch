@@ -108,6 +108,38 @@ No special signing setup required — all tests pass with default simulator sign
 
 See the README for snapshot test instructions — they use the wrapper scripts `bin/run-watch-snapshot-tests.sh` and `bin/run-phone-snapshot-tests.sh`.
 
+### StoreKitTest gotchas (Xcode 26.4)
+
+`SubscriptionManagerTests.swift` (in `SFTransitWatchPhoneTests`) exercises
+`SubscriptionManager` via StoreKitTest. A few non-obvious things have bitten
+us repeatedly here:
+
+- **`SKInternalErrorDomain Code=3` on `buyProduct`** is a known StoreKitTest
+  bug in the Xcode 26.4 SDK, not a bug in our code. If a purchase-flow test
+  fails with this error, don't go looking for a logic bug first.
+- **Use the async `buyProduct(identifier:)`**, not the deprecated sync
+  `SKTestSession.buyProduct(productIdentifier:)`.
+- **`Product.products(for:)` returns `productNotFound`** unless the
+  `SFTransitWatch` scheme's **Test action → StoreKit Configuration** is set
+  to `WorkerProxySubscription.storekit`. `SKTestSession(contentsOf:)` in
+  `setUp()` controls transactions but does *not* register the product
+  catalog for `Product.products(for:)` — that's a separate scheme setting.
+- **Use `try XCTSkipIf(true, "reason")`, not `throw XCTSkip("reason")`**, if
+  you need to temporarily skip a test. `Config.xcconfig` sets
+  `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`, and `throw XCTSkip` as a leading
+  statement makes the rest of the function body unreachable, which becomes a
+  build error under that flag. `XCTSkipIf` is a normal (throwing) function
+  call and doesn't trigger the unreachable-code warning.
+- **`SubscriptionManagerTests` is iOS-only.** The `SFTransitWatch Watch App`
+  scheme must mark the `SFTransitWatchPhoneTests` bundle as `skipped="YES"`
+  (same as `SFTransitWatchPhoneUITests`) — otherwise it runs under the
+  watchOS destination and crashes with SIGILL ("Early unexpected exit").
+
+Two of the purchase-flow tests are currently marked `XCTSkipIf(true, ...)`
+because of the `productNotFound` issue above — see the "Known issue" note in
+the root README for how to re-enable them once the scheme's StoreKit
+Configuration is set.
+
 ## Planning/spec docs
 
 `docs/superpowers/` is gitignored on purpose — specs and plans stay local. Don't try to `git add` anything under that path.
