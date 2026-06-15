@@ -1,7 +1,7 @@
 /// <reference path="../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts" />
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { env } from "cloudflare:test";
-import { verifySubscription, type AppStoreEnv } from "../src/appstore";
+import { verifySubscription, checkAppStoreAuth, type AppStoreEnv } from "../src/appstore";
 
 const TEST_ENV = env as unknown as AppStoreEnv;
 
@@ -83,5 +83,41 @@ describe("verifySubscription", () => {
 
         const result = await verifySubscription(TEST_ENV, "1000000000000001");
         expect(result).toEqual({ active: false });
+    });
+});
+
+describe("checkAppStoreAuth", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("returns ok:false for a 401 response (invalid credentials)", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+
+        const result = await checkAppStoreAuth(TEST_ENV);
+        expect(result).toEqual({ ok: false, status: 401 });
+    });
+
+    it("returns ok:false for a 403 response (invalid credentials)", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 403 })));
+
+        const result = await checkAppStoreAuth(TEST_ENV);
+        expect(result).toEqual({ ok: false, status: 403 });
+    });
+
+    it("returns ok:true for a 404 response (valid auth, unknown transaction)", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+
+        const result = await checkAppStoreAuth(TEST_ENV);
+        expect(result).toEqual({ ok: true, status: 404 });
+    });
+
+    it("probes the production host with a placeholder transaction id", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
+        vi.stubGlobal("fetch", fetchMock);
+
+        await checkAppStoreAuth(TEST_ENV);
+
+        expect(String(fetchMock.mock.calls[0][0])).toBe("https://api.storekit.itunes.apple.com/inApps/v1/subscriptions/0");
     });
 });

@@ -44,6 +44,12 @@ export async function verifySubscription(
 	return { active: false };
 }
 
+export async function checkAppStoreAuth(env: AppStoreEnv): Promise<{ ok: boolean; status: number }> {
+	const jwt = await signAppStoreJWT(env);
+	const resp = await fetchSubscriptionStatus("api.storekit.itunes.apple.com", "0", jwt);
+	return { ok: resp.status !== 401 && resp.status !== 403, status: resp.status };
+}
+
 async function fetchSubscriptionStatus(host: string, originalTransactionId: string, jwt: string): Promise<Response> {
 	return fetch(`https://${host}/inApps/v1/subscriptions/${originalTransactionId}`, {
 		headers: { Authorization: `Bearer ${jwt}` },
