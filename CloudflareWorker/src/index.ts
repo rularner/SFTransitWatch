@@ -1,3 +1,5 @@
+import { verifySubscription, checkAppStoreAuth } from "./appstore";
+
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
 const EXPECTED_ISS = "org.larner.SFTransitWatch";
 const FRESH_TTL_SECONDS = 60;
@@ -12,6 +14,7 @@ const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
 export const PROXY_RATE_LIMIT = { maxRequests: 30, windowSeconds: 60 };
+const SUBSCRIPTION_GRACE_SECONDS = 3 * 24 * 60 * 60;
 
 type TtlPair = { fresh: number; stale: number };
 
@@ -29,6 +32,11 @@ interface Env {
 	TRANSIT_CACHE: KVNamespace;
 	CLIENT_TOKENS: KVNamespace;
 	SELF_PROVISION_PUBLIC_KEY: string;
+	APPSTORE_KEY_ID: string;
+	APPSTORE_ISSUER_ID: string;
+	APPSTORE_PRIVATE_KEY: string;
+	APPSTORE_BUNDLE_ID: string;
+	HEALTHCHECK_TOKEN: string;
 }
 
 type CachedResponse = {
@@ -58,6 +66,11 @@ export default {
 			// Self-provision — unauthenticated, must come before the token gate.
 			if (url.pathname === "/self-provision") {
 				return await handleSelfProvision(request, env);
+			}
+
+			// Health check — gated by its own bearer token, must come before the token gate.
+			if (url.pathname === "/healthz/appstore") {
+				return await handleHealthzAppStore(request, env);
 			}
 
 			const auth = await authorizeClient(request, env);
@@ -538,6 +551,49 @@ async function checkRateLimit(
 	return true;
 }
 
+async function handleHealthzAppStore(request: Request, env: Env): Promise<Response> {
+	if (request.method !== "GET") {
+		return jsonError("Only GET requests are supported.", 405);
+	}
+
+	const expected = env.HEALTHCHECK_TOKEN;
+	const authHeader = request.headers.get("Authorization") ?? "";
+	if (!expected || authHeader !== `Bearer ${expected}`) {
+		return jsonError("Unauthorized.", 401);
+	}
+
+	const checks: Record<string, { ok: boolean; status?: number; error?: string }> = {};
+
+	try {
+		if (!env.SELF_PROVISION_PUBLIC_KEY) {
+			throw new Error("SELF_PROVISION_PUBLIC_KEY not configured");
+		}
+		const spkiBytes = Uint8Array.from(atob(env.SELF_PROVISION_PUBLIC_KEY), (c) => c.charCodeAt(0));
+		await crypto.subtle.importKey("spki", spkiBytes, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+		checks.selfProvisionKey = { ok: true };
+	} catch (err) {
+		console.error("Healthcheck selfProvisionKey check failed", err);
+		checks.selfProvisionKey = { ok: false, error: "Self-provision key check failed" };
+	}
+
+	try {
+		checks.appStoreAuth = await checkAppStoreAuth(env);
+	} catch (err) {
+		console.error("Healthcheck appStoreAuth check failed", err);
+		checks.appStoreAuth = { ok: false, error: "App Store auth check failed" };
+	}
+
+	const ok = checks.selfProvisionKey.ok && checks.appStoreAuth.ok;
+	return new Response(JSON.stringify({ ok, checks }), {
+		status: ok ? 200 : 503,
+		headers: {
+			...corsHeaders(),
+			"Content-Type": "application/json; charset=utf-8",
+			"Cache-Control": "no-store",
+		},
+	});
+}
+
 async function handleSelfProvision(request: Request, env: Env): Promise<Response> {
     if (request.method !== "POST") {
         return jsonError("Only POST requests are supported.", 405);
@@ -558,12 +614,18 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         return jsonError("Body must be valid JSON.", 400);
     }
 
-    if (!parsed || typeof parsed !== "object" || typeof (parsed as Record<string, unknown>).jwt !== "string") {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_jwt_field" }));
-        return jsonError('Body must be {"jwt": "<compact-jwt>"}', 400);
+    if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        typeof (parsed as Record<string, unknown>).jwt !== "string" ||
+        typeof (parsed as Record<string, unknown>).originalTransactionId !== "string"
+    ) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_required_field" }));
+        return jsonError('Body must be {"jwt": "<compact-jwt>", "originalTransactionId": "<string>"}', 400);
     }
 
     const jwt = (parsed as { jwt: string }).jwt;
+    const originalTransactionId = (parsed as { originalTransactionId: string }).originalTransactionId;
     const parts = jwt.split(".");
     if (parts.length !== 3) {
         console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "malformed_jwt" }));
@@ -632,17 +694,29 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         return jsonError("JWT signature is invalid.", 401);
     }
 
+    const subscription = await verifySubscription(env, originalTransactionId);
+    if (!subscription.active) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "no_active_subscription" }));
+        return jsonError("No active subscription.", 403);
+    }
+
     const rawToken = crypto.randomUUID();
     const hash = await sha256Hex(rawToken);
     const platform = typeof payload.platform === "string" ? payload.platform : "unknown";
     const installId = typeof payload.install_id === "string" ? payload.install_id : "unknown";
     const appVersion = typeof payload.app_version === "string" ? payload.app_version : "unknown";
     const label = `self-prov:${platform}:${installId.slice(0, 8)}:${appVersion}`;
+    const ttlSeconds = Math.floor((subscription.expiresAtMs - Date.now()) / 1000) + SUBSCRIPTION_GRACE_SECONDS;
 
     await env.CLIENT_TOKENS.put(
         hash,
-        JSON.stringify({ label, createdAt: new Date().toISOString() }),
-        { expirationTtl: 90 * 24 * 60 * 60 },
+        JSON.stringify({
+            label,
+            tier: "paid",
+            createdAt: new Date().toISOString(),
+            subExpiresAt: new Date(subscription.expiresAtMs).toISOString(),
+        }),
+        { expirationTtl: ttlSeconds },
     );
 
     console.log(JSON.stringify({ source: "self-provision", outcome: "ok", label }));

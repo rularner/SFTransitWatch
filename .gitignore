@@ -168,7 +168,9 @@ fastlane/test_output/
 *.backup
 
 # Superpowers working files (plans, specs)
-docs/superpowers/
+# No trailing slash: also matches the docs/superpowers symlink that
+# linked worktrees get via .git/hooks/post-checkout.
+docs/superpowers
 
 # Developer-specific signing config (contains team ID)
 Developer.xcconfig

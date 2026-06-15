@@ -1,0 +1,45 @@
+{
+  "identifier" : "6F2A1000-0000-0000-0000-000000000001",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_compatibilityTimeRate" : 1,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "6F2A1000-0000-0000-0000-000000000010",
+      "localizations" : [],
+      "name" : "Worker Proxy",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6F2A1000-0000-0000-0000-000000000020",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Routes transit requests through the shared worker proxy.",
+              "displayName" : "Worker Proxy Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "org.larner.SFTransitWatch.workerproxy.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Worker Proxy Monthly",
+          "subscriptionGroupID" : "6F2A1000-0000-0000-0000-000000000010",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

@@ -10,7 +10,7 @@ public enum SelfProvisionError: Error, Equatable {
 }
 
 public protocol SelfProvisionServiceProtocol {
-    func provision(workerURL: String) async -> Result<Void, SelfProvisionError>
+    func provision(workerURL: String, originalTransactionId: String) async -> Result<Void, SelfProvisionError>
 }
 
 public final class SelfProvisionService: SelfProvisionServiceProtocol {
@@ -42,7 +42,7 @@ public final class SelfProvisionService: SelfProvisionServiceProtocol {
         self.session = session
     }
 
-    public func provision(workerURL: String) async -> Result<Void, SelfProvisionError> {
+    public func provision(workerURL: String, originalTransactionId: String) async -> Result<Void, SelfProvisionError> {
         logger.info("provision: starting, workerURL=\(workerURL, privacy: .public)")
 
         let jwt: String
@@ -68,7 +68,7 @@ public final class SelfProvisionService: SelfProvisionServiceProtocol {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONEncoder().encode(["jwt": jwt])
+        request.httpBody = try? JSONEncoder().encode(["jwt": jwt, "originalTransactionId": originalTransactionId])
         request.timeoutInterval = 15
 
         do {
