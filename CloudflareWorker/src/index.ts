@@ -1,4 +1,4 @@
-import { verifySubscription } from "./appstore";
+import { verifySubscription, checkAppStoreAuth } from "./appstore";
 
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
 const EXPECTED_ISS = "org.larner.SFTransitWatch";
@@ -36,6 +36,7 @@ interface Env {
 	APPSTORE_ISSUER_ID: string;
 	APPSTORE_PRIVATE_KEY: string;
 	APPSTORE_BUNDLE_ID: string;
+	HEALTHCHECK_TOKEN: string;
 }
 
 type CachedResponse = {
@@ -65,6 +66,11 @@ export default {
 			// Self-provision — unauthenticated, must come before the token gate.
 			if (url.pathname === "/self-provision") {
 				return await handleSelfProvision(request, env);
+			}
+
+			// Health check — gated by its own bearer token, must come before the token gate.
+			if (url.pathname === "/healthz/appstore") {
+				return await handleHealthzAppStore(request, env);
 			}
 
 			const auth = await authorizeClient(request, env);
@@ -543,6 +549,39 @@ async function checkRateLimit(
 	if (count >= maxRequests) return false;
 	await env.TRANSIT_CACHE.put(key, String(count + 1), { expirationTtl: windowSeconds * 2 });
 	return true;
+}
+
+async function handleHealthzAppStore(request: Request, env: Env): Promise<Response> {
+	const expected = env.HEALTHCHECK_TOKEN;
+	const authHeader = request.headers.get("Authorization") ?? "";
+	if (!expected || authHeader !== `Bearer ${expected}`) {
+		return jsonError("Unauthorized.", 401);
+	}
+
+	const checks: Record<string, { ok: boolean; status?: number; error?: string }> = {};
+
+	try {
+		if (!env.SELF_PROVISION_PUBLIC_KEY) {
+			throw new Error("SELF_PROVISION_PUBLIC_KEY not configured");
+		}
+		const spkiBytes = Uint8Array.from(atob(env.SELF_PROVISION_PUBLIC_KEY), (c) => c.charCodeAt(0));
+		await crypto.subtle.importKey("spki", spkiBytes, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+		checks.selfProvisionKey = { ok: true };
+	} catch (err) {
+		checks.selfProvisionKey = { ok: false, error: String(err) };
+	}
+
+	checks.appStoreAuth = await checkAppStoreAuth(env);
+
+	const ok = checks.selfProvisionKey.ok && checks.appStoreAuth.ok;
+	return new Response(JSON.stringify({ ok, checks }), {
+		status: ok ? 200 : 503,
+		headers: {
+			...corsHeaders(),
+			"Content-Type": "application/json; charset=utf-8",
+			"Cache-Control": "no-store",
+		},
+	});
 }
 
 async function handleSelfProvision(request: Request, env: Env): Promise<Response> {

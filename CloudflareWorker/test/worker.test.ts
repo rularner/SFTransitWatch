@@ -730,3 +730,68 @@ describe("POST /self-provision", () => {
         expect(res.status).toBe(405);
     });
 });
+
+describe("GET /healthz/appstore", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("returns 401 without an Authorization header", async () => {
+        const res = await SELF.fetch("https://example.com/healthz/appstore");
+        expect(res.status).toBe(401);
+    });
+
+    it("returns 401 with the wrong bearer token", async () => {
+        const res = await SELF.fetch("https://example.com/healthz/appstore", {
+            headers: { Authorization: "Bearer wrong-token" },
+        });
+        expect(res.status).toBe(401);
+    });
+
+    it("returns 200 with ok:true when both checks pass", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+
+        const res = await SELF.fetch("https://example.com/healthz/appstore", {
+            headers: { Authorization: "Bearer test-healthcheck-token" },
+        });
+
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean }> };
+        expect(body.ok).toBe(true);
+        expect(body.checks.selfProvisionKey.ok).toBe(true);
+        expect(body.checks.appStoreAuth.ok).toBe(true);
+    });
+
+    it("returns 503 with ok:false when the App Store auth check fails", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+
+        const res = await SELF.fetch("https://example.com/healthz/appstore", {
+            headers: { Authorization: "Bearer test-healthcheck-token" },
+        });
+
+        expect(res.status).toBe(503);
+        const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean }> };
+        expect(body.ok).toBe(false);
+        expect(body.checks.appStoreAuth.ok).toBe(false);
+    });
+
+    it("returns 503 with ok:false when SELF_PROVISION_PUBLIC_KEY is not configured", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+
+        const testEnv = env as unknown as { SELF_PROVISION_PUBLIC_KEY: string };
+        const original = testEnv.SELF_PROVISION_PUBLIC_KEY;
+        testEnv.SELF_PROVISION_PUBLIC_KEY = "";
+        try {
+            const res = await SELF.fetch("https://example.com/healthz/appstore", {
+                headers: { Authorization: "Bearer test-healthcheck-token" },
+            });
+
+            expect(res.status).toBe(503);
+            const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean }> };
+            expect(body.ok).toBe(false);
+            expect(body.checks.selfProvisionKey.ok).toBe(false);
+        } finally {
+            testEnv.SELF_PROVISION_PUBLIC_KEY = original;
+        }
+    });
+});

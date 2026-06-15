@@ -77,8 +77,41 @@ from KV:
 npx wrangler kv key delete --binding CLIENT_TOKENS <hash>
 ```
 
+## Apple communication health check
+
+After every deploy, `npm run postdeploy` calls `GET /healthz/appstore` on
+the worker that was just deployed. This verifies:
+
+- `SELF_PROVISION_PUBLIC_KEY` is configured and is a valid P-256 SPKI key.
+- The `APPSTORE_KEY_ID`/`APPSTORE_ISSUER_ID`/`APPSTORE_PRIVATE_KEY`/`APPSTORE_BUNDLE_ID`
+  secrets can successfully authenticate to Apple's App Store Server API.
+
+If either check fails, the script exits non-zero and the Cloudflare Workers
+Build shows as failed — even though the new code is already live. Treat a
+red build here as "Apple credentials need attention", not "the deploy
+didn't go out".
+
+**One-time operator setup:**
+
+1. Set the health check bearer token as a worker secret:
+   ```bash
+   npx wrangler secret put HEALTHCHECK_TOKEN
+   ```
+2. In the Cloudflare Workers Build project settings, add these build
+   environment variables:
+   - `HEALTHCHECK_TOKEN` — same value as the worker secret above.
+   - `WORKERS_DEV_URL` — this worker's `*.workers.dev` hostname (e.g.
+     `sftransitwatch.rusty-cloudflare.workers.dev`), used to check PR
+     builds since `WORKER_HOSTNAME` isn't repointed for those.
+
+**Note:** `/healthz/appstore` makes a real call to Apple's App Store
+Server API on every invocation. It's meant for the `postdeploy` step and
+manual operator checks — don't point uptime-monitoring/polling services at
+it.
+
 ## Notes
 
 - `TRANSIT_CACHE_KV_ID` and `CLIENT_TOKENS_KV_ID` are required for `npm run deploy`, `npm run dev`, and `npm run cf-typegen`.
 - `SELF_PROVISION_PUBLIC_KEY` is required for the `/self-provision` endpoint to work. Without it, all self-provision attempts will fail with 401.
 - `.wrangler.generated.jsonc` is generated at runtime and is gitignored.
+- `HEALTHCHECK_TOKEN` and `WORKERS_DEV_URL` are required for `npm run postdeploy` to work, in addition to the `WORKER_HOSTNAME` already required by `npm run deploy`. See "Apple communication health check" above.

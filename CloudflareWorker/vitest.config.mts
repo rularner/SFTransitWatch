@@ -32,6 +32,7 @@ export default defineConfig({
                     APPSTORE_ISSUER_ID: "test-issuer-id",
                     APPSTORE_PRIVATE_KEY: toBase64(appStorePkcs8),
                     APPSTORE_BUNDLE_ID: "org.larner.SFTransitWatch",
+                    HEALTHCHECK_TOKEN: "test-healthcheck-token",
                 },
                 kvNamespaces: ["CLIENT_TOKENS", "TRANSIT_CACHE"],
             },
