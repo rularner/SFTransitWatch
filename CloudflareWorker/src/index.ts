@@ -552,6 +552,10 @@ async function checkRateLimit(
 }
 
 async function handleHealthzAppStore(request: Request, env: Env): Promise<Response> {
+	if (request.method !== "GET") {
+		return jsonError("Only GET requests are supported.", 405);
+	}
+
 	const expected = env.HEALTHCHECK_TOKEN;
 	const authHeader = request.headers.get("Authorization") ?? "";
 	if (!expected || authHeader !== `Bearer ${expected}`) {
@@ -571,7 +575,11 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 		checks.selfProvisionKey = { ok: false, error: String(err) };
 	}
 
-	checks.appStoreAuth = await checkAppStoreAuth(env);
+	try {
+		checks.appStoreAuth = await checkAppStoreAuth(env);
+	} catch (err) {
+		checks.appStoreAuth = { ok: false, error: String(err) };
+	}
 
 	const ok = checks.selfProvisionKey.ok && checks.appStoreAuth.ok;
 	return new Response(JSON.stringify({ ok, checks }), {

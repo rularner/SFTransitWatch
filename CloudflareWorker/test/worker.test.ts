@@ -794,4 +794,27 @@ describe("GET /healthz/appstore", () => {
             testEnv.SELF_PROVISION_PUBLIC_KEY = original;
         }
     });
+
+    it("returns 503 with ok:false when the App Store auth check throws", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
+
+        const res = await SELF.fetch("https://example.com/healthz/appstore", {
+            headers: { Authorization: "Bearer test-healthcheck-token" },
+        });
+
+        expect(res.status).toBe(503);
+        const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean; error?: string }> };
+        expect(body.ok).toBe(false);
+        expect(body.checks.appStoreAuth.ok).toBe(false);
+        expect(body.checks.appStoreAuth.error).toContain("network error");
+    });
+
+    it("returns 405 for non-GET requests", async () => {
+        const res = await SELF.fetch("https://example.com/healthz/appstore", {
+            method: "POST",
+            headers: { Authorization: "Bearer test-healthcheck-token" },
+        });
+
+        expect(res.status).toBe(405);
+    });
 });
