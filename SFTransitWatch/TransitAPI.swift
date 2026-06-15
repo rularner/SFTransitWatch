@@ -24,6 +24,7 @@ class TransitAPI: ObservableObject {
     private var useDirectFallback = false
 
     var urlSession: URLSessionProtocol = URLSession.shared
+    var stopRoutesCache = StopRoutesCache()
 
     private var resolvedKey: String {
         phoneAPIKey.isEmpty ? localAPIKey : phoneAPIKey
@@ -181,6 +182,20 @@ class TransitAPI: ObservableObject {
         } catch {
             return []
         }
+    }
+
+    /// Returns the distinct, sorted set of routes serving a stop, derived
+    /// from `/StopTimetable` (mostly-static scheduled data) and cached
+    /// on-device for 7 days so direct-511.org users don't refetch on every
+    /// list load.
+    func fetchRoutes(for stopId: String, agency: String) async -> [String] {
+        if let cached = stopRoutesCache.routes(for: stopId, agency: agency) {
+            return cached
+        }
+        let arrivals = await fetchScheduledDepartures(for: stopId, agency: agency)
+        let routes = Array(Set(arrivals.map(\.route))).sorted()
+        stopRoutesCache.setRoutes(routes, for: stopId, agency: agency)
+        return routes
     }
 
     @MainActor
