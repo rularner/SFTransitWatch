@@ -199,6 +199,14 @@ struct BusStopListView: View {
                         currentLocation: locationManager.currentLocation
                     )
                 }
+                .task {
+                    guard stop.routes.isEmpty else { return }
+                    let fetched = await transitAPI.fetchRoutes(for: stop.id, agency: stop.agency)
+                    guard !fetched.isEmpty else { return }
+                    if let idx = nearbyStops.firstIndex(where: { $0.id == stop.id && $0.agency == stop.agency }) {
+                        nearbyStops[idx].routes = fetched
+                    }
+                }
             }
         }
     }
