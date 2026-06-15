@@ -26,7 +26,7 @@ final class SubscriptionManagerTests: XCTestCase {
 
     func testActiveOriginalTransactionIdReturnsIdAfterPurchase() async throws {
         let manager = SubscriptionManager()
-        try await session.buyProduct(productIdentifier: SubscriptionManager.workerProxyProductID)
+        try await session.buyProduct(identifier: SubscriptionManager.workerProxyProductID)
 
         let result = await manager.activeOriginalTransactionId()
         XCTAssertNotNil(result)
