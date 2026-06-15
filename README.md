@@ -417,6 +417,19 @@ RECORD_SNAPSHOTS=1 bin/run-phone-snapshot-tests.sh
 
 Goldens are stored in `SFTransitWatchPhoneUITests/Goldens/` and committed to the repo for CI reproducibility.
 
+## StoreKitTest (subscription tests)
+
+`SFTransitWatchPhoneTests/SubscriptionManagerTests.swift` uses `StoreKitTest`
+(`WorkerProxySubscription.storekit`) to exercise `SubscriptionManager`
+against a local StoreKit config. This bundle is **iOS-only** — it launches
+the `SFTransitWatch` host app, which `StoreKitTest` requires.
+
+The `SFTransitWatch Watch App` test scheme marks `SFTransitWatchPhoneTests`
+as `skipped`. Running it there launches the iOS host app against a watchOS
+destination, which crashes before XCTest can attach (`SIGILL`, "Early
+unexpected exit"). Don't flip `skipped` back to `NO` on that scheme — run
+these tests via the `SFTransitWatch` (iPhone) scheme only.
+
 ## Rate Limits
 
 511.org API has rate limits:
