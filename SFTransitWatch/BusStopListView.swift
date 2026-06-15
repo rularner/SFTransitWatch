@@ -226,7 +226,19 @@ struct BusStopListView: View {
                 agencies: agencies
             )
             guard !Task.isCancelled else { return }
-            nearbyStops = stops
+            let previousRoutes = Dictionary(
+                nearbyStops.compactMap { stop in
+                    stop.routes.isEmpty ? nil : ("\(stop.agency):\(stop.id)", stop.routes)
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            nearbyStops = stops.map { stop in
+                var stop = stop
+                if let routes = previousRoutes["\(stop.agency):\(stop.id)"] {
+                    stop.routes = routes
+                }
+                return stop
+            }
         } else {
             nearbyStops = []
         }
