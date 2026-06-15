@@ -7,7 +7,7 @@ public struct BusStop: Identifiable, Codable, Sendable, Hashable {
     public let code: String
     public let latitude: Double
     public let longitude: Double
-    public let routes: [String]
+    public var routes: [String]
     public var isFavorite: Bool
     /// 511.org agency code (e.g. "SF" for Muni, "BA" for BART).
     /// Stop codes are scoped per-agency, so this is needed for arrival fetches.
