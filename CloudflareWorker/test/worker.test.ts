@@ -806,7 +806,7 @@ describe("GET /healthz/appstore", () => {
         const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean; error?: string }> };
         expect(body.ok).toBe(false);
         expect(body.checks.appStoreAuth.ok).toBe(false);
-        expect(body.checks.appStoreAuth.error).toContain("network error");
+        expect(body.checks.appStoreAuth.error).toBe("App Store auth check failed");
     });
 
     it("returns 405 for non-GET requests", async () => {

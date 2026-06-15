@@ -572,13 +572,15 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 		await crypto.subtle.importKey("spki", spkiBytes, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
 		checks.selfProvisionKey = { ok: true };
 	} catch (err) {
-		checks.selfProvisionKey = { ok: false, error: String(err) };
+		console.error("Healthcheck selfProvisionKey check failed", err);
+		checks.selfProvisionKey = { ok: false, error: "Self-provision key check failed" };
 	}
 
 	try {
 		checks.appStoreAuth = await checkAppStoreAuth(env);
 	} catch (err) {
-		checks.appStoreAuth = { ok: false, error: String(err) };
+		console.error("Healthcheck appStoreAuth check failed", err);
+		checks.appStoreAuth = { ok: false, error: "App Store auth check failed" };
 	}
 
 	const ok = checks.selfProvisionKey.ok && checks.appStoreAuth.ok;
