@@ -170,15 +170,11 @@ struct BusArrivalView: View {
                         .listRowBackground(Color.clear)
                     }
                     ForEach(filteredArrivals) { arrival in
-                        if !arrival.onwardStops.isEmpty {
-                            NavigationLink(destination: BusJourneyView(
-                                arrival: arrival,
-                                originStopId: stop.id,
-                                agency: stop.agency
-                            )) {
-                                BusArrivalRow(arrival: arrival)
-                            }
-                        } else {
+                        NavigationLink(destination: BusJourneyView(
+                            arrival: arrival,
+                            originStopId: stop.id,
+                            agency: stop.agency
+                        )) {
                             BusArrivalRow(arrival: arrival)
                         }
                     }

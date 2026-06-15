@@ -1,9 +1,7 @@
 Bugs:
-  - Turning on/off filters doesn't always work (likely due to internal rate limits)
-  - Bus view can't be triggered
-  - Watch complication to show next bus to nearest stop
 
 Quick wins (polish / watch-phone parity):
+  - Watch complication to show next bus to nearest stop
   - Add configuration for minimum time-to-stop for morning and evening
   - Add early/late times for morning and evening
   - Add ability to disable alerts
