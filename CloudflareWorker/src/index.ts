@@ -183,7 +183,6 @@ function xmlResponse(cached: CachedResponse, cacheStatus: string, ttl: TtlPair):
 
 const UPSTREAM_PATHS: Record<string, string> = {
 	StopMonitoring: "StopMonitoring",
-	StopPlace: "StopPlace",
 	StopTimetable: "stoptimetable",
 	Timetable: "timetable",
 };
@@ -197,7 +196,7 @@ function buildUpstreamUrl(
 	const endpoint = segments[segments.length - 1];
 
 	if (!endpoint || !Object.keys(UPSTREAM_PATHS).includes(endpoint)) {
-		return { ok: false, error: "Path must end with /StopMonitoring, /StopPlace, /Stops, /StopTimetable, or /Timetable." };
+		return { ok: false, error: "Path must end with /StopMonitoring, /Stops, /StopTimetable, or /Timetable." };
 	}
 
 	const upstream = new URL(`${UPSTREAM_BASE_URL}/${UPSTREAM_PATHS[endpoint]}`);
