@@ -9,7 +9,7 @@ struct SFTransitWatchApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tokenExchange = WorkerTokenExchange()
     @State private var pendingBootstrap: PendingBootstrap?
-    @State private var showingProvisionPrompt = false
+    @State private var showingSetup = false
     @State private var showingKeyEntry = false
     @State private var provisionError: String?
     private let provisionService = SelfProvisionService.makeFromBundle()
@@ -29,7 +29,7 @@ struct SFTransitWatchApp: App {
                     // to deliver the token rather than self-provisioning here.
                     let companionInstalled = WCSession.isSupported() && WCSession.default.isCompanionAppInstalled
                     if !companionInstalled {
-                        showingProvisionPrompt = true
+                        showingSetup = true
                     }
                 }
                 .onOpenURL { url in
@@ -41,22 +41,15 @@ struct SFTransitWatchApp: App {
                         pendingBootstrap = PendingBootstrap(url: bootstrap.url, code: bootstrap.code)
                     }
                 }
-                .confirmationDialog(
-                    "Connect to SF Transit Watch Server?",
-                    isPresented: $showingProvisionPrompt,
-                    titleVisibility: .visible
-                ) {
-                    if provisionService != nil {
-                        Button("Subscribe") {
-                            Task { await handleSubscribeAndProvision() }
+                .sheet(isPresented: $showingSetup) {
+                    SetupView(
+                        canSubscribe: provisionService != nil,
+                        onSubscribe: { Task { await handleSubscribeAndProvision() } },
+                        onUseKey: {
+                            showingSetup = false
+                            showingKeyEntry = true
                         }
-                    }
-                    Button("Use 511.org key instead") {
-                        showingProvisionPrompt = false
-                        showingKeyEntry = true
-                    }
-                } message: {
-                    Text("Transit requests will be sent to a remote server to find nearby stops.")
+                    )
                 }
                 .sheet(isPresented: $showingKeyEntry) {
                     NavigationStack { SettingsView() }
@@ -115,15 +108,15 @@ struct SFTransitWatchApp: App {
             let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
             switch result {
             case .success:
-                showingProvisionPrompt = false
+                showingSetup = false
             case .failure:
-                showingProvisionPrompt = false
+                showingSetup = false
                 provisionError = "Could not connect to the transit server. Check your connection and try again."
             }
         } catch SubscriptionManagerError.purchaseCancelled {
-            showingProvisionPrompt = false
+            showingSetup = false
         } catch {
-            showingProvisionPrompt = false
+            showingSetup = false
             provisionError = "Could not complete the subscription purchase. Check your connection and try again."
         }
     }
