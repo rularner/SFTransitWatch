@@ -11,6 +11,7 @@ final class PhoneTransitAPITests: XCTestCase {
         api = TransitAPI()
         mockSession = MockURLSession()
         api.urlSession = mockSession
+        api.stopRoutesCache = StopRoutesCache(defaults: UserDefaults(suiteName: "PhoneTransitAPITests-\(UUID().uuidString)")!)
         ConfigurationManager.shared.apiKey = "test-key"
     }
 
@@ -19,6 +20,51 @@ final class PhoneTransitAPITests: XCTestCase {
         ConfigurationManager.shared.apiKey = ""
         ConfigurationManager.shared.workerToken = ""
         ConfigurationManager.shared.workerBaseURL = ""
+    }
+
+    func testFetchRoutesCacheMissDerivesDistinctSortedRoutesAndCaches() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let isoIn10 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
+        let isoIn15 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(900))
+        let timetableData = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"SF:38R","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"Downtown"}}},
+          {"TargetedVehicleJourney":{"LineRef":"SF:38","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn10)","DestinationDisplay":"Downtown"}}},
+          {"TargetedVehicleJourney":{"LineRef":"SF:38","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn15)","DestinationDisplay":"Downtown"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopTimetable")!,
+            data: timetableData
+        )
+
+        let routes = await api.fetchRoutes(for: "1234", agency: "SF")
+
+        XCTAssertEqual(routes, ["38", "38R"])
+        XCTAssertEqual(mockSession.requestCount(), 1)
+
+        // Second call is a cache hit: no additional request.
+        let cachedRoutes = await api.fetchRoutes(for: "1234", agency: "SF")
+        XCTAssertEqual(cachedRoutes, ["38", "38R"])
+        XCTAssertEqual(mockSession.requestCount(), 1)
+    }
+
+    func testFetchRoutesEmptyTimetableCachesEmptyArray() async {
+        let emptyTimetable = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopTimetable")!,
+            data: emptyTimetable
+        )
+
+        let routes = await api.fetchRoutes(for: "1234", agency: "SF")
+        XCTAssertEqual(routes, [])
+        XCTAssertEqual(mockSession.requestCount(), 1)
+
+        let cachedRoutes = await api.fetchRoutes(for: "1234", agency: "SF")
+        XCTAssertEqual(cachedRoutes, [])
+        XCTAssertEqual(mockSession.requestCount(), 1)
     }
 
     func testSearchStopsByExactCode() async {

@@ -199,6 +199,14 @@ struct BusStopListView: View {
                         currentLocation: locationManager.currentLocation
                     )
                 }
+                .task {
+                    guard stop.routes.isEmpty else { return }
+                    let fetched = await transitAPI.fetchRoutes(for: stop.id, agency: stop.agency)
+                    guard !fetched.isEmpty else { return }
+                    if let idx = nearbyStops.firstIndex(where: { $0.id == stop.id && $0.agency == stop.agency }) {
+                        nearbyStops[idx].routes = fetched
+                    }
+                }
             }
         }
     }
@@ -218,7 +226,19 @@ struct BusStopListView: View {
                 agencies: agencies
             )
             guard !Task.isCancelled else { return }
-            nearbyStops = stops
+            let previousRoutes = Dictionary(
+                nearbyStops.compactMap { stop in
+                    stop.routes.isEmpty ? nil : ("\(stop.agency):\(stop.id)", stop.routes)
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            nearbyStops = stops.map { stop in
+                var stop = stop
+                if let routes = previousRoutes["\(stop.agency):\(stop.id)"] {
+                    stop.routes = routes
+                }
+                return stop
+            }
         } else {
             nearbyStops = []
         }
