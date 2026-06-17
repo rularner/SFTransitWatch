@@ -140,6 +140,15 @@ because of the `productNotFound` issue above — see the "Known issue" note in
 the root README for how to re-enable them once the scheme's StoreKit
 Configuration is set.
 
+**Xcode Cloud's simulator SDK can be ahead of the local one** (e.g. CI ran
+`iPhoneSimulator26.5.sdk` while the local sandbox only has 26.4.1 installed).
+The same StoreKitTest bugs above can surface with different error text on a
+newer SDK — e.g. `SKInternalErrorDomain Code=3` stayed the same but
+`productNotFound` only appeared on 26.5, not locally. If a StoreKitTest
+failure only happens in CI, check this list before assuming a new
+regression — it's likely one of the same known issues hitting a different
+code path on the newer SDK, not new code.
+
 ## Planning/spec docs
 
 `docs/superpowers/` is gitignored on purpose — specs and plans stay local. Don't try to `git add` anything under that path.
