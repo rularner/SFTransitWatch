@@ -8,6 +8,7 @@ struct SFTransitWatchApp: App {
     @State private var pendingBootstrap: PendingBootstrap?
     @State private var showingSetup = false
     @State private var showingKeyEntry = false
+    @State private var pendingKeyEntry = false
     @State private var provisionError: String?
     private let provisionService = SelfProvisionService.makeFromBundle()
     private let subscriptionManager = SubscriptionManager()
@@ -34,13 +35,18 @@ struct SFTransitWatchApp: App {
                     }
                 }
                 // Onboarding sheet
-                .sheet(isPresented: $showingSetup) {
+                .sheet(isPresented: $showingSetup, onDismiss: {
+                    if pendingKeyEntry {
+                        showingKeyEntry = true
+                        pendingKeyEntry = false
+                    }
+                }) {
                     SetupView(
                         canSubscribe: provisionService != nil,
                         onSubscribe: { Task { await handleSubscribeAndProvision() } },
                         onUseKey: {
+                            pendingKeyEntry = true
                             showingSetup = false
-                            showingKeyEntry = true
                         }
                     )
                 }

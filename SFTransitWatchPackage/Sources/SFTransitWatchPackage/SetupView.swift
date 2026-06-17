@@ -53,6 +53,7 @@ public struct SetupView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
+        .interactiveDismissDisabled(true)
     }
 }
 
