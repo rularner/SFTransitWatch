@@ -16,7 +16,10 @@ struct SettingsView: View {
     @State private var showingAfternoonPicker = false
     @State private var showingManageSubscriptions = false
     @State private var hasActiveSubscription = false
+    @State private var isSubscribing = false
+    @State private var subscribeError: String?
     private let subscriptionManager = SubscriptionManager()
+    private let provisionService = SelfProvisionService.makeFromBundle()
     @AppStorage(AlertSettingsManager.alertEnabledKey,
                 store: UserDefaults(suiteName: AlertSettingsManager.appGroupSuiteName))
     private var alertsEnabled = true
@@ -89,6 +92,14 @@ struct SettingsView: View {
                     Button("Manage Subscription") {
                         showingManageSubscriptions = true
                     }
+                } else if provisionService != nil {
+                    Button(isSubscribing ? "Subscribing…" : "Subscribe") {
+                        Task { await handleSubscribeAndProvision() }
+                    }
+                    .disabled(isSubscribing)
+                    Text("Access transit via SF Transit Watch Server")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -296,6 +307,14 @@ struct SettingsView: View {
         .task {
             hasActiveSubscription = await subscriptionManager.activeOriginalTransactionId() != nil
         }
+        .alert("Subscription Failed", isPresented: Binding(
+            get: { subscribeError != nil },
+            set: { if !$0 { subscribeError = nil } }
+        )) {
+            Button("OK") { subscribeError = nil }
+        } message: {
+            Text(subscribeError ?? "")
+        }
         .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
     }
     
@@ -334,6 +353,31 @@ struct SettingsView: View {
 
     private var favoriteStopsForPicker: [BusStop] {
         favoritesManager.favoriteStops
+    }
+
+    private func handleSubscribeAndProvision() async {
+        guard let service = provisionService else { return }
+        isSubscribing = true
+        defer { isSubscribing = false }
+        do {
+            let originalTransactionId: String
+            if let existing = await subscriptionManager.activeOriginalTransactionId() {
+                originalTransactionId = existing
+            } else {
+                originalTransactionId = try await subscriptionManager.purchase()
+            }
+            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            switch result {
+            case .success:
+                hasActiveSubscription = true
+            case .failure:
+                subscribeError = "Could not connect to the transit server. Check your internet connection and try again."
+            }
+        } catch SubscriptionManagerError.purchaseCancelled {
+            // user cancelled, no error shown
+        } catch {
+            subscribeError = "Could not complete the subscription purchase. Check your internet connection and try again."
+        }
     }
 }
 
