@@ -13,19 +13,23 @@ public struct SetupView: View {
 
     public var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "bus.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(.tint)
+            VStack(spacing: 12) {
+                Image(systemName: "bus.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.tint)
 
-            VStack(spacing: 6) {
-                Text("SF Transit Watch")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                Text("Set up data access to see nearby stops.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                VStack(spacing: 6) {
+                    Text("SF Transit Watch")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Set up data access to see nearby stops.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("SF Transit Watch. Set up data access to see nearby stops.")
 
             VStack(spacing: 12) {
                 if canSubscribe {
@@ -47,6 +51,7 @@ public struct SetupView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity)
         .padding()
     }
 }
