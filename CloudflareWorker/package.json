@@ -12,10 +12,10 @@
 		"cf-typegen": "npm run prepare:wrangler && wrangler types --config .wrangler.generated.jsonc"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.15.0",
+		"@cloudflare/vitest-pool-workers": "^0.16.18",
 		"@types/node": "^25.6.0",
 		"typescript": "^5.5.2",
 		"vitest": "^4.1.5",
-		"wrangler": "^4.83.0"
+		"wrangler": "^4.103.0"
 	}
 }
