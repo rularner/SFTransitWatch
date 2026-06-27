@@ -447,21 +447,10 @@ removing the `XCTSkipIf` lines.
 
 ## Future Enhancements
 
-- [ ] Real-time vehicle tracking
-- [ ] Route planning with 511.org
-- [ ] Service alerts from 511.org
-- [ ] Accessibility improvements
-- [ ] Complications support
-- [ ] Offline mode with cached data
-- [ ] Multiple transit agencies
-- [ ] Push notifications for delays
-- [ ] Favorite stop widgets
-- [ ] Custom favorite stop names
-- [ ] Advanced Siri commands
-- [ ] Siri complications
-- [ ] Voice feedback for arrival times
-- [ ] Route-specific complications
-- [ ] Multi-route voice queries
+The planned-work backlog lives in [TODO.md](TODO.md), grouped by effort
+(quick wins, medium features, bigger bets) plus bug and privacy items.
+Complications, multiple transit agencies, and favorite-stop widgets that
+were once listed here are already shipped.
 
 ## Contributing
 

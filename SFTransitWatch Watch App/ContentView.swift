@@ -2,9 +2,6 @@ import SwiftUI
 import SFTransitWatchPackage
 
 struct ContentView: View {
-    @StateObject private var favoritesManager = FavoritesManager()
-    @StateObject private var slotsManager = CommuteSlotsManager()
-
     var body: some View {
         Group {
             if SnapshotMode.showArrivalDirectly {
@@ -28,11 +25,11 @@ struct ContentView: View {
                 }
             }
         }
-        .environmentObject(favoritesManager)
-        .environmentObject(slotsManager)
     }
 }
 
 #Preview {
     ContentView()
-} 
+        .environmentObject(FavoritesManager())
+        .environmentObject(CommuteSlotsManager())
+}
