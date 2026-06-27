@@ -16,6 +16,33 @@ final class PhoneSnapshotUITests: XCTestCase {
         return app
     }
 
+    /// Regression test: tapping "Use 511.org API Key" during onboarding presents
+    /// `SettingsView` from a sheet attached at the `WindowGroup` level. `SettingsView`
+    /// requires `FavoritesManager`/`CommuteSlotsManager` as `@EnvironmentObject`s, which
+    /// are only injected inside `ContentView` — so before the fix this path crashed with
+    /// "No ObservableObject of type FavoritesManager found".
+    ///
+    /// Launches unconfigured (no API key / worker token) so the onboarding sheet appears.
+    func testOnboarding_UseKeyButton_PresentsSettingsWithoutCrashing() throws {
+        let app = XCUIApplication()
+        // -SNAPSHOT_MODE stubs location; empty key/token force the unconfigured
+        // (onboarding) state regardless of any persisted app-group prefs.
+        app.launchArguments += [
+            "-SNAPSHOT_MODE",
+            "-511_API_KEY", "",
+            "-WORKER_TOKEN", "",
+        ]
+        app.launch()
+
+        let useKeyButton = app.buttons["Use 511.org API Key"]
+        XCTAssertTrue(useKeyButton.waitForExistence(timeout: 10),
+                      "Onboarding 'Use 511.org API Key' button should appear when the app is unconfigured")
+        useKeyButton.tap()
+
+        XCTAssertTrue(app.staticTexts["API Key"].waitForExistence(timeout: 10),
+                      "SettingsView should present without crashing after tapping 'Use 511.org API Key'")
+    }
+
     func testSnapshot_BusStopList() throws {
         let app = launchSnapshotModeApp()
         XCTAssertTrue(app.staticTexts["Castro Station"].waitForExistence(timeout: 10),

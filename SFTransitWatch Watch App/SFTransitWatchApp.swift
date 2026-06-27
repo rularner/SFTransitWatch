@@ -13,6 +13,8 @@ struct SFTransitWatchApp: App {
     @State private var showingKeyEntry = false
     @State private var pendingKeyEntry = false
     @State private var provisionError: String?
+    @StateObject private var favoritesManager = FavoritesManager()
+    @StateObject private var slotsManager = CommuteSlotsManager()
     private let provisionService = SelfProvisionService.makeFromBundle()
     private let subscriptionManager = SubscriptionManager()
 
@@ -92,6 +94,11 @@ struct SFTransitWatchApp: App {
                 } message: { bootstrap in
                     Text("Route transit requests through \(bootstrap.displayHost)?")
                 }
+                // Inject here (outside ContentView) so sheets/dialogs presented at the
+                // WindowGroup level — e.g. the onboarding key-entry SettingsView — also
+                // inherit these environment objects. SettingsView requires them.
+                .environmentObject(favoritesManager)
+                .environmentObject(slotsManager)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
