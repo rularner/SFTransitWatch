@@ -12,6 +12,12 @@ SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 // Base URL for the Cloudflare Worker proxy. Seeded into UserDefaults on first launch.
 WORKER_BASE_URL = api.sftransitwatch.com
 
+// When NO (the default), a build with an empty SELF_PROVISION_PRIVATE_KEY fails
+// via bin/check-self-provision-key.sh — an empty key silently disables the
+// subscribe/store flow, so we'd rather catch it before archiving. Override to
+// YES in Developer.xcconfig to build without the key on purpose.
+ALLOW_MISSING_SELF_PROVISION_KEY = NO
+
 // Developer-local overrides (signing, build number for manual TestFlight builds).
 // Included last so values here win over defaults above.
 // File is gitignored — safe to set CURRENT_PROJECT_VERSION here before a GUI archive.
