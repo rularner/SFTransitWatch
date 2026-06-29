@@ -470,11 +470,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = CAFE000000000000000001AB /* Build configuration list for PBXNativeTarget "SFTransitWatch Watch App" */;
 			buildPhases = (
-				CAFE0000000000000000SP01 /* Check self-provision key */,
 				CAFE000000000000000001AC /* Sources */,
 				CAFE000000000000000017A0 /* Frameworks */,
 				CAFE000000000000000001AD /* Resources */,
 				CAFE0000000000000000CT04 /* Embed Foundation Extensions */,
+				CAFE0000000000000000SP01 /* Check self-provision key */,
 			);
 			buildRules = (
 			);
@@ -493,11 +493,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = CAFE000000000000000020E1 /* Build configuration list for PBXNativeTarget "SFTransitWatch" */;
 			buildPhases = (
-				CAFE0000000000000000SP02 /* Check self-provision key */,
 				CAFE000000000000000020D0 /* Sources */,
 				CAFE000000000000000020D2 /* Frameworks */,
 				CAFE000000000000000020D1 /* Resources */,
 				CAFE000000000000000020D3 /* Embed Watch Content */,
+				CAFE0000000000000000SP02 /* Check self-provision key */,
 			);
 			buildRules = (
 			);
@@ -665,6 +665,7 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/bin/check-self-provision-key.sh",
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
 			);
 			name = "Check self-provision key";
 			outputPaths = (
@@ -681,6 +682,7 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/bin/check-self-provision-key.sh",
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
 			);
 			name = "Check self-provision key";
 			outputPaths = (
