@@ -29,7 +29,8 @@ export async function verifySubscription(
 		usedSandbox = true;
 	}
 	if (!resp.ok) {
-		console.warn(JSON.stringify({ source: "verify-sub", reason: "http_not_ok", prodStatus: prodResp.status, usedSandbox, finalStatus: resp.status }));
+		const body = await resp.text().catch(() => "");
+		console.warn(JSON.stringify({ source: "verify-sub", reason: "http_not_ok", prodStatus: prodResp.status, usedSandbox, finalStatus: resp.status, body: body.slice(0, 300) }));
 		return { active: false };
 	}
 
