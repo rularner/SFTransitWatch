@@ -9,7 +9,7 @@ public enum SubscriptionManagerError: Error, Equatable {
 }
 
 public final class SubscriptionManager {
-    public static let workerProxyProductID = "org.larner.SFTransitWatch.workerproxy.monthly"
+    public static let workerProxyProductID = "org.larner.SFTransitWatch.proxy.monthly"
 
     public init() {}
 

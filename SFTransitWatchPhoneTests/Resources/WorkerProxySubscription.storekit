@@ -29,7 +29,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "org.larner.SFTransitWatch.workerproxy.monthly",
+          "productID" : "org.larner.SFTransitWatch.proxy.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Worker Proxy Monthly",
           "subscriptionGroupID" : "6F2A1000-0000-0000-0000-000000000010",
