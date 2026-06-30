@@ -9,22 +9,31 @@
 	"compatibility_date": "2026-04-20",
 	"observability": {
 		"enabled": true,
-                "logs": {
-                  "enabled": true,
-                  "invocation_logs": true
-                }
+		"logs": {
+			"enabled": true,
+			"invocation_logs": true
+		}
 	},
 	"upload_source_maps": true,
 	"kv_namespaces": [
 		{
 			"binding": "TRANSIT_CACHE",
-			"id": "__TRANSIT_CACHE_KV_ID__"
-		},
-		{
-			"binding": "CLIENT_TOKENS",
-			"id": "__CLIENT_TOKENS_KV_ID__"
+			"id": "bcea5b293c9d42939203ccba75648114"
 		}
 	],
-	"compatibility_flags": ["nodejs_compat"],
-	"custom_domains": ["__WORKER_HOSTNAME__"]
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"custom_domains": [
+		"__WORKER_HOSTNAME__"
+	],
+	"routes": [
+		{
+			"pattern": "api.sftransitwatch.com",
+			"zone_name": "sftransitwatch.com",
+			"custom_domain": true,
+			"enabled": true,
+			"previews_enabled": false
+		}
+	]
 }

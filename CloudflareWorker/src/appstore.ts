@@ -54,7 +54,12 @@ export async function verifySubscription(
 export async function checkAppStoreAuth(env: AppStoreEnv): Promise<{ ok: boolean; status: number }> {
 	const jwt = await signAppStoreJWT(env);
 	const resp = await fetchSubscriptionStatus("api.storekit.itunes.apple.com", "0", jwt);
-	return { ok: resp.status !== 401 && resp.status !== 403, status: resp.status };
+	const ok = resp.status !== 401 && resp.status !== 403;
+	if (!ok) {
+		const body = await resp.text().catch(() => "");
+		console.warn(JSON.stringify({ source: "appstore-auth-check", status: resp.status, kid: env.APPSTORE_KEY_ID, iss: env.APPSTORE_ISSUER_ID, bid: env.APPSTORE_BUNDLE_ID, body: body.slice(0, 300) }));
+	}
+	return { ok, status: resp.status };
 }
 
 async function fetchSubscriptionStatus(host: string, originalTransactionId: string, jwt: string): Promise<Response> {
