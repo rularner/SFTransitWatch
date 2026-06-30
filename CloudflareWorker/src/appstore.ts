@@ -21,17 +21,22 @@ export async function verifySubscription(
 ): Promise<SubscriptionStatus> {
 	const jwt = await signAppStoreJWT(env);
 
-	let resp = await fetchSubscriptionStatus("api.storekit.itunes.apple.com", originalTransactionId, jwt);
-	if (resp.status === 404) {
+	const prodResp = await fetchSubscriptionStatus("api.storekit.itunes.apple.com", originalTransactionId, jwt);
+	let resp = prodResp;
+	let usedSandbox = false;
+	if (prodResp.status === 404) {
 		resp = await fetchSubscriptionStatus("api.storekit-sandbox.itunes.apple.com", originalTransactionId, jwt);
+		usedSandbox = true;
 	}
 	if (!resp.ok) {
+		console.warn(JSON.stringify({ source: "verify-sub", reason: "http_not_ok", prodStatus: prodResp.status, usedSandbox, finalStatus: resp.status }));
 		return { active: false };
 	}
 
 	const data = (await resp.json()) as AppStoreSubscriptionResponse;
 	const last = data.data?.[0]?.lastTransactions?.[0];
 	if (!last) {
+		console.warn(JSON.stringify({ source: "verify-sub", reason: "no_last_transaction", usedSandbox, dataCount: data.data?.length ?? 0 }));
 		return { active: false };
 	}
 
@@ -41,6 +46,7 @@ export async function verifySubscription(
 	if (ACTIVE_STATUSES.has(last.status) && expiresAtMs > Date.now()) {
 		return { active: true, expiresAtMs };
 	}
+	console.warn(JSON.stringify({ source: "verify-sub", reason: "inactive", usedSandbox, txStatus: last.status, expiresAtMs, now: Date.now() }));
 	return { active: false };
 }
 
