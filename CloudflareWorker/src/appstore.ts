@@ -37,7 +37,7 @@ export async function verifySubscription(
 	const data = (await resp.json()) as AppStoreSubscriptionResponse;
 	const last = data.data?.[0]?.lastTransactions?.[0];
 	if (!last) {
-		console.warn(JSON.stringify({ source: "verify-sub", reason: "no_last_transaction", usedSandbox, dataCount: data.data?.length ?? 0 }));
+		console.warn(JSON.stringify({ source: "verify-sub", reason: "no_last_transaction", usedSandbox, dataCount: data.data?.length ?? 0, txId: originalTransactionId, raw: JSON.stringify(data).slice(0, 500) }));
 		return { active: false };
 	}
 
