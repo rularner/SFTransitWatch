@@ -313,4 +313,34 @@ final class PhoneTransitAPITests: XCTestCase {
         let url = mockSession.recordedRequests().first!.url!.absoluteString
         XCTAssertTrue(url.contains("format=json"), "expected format=json in \(url)")
     }
+
+    func testFetchArrivalsThrottlesRepeatCalls() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"SF:38","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+        XCTAssertEqual(mockSession.requestCount(), 1, "second call within throttle window is served from cache")
+    }
+
+    func testFetchArrivalsCoalescesConcurrentCalls() async {
+        mockSession.delaySeconds = 1
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"SF:38","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+
+        async let a = api.fetchArrivals(for: "15552", agency: "SF")
+        async let b = api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await [a, b]
+        XCTAssertEqual(mockSession.requestCount(), 1, "concurrent calls for the same stop issue one request")
+    }
 }

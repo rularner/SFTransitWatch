@@ -25,6 +25,13 @@ class TransitAPI: ObservableObject {
 
     var urlSession: URLSessionProtocol = URLSession.shared
     var stopRoutesCache = StopRoutesCache()
+    var now: () -> Date = { Date() }
+    private let throttleInterval: TimeInterval = 20
+    private struct CachedArrivals { let arrivals: [BusArrival]; let timestamp: Date }
+    private var arrivalsCache: [String: CachedArrivals] = [:]
+    private var inFlight: [String: Task<[BusArrival], Never>] = [:]
+
+    private func arrivalsCacheKey(_ stopId: String, _ agency: String) -> String { "\(agency):\(stopId)" }
 
     private var resolvedKey: String {
         phoneAPIKey.isEmpty ? localAPIKey : phoneAPIKey
@@ -81,13 +88,23 @@ class TransitAPI: ObservableObject {
 
     @MainActor
     func fetchArrivals(for stopId: String, agency: String = "SF") async -> [BusArrival] {
-        // SnapshotMode: bypass network when launched with -SNAPSHOT_MODE.
-        // SnapshotMode.arrivals(for:) currently always returns Castro Station's 4 arrivals
-        // regardless of the stop arg. That's intentional for the App Store snapshot.
-        if SnapshotMode.isActive {
-            return SnapshotMode.arrivals(for: SnapshotMode.sampleStop)
+        if SnapshotMode.isActive { return SnapshotMode.arrivals(for: SnapshotMode.sampleStop) }
+        let key = arrivalsCacheKey(stopId, agency)
+        if let cached = arrivalsCache[key], now().timeIntervalSince(cached.timestamp) < throttleInterval {
+            return cached.arrivals
         }
+        if let existing = inFlight[key] {
+            return await existing.value
+        }
+        let task = Task { @MainActor in await self.performFetchArrivals(for: stopId, agency: agency) }
+        inFlight[key] = task
+        let result = await task.value
+        inFlight[key] = nil
+        return result
+    }
 
+    @MainActor
+    private func performFetchArrivals(for stopId: String, agency: String) async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -130,7 +147,7 @@ class TransitAPI: ObservableObject {
             if httpResponse.statusCode == 401, !isDirect511Mode {
                 useDirectFallback = true
                 Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "worker_401_fallback", httpStatus: 401, latencyMs: latencyMs)
-                return await fetchArrivals(for: stopId, agency: agency)
+                return await performFetchArrivals(for: stopId, agency: agency)
             }
 
             if httpResponse.statusCode != 200 {
@@ -148,8 +165,11 @@ class TransitAPI: ObservableObject {
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
             let realTimeArrivals = try parse511Arrivals(data: data)
             if realTimeArrivals.isEmpty {
-                return await fetchScheduledDepartures(for: stopId, agency: agency)
+                let scheduled = await fetchScheduledDepartures(for: stopId, agency: agency)
+                arrivalsCache[arrivalsCacheKey(stopId, agency)] = CachedArrivals(arrivals: scheduled, timestamp: now())
+                return scheduled
             }
+            arrivalsCache[arrivalsCacheKey(stopId, agency)] = CachedArrivals(arrivals: realTimeArrivals, timestamp: now())
             return realTimeArrivals
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
