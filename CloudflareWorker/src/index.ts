@@ -13,7 +13,7 @@ const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
-export const PROXY_RATE_LIMIT = { maxRequests: 30, windowSeconds: 60 };
+export const PROXY_RATE_LIMIT = { maxRequests: 60, windowSeconds: 60 };
 const SUBSCRIPTION_GRACE_SECONDS = 3 * 24 * 60 * 60;
 
 type TtlPair = { fresh: number; stale: number };
@@ -87,14 +87,9 @@ export default {
 				keyHashPrefix,
 			}));
 
-			const tokenAllowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
-			if (!tokenAllowed) {
-				console.warn(JSON.stringify({ source: "proxy-rate-limit", outcome: "rate_limited", label: auth.client.label }));
-				return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
-			}
-
+			// /log has its own token-keyed bucket — must not consume the proxy data budget.
 			if (url.pathname === "/log") {
-				return await handleLog(request, env);
+				return await handleLog(request, env, auth.client.tokenHash);
 			}
 
 			if (request.method !== "GET") {
@@ -103,6 +98,10 @@ export default {
 
 			const endpoint = url.pathname.split("/").filter(Boolean).pop() ?? "";
 			if (endpoint === "Stops") {
+				const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+				if (!allowed) {
+					return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+				}
 				return await handleStopsRequest(url, env);
 			}
 
@@ -111,32 +110,38 @@ export default {
 				return jsonError(upstream.error, 400);
 			}
 
-			const cacheKey = cacheKeyFor(upstream.url);
-			const cached = await readCachedResponse(env, cacheKey);
 			const now = Date.now();
 			const ttl = ttlForEndpoint(endpoint);
+			const cached = await readHotCache(upstream.url);
 
+			// Fresh cache HIT: free — does not consume the token budget.
 			if (cached && now - cached.fetchedAtMs < ttl.fresh * 1000) {
 				return xmlResponse(cached, "HIT", ttl);
 			}
 
+			// Work is required — now gate on the per-token budget.
+			const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+			if (!allowed) {
+				if (cached) {
+					return xmlResponse(cached, "STALE", ttl);
+				}
+				console.warn(JSON.stringify({ source: "proxy-rate-limit", outcome: "rate_limited", label: auth.client.label }));
+				return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+			}
+
 			const canRefreshNow = await canMakeUpstreamRequest(env, now);
 			if (!canRefreshNow && cached) {
-				const didSchedule = await scheduleBackgroundRefresh(env, ctx, upstream.url, cacheKey, now, ttl);
+				const didSchedule = await scheduleBackgroundRefresh(env, ctx, upstream.url, now, ttl);
 				return xmlResponse(cached, didSchedule ? "STALE-REVALIDATE" : "STALE", ttl);
 			}
-
 			if (!canRefreshNow && !cached) {
-				return jsonError("Rate limited by upstream policy. Retry in a few seconds.", 429, {
-					"Retry-After": "60",
-				});
+				return jsonError("Rate limited by upstream policy. Retry in a few seconds.", 429, { "Retry-After": "60" });
 			}
 
-			const refreshed = await fetchAndCacheUpstream(env, upstream.url, cacheKey, now, ttl);
+			const refreshed = await fetchAndCacheUpstream(env, upstream.url, now, ttl);
 			if (refreshed.ok) {
 				return xmlResponse(refreshed.value, "MISS", ttl);
 			}
-
 			if (cached) {
 				return xmlResponse(cached, "STALE-UPSTREAM-ERROR", ttl);
 			}
@@ -206,28 +211,32 @@ function buildUpstreamUrl(
 		}
 	}
 	upstream.searchParams.set("api_key", apiKey);
+	upstream.searchParams.set("format", "json");
 	return { ok: true, url: upstream };
 }
 
-function cacheKeyFor(upstreamUrl: URL): string {
-	return `cache:${upstreamUrl.pathname}?${upstreamUrl.searchParams.toString()}`;
+async function readHotCache(upstreamUrl: URL): Promise<CachedResponse | null> {
+	const res = await caches.default.match(new Request(upstreamUrl.toString()));
+	if (!res) return null;
+	const fetchedAtMs = Number.parseInt(res.headers.get("X-Cached-At-Ms") ?? "", 10);
+	if (!Number.isFinite(fetchedAtMs)) return null;
+	const body = await res.text();
+	const status = Number.parseInt(res.headers.get("X-Origin-Status") ?? "200", 10);
+	const contentType = res.headers.get("X-Origin-Content-Type") ?? "application/xml; charset=utf-8";
+	return { body, status, contentType, fetchedAtMs };
 }
 
-async function readCachedResponse(env: Env, cacheKey: string): Promise<CachedResponse | null> {
-	const raw = await env.TRANSIT_CACHE.get(cacheKey, "json");
-	if (!raw || typeof raw !== "object") {
-		return null;
-	}
-	const candidate = raw as Partial<CachedResponse>;
-	if (
-		typeof candidate.body !== "string" ||
-		typeof candidate.status !== "number" ||
-		typeof candidate.contentType !== "string" ||
-		typeof candidate.fetchedAtMs !== "number"
-	) {
-		return null;
-	}
-	return candidate as CachedResponse;
+async function writeHotCache(upstreamUrl: URL, cached: CachedResponse, ttl: TtlPair): Promise<void> {
+	const res = new Response(cached.body, {
+		headers: {
+			"Content-Type": cached.contentType,
+			"Cache-Control": `max-age=${ttl.stale}`,
+			"X-Cached-At-Ms": String(cached.fetchedAtMs),
+			"X-Origin-Status": String(cached.status),
+			"X-Origin-Content-Type": cached.contentType,
+		},
+	});
+	await caches.default.put(new Request(upstreamUrl.toString()), res);
 }
 
 async function canMakeUpstreamRequest(env: Env, nowMs: number): Promise<boolean> {
@@ -243,7 +252,6 @@ async function scheduleBackgroundRefresh(
 	env: Env,
 	ctx: ExecutionContext,
 	upstreamUrl: URL,
-	cacheKey: string,
 	nowMs: number,
 	ttl: TtlPair,
 ): Promise<boolean> {
@@ -255,7 +263,7 @@ async function scheduleBackgroundRefresh(
 			try {
 				const allowed = await canMakeUpstreamRequest(env, nowMs);
 				if (!allowed) return;
-				await fetchAndCacheUpstream(env, upstreamUrl, cacheKey, Date.now(), ttl);
+				await fetchAndCacheUpstream(env, upstreamUrl, Date.now(), ttl);
 			} finally {
 				await releaseRefreshLock(env);
 			}
@@ -267,7 +275,6 @@ async function scheduleBackgroundRefresh(
 async function fetchAndCacheUpstream(
 	env: Env,
 	upstreamUrl: URL,
-	cacheKey: string,
 	nowMs: number,
 	ttl: TtlPair,
 ): Promise<{ ok: true; value: CachedResponse } | { ok: false; error: string }> {
@@ -275,7 +282,7 @@ async function fetchAndCacheUpstream(
 	try {
 		response = await fetch(upstreamUrl, {
 			method: "GET",
-			headers: { Accept: "application/xml,text/xml,*/*" },
+			headers: { Accept: "application/json,application/xml;q=0.9,*/*;q=0.1" },
 		});
 	} catch (error) {
 		console.error("Upstream fetch failed:", error);
@@ -287,9 +294,7 @@ async function fetchAndCacheUpstream(
 	const cached: CachedResponse = { body, status: response.status, contentType, fetchedAtMs: nowMs };
 
 	if (response.ok) {
-		await env.TRANSIT_CACHE.put(cacheKey, JSON.stringify(cached), {
-			expirationTtl: ttl.stale,
-		});
+		await writeHotCache(upstreamUrl, cached, ttl);
 		await env.TRANSIT_CACHE.put(LAST_UPSTREAM_FETCH_KEY, String(nowMs), {
 			expirationTtl: STALE_TTL_SECONDS,
 		});
@@ -351,13 +356,12 @@ async function handleWorkerToken(request: Request, env: Env): Promise<Response> 
 
 const MAX_LOG_BATCH = 50;
 
-async function handleLog(request: Request, env: Env): Promise<Response> {
+async function handleLog(request: Request, env: Env, tokenHash: string): Promise<Response> {
 	if (request.method !== "POST") {
 		return jsonError("POST required.", 405);
 	}
 
-	const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
-	const allowed = await checkRateLimit(env, "log", clientIp, LOG_RATE_LIMIT.maxRequests, LOG_RATE_LIMIT.windowSeconds);
+	const allowed = await checkRateLimit(env, "log", tokenHash, LOG_RATE_LIMIT.maxRequests, LOG_RATE_LIMIT.windowSeconds);
 	if (!allowed) {
 		console.warn(JSON.stringify({ source: "log", outcome: "rate_limited" }));
 		return jsonError("Too many requests.", 429, { "Retry-After": String(LOG_RATE_LIMIT.windowSeconds) });

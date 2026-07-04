@@ -142,6 +142,27 @@ describe("POST /log", () => {
         expect(matched.length).toBe(1);
         expect(matched[0]).toContain('"endpoint":"StopMonitoring"');
     });
+
+    it("does not consume the proxy-token data bucket (still 204 when data bucket is full)", async () => {
+        const tokenHash = await sha256Hex(VALID_TOKEN);
+        const idHash = (await sha256Hex(tokenHash)).slice(0, 16);
+        const bucket = String(Math.floor(Date.now() / 1000 / PROXY_RATE_LIMIT.windowSeconds));
+        const proxyKey = `ratelimit:proxy-token:${idHash}:${bucket}`;
+        try {
+            await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.put(
+                proxyKey, String(PROXY_RATE_LIMIT.maxRequests), { expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2 },
+            );
+
+            const res = await SELF.fetch("https://example.com/log", {
+                method: "POST",
+                headers: { "X-App-Token": VALID_TOKEN, "Content-Type": "application/json" },
+                body: JSON.stringify({ events: [] }),
+            });
+            expect(res.status).toBe(204);
+        } finally {
+            await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.delete(proxyKey);
+        }
+    });
 });
 
 describe("GET /worker-token", () => {
@@ -728,6 +749,73 @@ describe("POST /self-provision", () => {
             method: "GET",
         });
         expect(res.status).toBe(405);
+    });
+});
+
+describe("cacheable SIRI endpoints (Cache API + rate-limit-after-cache)", () => {
+    const SM_TOKEN = "cache-test-token";
+    const SM_URL = "https://example.com/StopMonitoring?agency=SF&stopCode=99999&MaximumNumberOfCallsOnwards=10";
+    // upstream URL the worker builds (params in the order buildUpstreamUrl emits them, then api_key, then format)
+    const UPSTREAM = "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=99999&MaximumNumberOfCallsOnwards=10&api_key=test-511-key&format=json";
+
+    async function proxyKey(token: string): Promise<string> {
+        const tokenHash = await sha256Hex(token);
+        const idHash = (await sha256Hex(tokenHash)).slice(0, 16);
+        const bucket = String(Math.floor(Date.now() / 1000 / PROXY_RATE_LIMIT.windowSeconds));
+        return `ratelimit:proxy-token:${idHash}:${bucket}`;
+    }
+
+    async function seedCache(fetchedAtMs: number) {
+        const res = new Response("<Siri>cached</Siri>", {
+            headers: {
+                "Content-Type": "application/xml; charset=utf-8",
+                "Cache-Control": "max-age=21600",
+                "X-Cached-At-Ms": String(fetchedAtMs),
+                "X-Origin-Status": "200",
+                "X-Origin-Content-Type": "application/xml; charset=utf-8",
+            },
+        });
+        await caches.default.put(new Request(UPSTREAM), res);
+    }
+
+    beforeAll(async () => {
+        const hash = await sha256Hex(SM_TOKEN);
+        await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+            hash, JSON.stringify({ label: "cache-test", createdAt: "2026-06-01T00:00:00Z" }),
+        );
+    });
+
+    beforeEach(async () => {
+        await caches.default.delete(new Request(UPSTREAM));
+        await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.delete(await proxyKey(SM_TOKEN));
+    });
+
+    it("serves a fresh cache HIT even when the data bucket is full (hit does not require budget)", async () => {
+        await seedCache(Date.now()); // fresh (< 60s)
+        await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.put(
+            await proxyKey(SM_TOKEN), String(PROXY_RATE_LIMIT.maxRequests), { expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2 },
+        );
+        const res = await SELF.fetch(SM_URL, { headers: { "X-App-Token": SM_TOKEN } });
+        expect(res.status).toBe(200);
+        expect(res.headers.get("X-Cache-Status")).toBe("HIT");
+    });
+
+    it("serves STALE (not 429) when rate-limited but a stale cache entry exists", async () => {
+        await seedCache(Date.now() - 5 * 60 * 1000); // stale (> 60s fresh, < 6h)
+        await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.put(
+            await proxyKey(SM_TOKEN), String(PROXY_RATE_LIMIT.maxRequests), { expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2 },
+        );
+        const res = await SELF.fetch(SM_URL, { headers: { "X-App-Token": SM_TOKEN } });
+        expect(res.status).toBe(200);
+        expect(res.headers.get("X-Cache-Status")).toBe("STALE");
+    });
+
+    it("returns 429 when rate-limited and no cache exists", async () => {
+        await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.put(
+            await proxyKey(SM_TOKEN), String(PROXY_RATE_LIMIT.maxRequests), { expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2 },
+        );
+        const res = await SELF.fetch(SM_URL, { headers: { "X-App-Token": SM_TOKEN } });
+        expect(res.status).toBe(429);
     });
 });
 

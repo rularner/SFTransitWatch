@@ -298,4 +298,105 @@ final class PhoneTransitAPITests: XCTestCase {
 
         XCTAssertEqual(stops.count, 0)
     }
+
+    func testStopMonitoringRequestsJSONFormat() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"SF:38","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        let url = mockSession.recordedRequests().first!.url!.absoluteString
+        XCTAssertTrue(url.contains("format=json"), "expected format=json in \(url)")
+    }
+
+    func testFetchArrivalsThrottlesRepeatCalls() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"SF:38","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+        XCTAssertEqual(mockSession.requestCount(), 1, "second call within throttle window is served from cache")
+    }
+
+    func testFetchArrivalsCoalescesConcurrentCalls() async {
+        mockSession.delaySeconds = 1
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"SF:38","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+
+        async let a = api.fetchArrivals(for: "15552", agency: "SF")
+        async let b = api.fetchArrivals(for: "15552", agency: "SF")
+        _ = await [a, b]
+        XCTAssertEqual(mockSession.requestCount(), 1, "concurrent calls for the same stop issue one request")
+    }
+
+    // MARK: - 429 backoff + keep-last / schedule fallback
+
+    func testRateLimitedFallsBackToScheduleWhenNoRecentData() async {
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: Data("{}".utf8), statusCode: 429)
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetable = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"Local Weekday","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"SF"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopTimetable")!, data: timetable)
+
+        let arrivals = await api.fetchArrivals(for: "70021", agency: "CT")
+
+        XCTAssertEqual(arrivals.count, 1)
+        XCTAssertFalse(arrivals[0].isRealTime)
+        XCTAssertNotNil(api.softBanner)
+        XCTAssertGreaterThan(api.pollInterval, 30, "poll interval backs off after a 429")
+    }
+
+    func testSuccessResetsBackoff() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"SF:38","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertEqual(api.pollInterval, 30)
+        XCTAssertNil(api.softBanner)
+    }
+
+    func testRateLimitedKeepsRecentRealtimeData() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"SF:38","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")   // caches realtime
+
+        api.now = { Date().addingTimeInterval(30) }               // past 20s throttle, within 120s keep-last
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: Data("{}".utf8), statusCode: 429)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertEqual(arrivals.count, 1)
+        XCTAssertTrue(arrivals[0].isRealTime, "kept the recent live data instead of the schedule")
+        XCTAssertNotNil(api.softBanner)
+        XCTAssertEqual(mockSession.requestCount(), 2, "one initial load + one 429; no schedule fetch")
+    }
 }

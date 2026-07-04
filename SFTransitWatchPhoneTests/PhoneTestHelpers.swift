@@ -36,5 +36,6 @@ class MockURLSession: URLSessionProtocol {
 
     func setMockError(for url: URL, error: Error) { errors[url] = error }
     func requestCount() -> Int { lock.withLock { _requests.count } }
+    func recordedRequests() -> [URLRequest] { lock.withLock { _requests } }
     func clearHistory() { lock.withLock { _requests.removeAll() } }
 }

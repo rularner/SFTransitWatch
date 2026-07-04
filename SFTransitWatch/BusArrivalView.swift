@@ -12,6 +12,7 @@ struct BusArrivalView: View {
     @State private var selectedRoute: String? = nil
     @State private var showCommutePrompt = false
     @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
+    @State private var pollInterval: TimeInterval = 30
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     private var isLandscape: Bool { verticalSizeClass == .compact }
@@ -169,6 +170,16 @@ struct BusArrivalView: View {
                         .accessibilityLabel("Error: \(error)")
                         .listRowBackground(Color.clear)
                     }
+                    if let banner = transitAPI.softBanner {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundColor(.secondary)
+                            Text(banner).font(.caption).foregroundColor(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(banner)
+                        .listRowBackground(Color.clear)
+                    }
                     ForEach(filteredArrivals) { arrival in
                         NavigationLink(destination: BusJourneyView(
                             arrival: arrival,
@@ -199,8 +210,11 @@ struct BusArrivalView: View {
             locationManager.startLocationUpdates()
             Task { await loadArrivals() }
         }
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
+        .onReceive(Timer.publish(every: pollInterval, on: .main, in: .common).autoconnect()) { _ in
             Task { await loadArrivals() }
+        }
+        .onReceive(transitAPI.$pollInterval) { newInterval in
+            if newInterval != pollInterval { pollInterval = newInterval }
         }
         .confirmationDialog(
             "Add to commute?",
