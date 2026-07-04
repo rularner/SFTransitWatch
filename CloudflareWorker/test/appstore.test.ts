@@ -78,6 +78,21 @@ describe("verifySubscription", () => {
         expect(String(fetchMock.mock.calls[1][0])).toContain("storekit-sandbox.itunes.apple.com");
     });
 
+    it("retries against the sandbox host when production returns 401 (pre-release/TestFlight app)", async () => {
+        const expiresAtMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        const jws = fakeSignedTransactionInfo({ expiresDate: expiresAtMs });
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(new Response(null, { status: 401 }))
+            .mockResolvedValueOnce(appStoreResponse([{ status: 1, signedTransactionInfo: jws }]));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const result = await verifySubscription(TEST_ENV, "1000000000000001");
+        expect(result).toEqual({ active: true, expiresAtMs });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(String(fetchMock.mock.calls[1][0])).toContain("storekit-sandbox.itunes.apple.com");
+    });
+
     it("returns inactive when Apple returns no transactions", async () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 })));
 
@@ -110,6 +125,18 @@ describe("checkAppStoreAuth", () => {
 
         const result = await checkAppStoreAuth(TEST_ENV);
         expect(result).toEqual({ ok: true, status: 404 });
+    });
+
+    it("falls back to sandbox when production 401s and returns ok when sandbox authenticates", async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(new Response(null, { status: 401 }))
+            .mockResolvedValueOnce(new Response(null, { status: 404 }));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const result = await checkAppStoreAuth(TEST_ENV);
+        expect(result).toEqual({ ok: true, status: 404 });
+        expect(String(fetchMock.mock.calls[1][0])).toContain("storekit-sandbox.itunes.apple.com");
     });
 
     it("probes the production host with a placeholder transaction id", async () => {
