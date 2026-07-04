@@ -130,6 +130,7 @@ class TransitAPI: ObservableObject {
     private func performFetchArrivals(for stopId: String, agency: String) async -> [BusArrival] {
         isLoading = true
         errorMessage = nil
+        softBanner = nil
         defer { isLoading = false }
 
         if isDirect511Mode && !hasUsableKey {
