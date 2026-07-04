@@ -24,7 +24,12 @@ export async function verifySubscription(
 	const prodResp = await fetchSubscriptionStatus("api.storekit.itunes.apple.com", originalTransactionId, jwt);
 	let resp = prodResp;
 	let usedSandbox = false;
-	if (prodResp.status === 404) {
+	// Retry in sandbox on 404 (transaction unknown in production) and on 401
+	// (a pre-release/TestFlight app has no production App Store Server API
+	// presence, so production rejects the token even though it's valid in
+	// sandbox). Production is still tried first so real subscriptions verify
+	// correctly once the app ships.
+	if (prodResp.status === 404 || prodResp.status === 401) {
 		resp = await fetchSubscriptionStatus("api.storekit-sandbox.itunes.apple.com", originalTransactionId, jwt);
 		usedSandbox = true;
 	}
@@ -53,11 +58,18 @@ export async function verifySubscription(
 
 export async function checkAppStoreAuth(env: AppStoreEnv): Promise<{ ok: boolean; status: number }> {
 	const jwt = await signAppStoreJWT(env);
-	const resp = await fetchSubscriptionStatus("api.storekit.itunes.apple.com", "0", jwt);
+	// Production first; fall back to sandbox on 401/403 so a pre-release app
+	// (which has no production presence yet) still reports healthy.
+	let resp = await fetchSubscriptionStatus("api.storekit.itunes.apple.com", "0", jwt);
+	let host = "production";
+	if (resp.status === 401 || resp.status === 403) {
+		resp = await fetchSubscriptionStatus("api.storekit-sandbox.itunes.apple.com", "0", jwt);
+		host = "sandbox";
+	}
 	const ok = resp.status !== 401 && resp.status !== 403;
 	if (!ok) {
 		const body = await resp.text().catch(() => "");
-		console.warn(JSON.stringify({ source: "appstore-auth-check", status: resp.status, kid: env.APPSTORE_KEY_ID, iss: env.APPSTORE_ISSUER_ID, bid: env.APPSTORE_BUNDLE_ID, body: body.slice(0, 300) }));
+		console.warn(JSON.stringify({ source: "appstore-auth-check", status: resp.status, host, kid: env.APPSTORE_KEY_ID, iss: env.APPSTORE_ISSUER_ID, bid: env.APPSTORE_BUNDLE_ID, body: body.slice(0, 300) }));
 	}
 	return { ok, status: resp.status };
 }
