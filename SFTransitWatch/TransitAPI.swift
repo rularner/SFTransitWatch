@@ -102,7 +102,8 @@ class TransitAPI: ObservableObject {
         var queryItems = [
             URLQueryItem(name: "agency", value: agency),
             URLQueryItem(name: "stopCode", value: stopId),
-            URLQueryItem(name: "MaximumNumberOfCallsOnwards", value: "10")
+            URLQueryItem(name: "MaximumNumberOfCallsOnwards", value: "10"),
+            URLQueryItem(name: "format", value: "json")
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
@@ -163,7 +164,8 @@ class TransitAPI: ObservableObject {
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
             URLQueryItem(name: "operatorref", value: agency),
-            URLQueryItem(name: "monitoringref", value: stopId)
+            URLQueryItem(name: "monitoringref", value: stopId),
+            URLQueryItem(name: "format", value: "json")
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
@@ -404,7 +406,8 @@ class TransitAPI: ObservableObject {
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
             URLQueryItem(name: "operator_id", value: agency),
-            URLQueryItem(name: "line_id", value: route)
+            URLQueryItem(name: "line_id", value: route),
+            URLQueryItem(name: "format", value: "json")
         ]
         if isDirect511Mode {
             queryItems.append(URLQueryItem(name: "api_key", value: apiKey))
