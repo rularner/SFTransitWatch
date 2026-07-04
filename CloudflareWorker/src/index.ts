@@ -13,7 +13,7 @@ const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
-export const PROXY_RATE_LIMIT = { maxRequests: 30, windowSeconds: 60 };
+export const PROXY_RATE_LIMIT = { maxRequests: 60, windowSeconds: 60 };
 const SUBSCRIPTION_GRACE_SECONDS = 3 * 24 * 60 * 60;
 
 type TtlPair = { fresh: number; stale: number };
@@ -87,14 +87,15 @@ export default {
 				keyHashPrefix,
 			}));
 
+			// /log has its own token-keyed bucket — must not consume the proxy data budget.
+			if (url.pathname === "/log") {
+				return await handleLog(request, env, auth.client.tokenHash);
+			}
+
 			const tokenAllowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
 			if (!tokenAllowed) {
 				console.warn(JSON.stringify({ source: "proxy-rate-limit", outcome: "rate_limited", label: auth.client.label }));
 				return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
-			}
-
-			if (url.pathname === "/log") {
-				return await handleLog(request, env);
 			}
 
 			if (request.method !== "GET") {
@@ -351,13 +352,12 @@ async function handleWorkerToken(request: Request, env: Env): Promise<Response> 
 
 const MAX_LOG_BATCH = 50;
 
-async function handleLog(request: Request, env: Env): Promise<Response> {
+async function handleLog(request: Request, env: Env, tokenHash: string): Promise<Response> {
 	if (request.method !== "POST") {
 		return jsonError("POST required.", 405);
 	}
 
-	const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
-	const allowed = await checkRateLimit(env, "log", clientIp, LOG_RATE_LIMIT.maxRequests, LOG_RATE_LIMIT.windowSeconds);
+	const allowed = await checkRateLimit(env, "log", tokenHash, LOG_RATE_LIMIT.maxRequests, LOG_RATE_LIMIT.windowSeconds);
 	if (!allowed) {
 		console.warn(JSON.stringify({ source: "log", outcome: "rate_limited" }));
 		return jsonError("Too many requests.", 429, { "Retry-After": String(LOG_RATE_LIMIT.windowSeconds) });

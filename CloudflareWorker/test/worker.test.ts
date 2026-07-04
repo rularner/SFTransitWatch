@@ -142,6 +142,27 @@ describe("POST /log", () => {
         expect(matched.length).toBe(1);
         expect(matched[0]).toContain('"endpoint":"StopMonitoring"');
     });
+
+    it("does not consume the proxy-token data bucket (still 204 when data bucket is full)", async () => {
+        const tokenHash = await sha256Hex(VALID_TOKEN);
+        const idHash = (await sha256Hex(tokenHash)).slice(0, 16);
+        const bucket = String(Math.floor(Date.now() / 1000 / PROXY_RATE_LIMIT.windowSeconds));
+        const proxyKey = `ratelimit:proxy-token:${idHash}:${bucket}`;
+        try {
+            await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.put(
+                proxyKey, String(PROXY_RATE_LIMIT.maxRequests), { expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2 },
+            );
+
+            const res = await SELF.fetch("https://example.com/log", {
+                method: "POST",
+                headers: { "X-App-Token": VALID_TOKEN, "Content-Type": "application/json" },
+                body: JSON.stringify({ events: [] }),
+            });
+            expect(res.status).toBe(204);
+        } finally {
+            await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.delete(proxyKey);
+        }
+    });
 });
 
 describe("GET /worker-token", () => {
