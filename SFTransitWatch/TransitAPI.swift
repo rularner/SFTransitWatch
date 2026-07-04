@@ -20,8 +20,14 @@ class TransitAPI: ObservableObject {
 
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var pollInterval: TimeInterval = 30
+    @Published var softBanner: String?
 
     private var useDirectFallback = false
+    private let basePollInterval: TimeInterval = 30
+    private let maxPollInterval: TimeInterval = 300
+    private let keepLastMaxAge: TimeInterval = 120
+    private var consecutive429 = 0
 
     var urlSession: URLSessionProtocol = URLSession.shared
     var stopRoutesCache = StopRoutesCache()
@@ -103,6 +109,23 @@ class TransitAPI: ObservableObject {
         return result
     }
 
+    private func applyBackoff(retryAfter: String?) {
+        consecutive429 += 1
+        if let retryAfter, let seconds = TimeInterval(retryAfter), seconds > 0 {
+            pollInterval = min(seconds, maxPollInterval)
+            return
+        }
+        let raw = basePollInterval * pow(2.0, Double(consecutive429))   // 60, 120, 240, …
+        let jitter = Double.random(in: 0...5)
+        pollInterval = min(raw, maxPollInterval) + jitter
+    }
+
+    private func resetBackoff() {
+        consecutive429 = 0
+        pollInterval = basePollInterval
+        softBanner = nil
+    }
+
     @MainActor
     private func performFetchArrivals(for stopId: String, agency: String) async -> [BusArrival] {
         isLoading = true
@@ -157,6 +180,22 @@ class TransitAPI: ObservableObject {
                     httpStatus: httpResponse.statusCode,
                     latencyMs: latencyMs
                 )
+                if httpResponse.statusCode == 429 {
+                    applyBackoff(retryAfter: httpResponse.value(forHTTPHeaderField: "Retry-After"))
+                }
+                let key = arrivalsCacheKey(stopId, agency)
+                if let cached = arrivalsCache[key], now().timeIntervalSince(cached.timestamp) < keepLastMaxAge, !cached.arrivals.isEmpty {
+                    errorMessage = nil
+                    softBanner = "Live updates paused"
+                    return cached.arrivals
+                }
+                let scheduled = await fetchScheduledDepartures(for: stopId, agency: agency)
+                if !scheduled.isEmpty {
+                    arrivalsCache[key] = CachedArrivals(arrivals: scheduled, timestamp: now())
+                    errorMessage = nil
+                    softBanner = "Showing scheduled times"
+                    return scheduled
+                }
                 errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
                 return []
             }
@@ -167,9 +206,11 @@ class TransitAPI: ObservableObject {
             if realTimeArrivals.isEmpty {
                 let scheduled = await fetchScheduledDepartures(for: stopId, agency: agency)
                 arrivalsCache[arrivalsCacheKey(stopId, agency)] = CachedArrivals(arrivals: scheduled, timestamp: now())
+                resetBackoff()
                 return scheduled
             }
             arrivalsCache[arrivalsCacheKey(stopId, agency)] = CachedArrivals(arrivals: realTimeArrivals, timestamp: now())
+            resetBackoff()
             return realTimeArrivals
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
