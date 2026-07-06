@@ -12,7 +12,7 @@ struct BusArrivalView: View {
     @State private var selectedTab = 0
     @State private var arrivals: [BusArrival] = []
     @State private var lastUpdated = Date()
-    @State private var secondsUntilRefresh = 30
+    @StateObject private var countdown = RefreshCountdown(interval: BusArrivalView.refreshInterval)
     @State private var notifiedArrivalIDs: Set<UUID> = []
     @State private var selectedRoute: String? = nil
     @State private var showCommutePrompt = false
@@ -30,7 +30,8 @@ struct BusArrivalView: View {
         _selectedTab = State(initialValue: initialTab)
     }
 
-    private let refreshInterval = 30
+    private static let refreshInterval = 30
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var filteredArrivals: [BusArrival] { arrivals.filtered(by: selectedRoute) }
     var uniqueRoutes: [String] { arrivals.uniqueRoutes }
@@ -159,7 +160,7 @@ struct BusArrivalView: View {
                             ProgressView()
                                 .scaleEffect(0.7)
                         } else {
-                            Text("↻ \(secondsUntilRefresh)s")
+                            Text("↻ \(countdown.secondsRemaining)s")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                                 .monospacedDigit()
@@ -170,18 +171,6 @@ struct BusArrivalView: View {
             .navigationTitle("Arrivals")
             .refreshable {
                 await loadArrivals()
-            }
-            .onAppear {
-                Task { await loadArrivals() }
-            }
-            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-                guard !transitAPI.isLoading else { return }
-                if secondsUntilRefresh <= 1 {
-                    secondsUntilRefresh = refreshInterval
-                    Task { await loadArrivals() }
-                } else {
-                    secondsUntilRefresh -= 1
-                }
             }
             .tag(0)
 
@@ -204,9 +193,10 @@ struct BusArrivalView: View {
                 await loadArrivals()
             }
         }
-        .onReceive(Timer.publish(every: TimeInterval(refreshInterval), on: .main, in: .common).autoconnect()) { _ in
-            Task {
-                await loadArrivals()
+        .onReceive(ticker) { _ in
+            guard !transitAPI.isLoading else { return }
+            if countdown.tick() {
+                Task { await loadArrivals() }
             }
         }
         .confirmationDialog(
@@ -228,7 +218,7 @@ struct BusArrivalView: View {
     private func loadArrivals() async {
         arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
         lastUpdated = Date()
-        secondsUntilRefresh = refreshInterval
+        countdown.reset()
 
         fireHapticsIfNeeded()
 
