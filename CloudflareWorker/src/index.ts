@@ -1,11 +1,12 @@
 import { verifySubscription, checkAppStoreAuth } from "./appstore";
+import { handleStopMonitoring } from "./gtfsrt/snapshot";
 
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
 const EXPECTED_ISS = "org.larner.SFTransitWatch";
 const FRESH_TTL_SECONDS = 60;
 const STALE_TTL_SECONDS = 6 * 60 * 60;
 const MIN_UPSTREAM_INTERVAL_MS = 60_000;
-const LAST_UPSTREAM_FETCH_KEY = "meta:last_upstream_fetch_ms";
+export const LAST_UPSTREAM_FETCH_KEY = "meta:last_upstream_fetch_ms";
 const REFRESH_LOCK_KEY = "meta:refresh_lock";
 const STOPS_FRESH_TTL_SECONDS = 24 * 60 * 60;
 const TIMETABLE_FRESH_TTL_SECONDS = 24 * 60 * 60;
@@ -27,7 +28,7 @@ function ttlForEndpoint(endpoint: string): TtlPair {
         : DEFAULT_TTL;
 }
 
-interface Env {
+export interface Env {
 	API_511_KEY: string;
 	TRANSIT_CACHE: KVNamespace;
 	CLIENT_TOKENS: KVNamespace;
@@ -47,7 +48,7 @@ type CachedResponse = {
 };
 
 export type CachedStop = { id: string; name: string; lat: number; lon: number };
-type CachedStops = { stops: CachedStop[]; fetchedAtMs: number };
+export type CachedStops = { stops: CachedStop[]; fetchedAtMs: number };
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -103,6 +104,10 @@ export default {
 					return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
 				}
 				return await handleStopsRequest(url, env);
+			}
+
+			if (endpoint === "StopMonitoring") {
+				return await handleStopMonitoring(url, env, ctx);
 			}
 
 			const upstream = buildUpstreamUrl(request.url, env.API_511_KEY);
@@ -239,7 +244,7 @@ async function writeHotCache(upstreamUrl: URL, cached: CachedResponse, ttl: TtlP
 	await caches.default.put(new Request(upstreamUrl.toString()), res);
 }
 
-async function canMakeUpstreamRequest(env: Env, nowMs: number): Promise<boolean> {
+export async function canMakeUpstreamRequest(env: Env, nowMs: number): Promise<boolean> {
 	const raw = await env.TRANSIT_CACHE.get(LAST_UPSTREAM_FETCH_KEY);
 	const lastMs = raw ? Number.parseInt(raw, 10) : 0;
 	if (!Number.isFinite(lastMs)) {
@@ -312,16 +317,16 @@ async function fetchAndCacheUpstream(
 	return { ok: false, error: `Upstream responded with HTTP ${response.status}.` };
 }
 
-async function tryAcquireRefreshLock(env: Env): Promise<boolean> {
+export async function tryAcquireRefreshLock(env: Env): Promise<boolean> {
 	const existing = await env.TRANSIT_CACHE.get(REFRESH_LOCK_KEY);
 	if (existing) {
 		return false;
 	}
-	await env.TRANSIT_CACHE.put(REFRESH_LOCK_KEY, "1", { expirationTtl: 20 });
+	await env.TRANSIT_CACHE.put(REFRESH_LOCK_KEY, "1", { expirationTtl: 60 });
 	return true;
 }
 
-async function releaseRefreshLock(env: Env): Promise<void> {
+export async function releaseRefreshLock(env: Env): Promise<void> {
 	await env.TRANSIT_CACHE.delete(REFRESH_LOCK_KEY);
 }
 
