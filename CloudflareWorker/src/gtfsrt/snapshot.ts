@@ -12,7 +12,10 @@ const UPSTREAM = "https://api.511.org/transit/tripupdates";
 
 export async function gunzipIfNeeded(res: Response): Promise<Uint8Array> {
   const raw = new Uint8Array(await res.arrayBuffer());
-  const gzipped = res.headers.get("Content-Encoding") === "gzip" || (raw[0] === 0x1f && raw[1] === 0x8b);
+  // Decide purely from the gzip magic bytes. The Workers runtime can transparently decompress a
+  // gzip subrequest response while leaving the Content-Encoding: gzip header in place — trusting
+  // that header would trigger a second decompression of already-plain bytes and throw.
+  const gzipped = raw[0] === 0x1f && raw[1] === 0x8b;
   if (!gzipped) return raw;
   const ds = new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip")));
   return new Uint8Array(await ds.arrayBuffer());
@@ -31,15 +34,21 @@ async function writeSnapshot(index: ArrivalsIndex, fetchedAt: number): Promise<v
   }));
 }
 
-async function refreshSnapshot(env: Env, now: number): Promise<ArrivalsIndex> {
+async function refreshSnapshot(env: Env, now: number): Promise<ArrivalsIndex | null> {
   const u = new URL(UPSTREAM);
   u.searchParams.set("agency", "RG");
   u.searchParams.set("api_key", env.API_511_KEY);
+  // Mark the attempt unconditionally, before the fetch, so a failed refresh still counts against
+  // the shared 60/hr throttle interval — otherwise an outage triggers a retry storm.
+  await env.TRANSIT_CACHE.put(LAST_UPSTREAM_FETCH_KEY, String(now), { expirationTtl: 6 * 60 * 60 });
   const res = await fetch(u.toString());
+  if (!res.ok) {
+    console.error(`GTFS-RT upstream error refreshing RG snapshot: HTTP ${res.status}`);
+    return null;
+  }
   const bytes = await gunzipIfNeeded(res);
   const index = buildArrivalsIndex(decodeTripUpdates(bytes));
   await writeSnapshot(index, now);
-  await env.TRANSIT_CACHE.put(LAST_UPSTREAM_FETCH_KEY, String(now), { expirationTtl: 6 * 60 * 60 });
   return index;
 }
 
@@ -56,7 +65,8 @@ export async function loadStopNames(env: Env, agency: string): Promise<(stopId: 
 export async function handleStopMonitoring(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
   const agency = url.searchParams.get("agency") ?? "SF";
   const stopCode = url.searchParams.get("stopCode") ?? "";
-  const maxOnward = Number(url.searchParams.get("MaximumNumberOfCallsOnwards") ?? "10");
+  const maxOnwardParam = Number(url.searchParams.get("MaximumNumberOfCallsOnwards") ?? "10");
+  const maxOnward = Number.isFinite(maxOnwardParam) ? maxOnwardParam : 10;
   const now = Date.now();
 
   let snap = await readSnapshot();
@@ -67,7 +77,17 @@ export async function handleStopMonitoring(url: URL, env: Env, ctx: ExecutionCon
     if (gotLock) {
       try {
         if (await canMakeUpstreamRequest(env, now)) {
-          snap = { index: await refreshSnapshot(env, now), fetchedAt: now };
+          // This path must never surface a 4xx/5xx: any failure (network error, non-OK
+          // upstream, malformed protobuf body) degrades to the existing stale/null snapshot
+          // and falls through to an empty MonitoredStopVisit[] below.
+          try {
+            const index = await refreshSnapshot(env, now);
+            if (index !== null) {
+              snap = { index, fetchedAt: now };
+            }
+          } catch (error) {
+            console.error("GTFS-RT snapshot refresh failed:", error);
+          }
         }
       } finally {
         await releaseRefreshLock(env);
