@@ -4,6 +4,7 @@ import { toStopMonitoringJson } from "./siri";
 import {
   type Env, canMakeUpstreamRequest, LAST_UPSTREAM_FETCH_KEY,
   tryAcquireRefreshLock, releaseRefreshLock, type CachedStops,
+  STALE_TTL_SECONDS,
 } from "../index";
 
 export const RG_SNAPSHOT_TTL_MS = 90_000;
@@ -29,8 +30,13 @@ async function readSnapshot(): Promise<{ index: ArrivalsIndex; fetchedAt: number
 }
 
 async function writeSnapshot(index: ArrivalsIndex, fetchedAt: number): Promise<void> {
+  // Retain the entry in the Cache API well past the RG_SNAPSHOT_TTL_MS freshness window so it
+  // remains available for stale-serve. Freshness is decided separately in readSnapshot/
+  // handleStopMonitoring by comparing X-Fetched-At-Ms against RG_SNAPSHOT_TTL_MS — the Cache API's
+  // own max-age is purely a retention/eviction knob, not the freshness signal. Mirrors the
+  // writeHotCache pattern in ../index.ts.
   await caches.default.put(new Request(SNAPSHOT_KEY), new Response(JSON.stringify(index), {
-    headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${RG_SNAPSHOT_TTL_MS / 1000}`, "X-Fetched-At-Ms": String(fetchedAt) },
+    headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${STALE_TTL_SECONDS}`, "X-Fetched-At-Ms": String(fetchedAt) },
   }));
 }
 

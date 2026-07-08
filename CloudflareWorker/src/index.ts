@@ -4,7 +4,7 @@ import { handleStopMonitoring } from "./gtfsrt/snapshot";
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
 const EXPECTED_ISS = "org.larner.SFTransitWatch";
 const FRESH_TTL_SECONDS = 60;
-const STALE_TTL_SECONDS = 6 * 60 * 60;
+export const STALE_TTL_SECONDS = 6 * 60 * 60;
 const MIN_UPSTREAM_INTERVAL_MS = 60_000;
 export const LAST_UPSTREAM_FETCH_KEY = "meta:last_upstream_fetch_ms";
 const REFRESH_LOCK_KEY = "meta:refresh_lock";
