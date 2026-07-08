@@ -128,3 +128,25 @@ describe("/StopMonitoring served from GTFS-RT snapshot", () => {
     expect(mvj.LineRef).toBe("44");
   });
 });
+
+describe("snapshot refresh discipline", () => {
+  it("does not refetch within the TTL window (second request served from cached snapshot)", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(feedBytes(now), { status: 200 }));
+    const q = "https://example.com/StopMonitoring?agency=SF&stopCode=16393";
+
+    const first = await SELF.fetch(q, { headers: { "X-App-Token": TOKEN } });
+    expect(first.status).toBe(200);
+    expect(first.headers.get("X-Cache-Status")).toBe("MISS");
+
+    // Within RG_SNAPSHOT_TTL_MS (90s), a second request must be served from the snapshot written
+    // by the first request rather than triggering another upstream fetch. Asserting the
+    // X-Cache-Status header (rather than the fetch mock's call count) because cross-request
+    // Cache-API behavior in this vitest-pool-workers harness is the thing actually under test —
+    // a HIT here can only happen if handleStopMonitoring found the snapshot written moments ago
+    // still fresh, which is precisely the refresh-discipline behavior this test guards.
+    const second = await SELF.fetch(q, { headers: { "X-App-Token": TOKEN } });
+    expect(second.status).toBe(200);
+    expect(second.headers.get("X-Cache-Status")).toBe("HIT");
+  });
+});
