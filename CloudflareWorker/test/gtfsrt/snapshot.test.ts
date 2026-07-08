@@ -89,6 +89,28 @@ describe("/StopMonitoring served from GTFS-RT snapshot", () => {
     expect(Number(raw)).toBeGreaterThanOrEqual(before);
   });
 
+  it("degrades to 200 with empty visits (never 500) when the upstream 200 body is corrupt protobuf", async () => {
+    const before = Date.now();
+    // A 200 OK response (so refreshSnapshot's `!res.ok` guard does NOT trigger) whose body is a
+    // single byte that decodes to wire type 7 — unsupported, so decodeTripUpdates -> Reader.skip
+    // throws. This only degrades to 200 via the try/catch around refreshSnapshot() in
+    // handleStopMonitoring (safety net #2), not via the !res.ok check (safety net #1).
+    const corruptBody = new Uint8Array([0x0f]);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(corruptBody, { status: 200 }));
+
+    const res = await SELF.fetch("https://example.com/StopMonitoring?agency=SF&stopCode=16393", {
+      headers: { "X-App-Token": TOKEN },
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisit).toEqual([]);
+
+    const raw = await (env as any).TRANSIT_CACHE.get(LAST_UPSTREAM_FETCH_KEY);
+    expect(raw).not.toBeNull();
+    expect(Number(raw)).toBeGreaterThanOrEqual(before);
+  });
+
   it("decodes a gzip-compressed upstream response", async () => {
     const now = Math.floor(Date.now() / 1000);
     const plain = feedBytes(now);
