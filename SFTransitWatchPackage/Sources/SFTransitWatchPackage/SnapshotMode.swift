@@ -30,6 +30,31 @@ public enum SnapshotMode {
         isActive && ProcessInfo.processInfo.arguments.contains("-SNAPSHOT_LOCATION")
     }
 
+    /// When true (launch arg `-SNAPSHOT_PAYWALL`), the app injects deterministic
+    /// subscription tiers so the onboarding paywall renders without hitting StoreKit.
+    public static var showPaywall: Bool {
+        isActive && ProcessInfo.processInfo.arguments.contains("-SNAPSHOT_PAYWALL")
+    }
+
+    /// Deterministic tiers for the onboarding paywall snapshot: a monthly tier with a
+    /// free-trial intro offer and a yearly tier.
+    public static let subscriptionTiers: [SubscriptionDisplayInfo] = [
+        SubscriptionDisplayInfo(
+            productID: "org.larner.SFTransitWatch.proxy.monthly",
+            displayName: "Monthly",
+            displayPrice: "$1.99",
+            periodLabel: "month",
+            introOffer: IntroOfferInfo(displayPrice: "Free", periodLabel: "week", periodCount: 1, paymentMode: .freeTrial)
+        ),
+        SubscriptionDisplayInfo(
+            productID: "org.larner.SFTransitWatch.proxy.yearly",
+            displayName: "Yearly",
+            displayPrice: "$19.99",
+            periodLabel: "year",
+            introOffer: nil
+        ),
+    ]
+
     /// 5 hand-curated SF Muni Metro stops centered around the Castro neighborhood.
     /// Editing these values changes what appears in the App Store screenshots.
     public static let nearbyStops: [BusStop] = [

@@ -64,7 +64,9 @@ struct SFTransitWatchApp: App {
                     )
                     .task {
                         if subscriptionTiers.isEmpty {
-                            subscriptionTiers = await subscriptionManager.loadDisplayInfo()
+                            subscriptionTiers = SnapshotMode.showPaywall
+                                ? SnapshotMode.subscriptionTiers
+                                : await subscriptionManager.loadDisplayInfo()
                         }
                     }
                 }

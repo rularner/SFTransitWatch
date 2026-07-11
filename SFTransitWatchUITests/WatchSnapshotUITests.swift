@@ -87,4 +87,19 @@ final class WatchSnapshotUITests: XCTestCase {
                       "Expected Distance label in StopLocationView compass tab")
         try XCUISnapshotRunner.verify(app, named: "StopLocation", in: self, topPixelsToIgnore: 200)
     }
+
+    func testSnapshot_Paywall() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-SNAPSHOT_MODE",
+            "-SNAPSHOT_PAYWALL",
+            "-511_API_KEY", "",
+            "-WORKER_TOKEN", "",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["Subscribe"].waitForExistence(timeout: 10),
+                      "Onboarding paywall Subscribe button should appear")
+        try XCUISnapshotRunner.verify(app, named: "Paywall", in: self, topPixelsToIgnore: 200)
+    }
 }

@@ -2,14 +2,14 @@ import Foundation
 
 /// How an introductory offer is billed. Mirrors StoreKit's payment modes but is
 /// StoreKit-free so it can be constructed and unit-tested without StoreKitTest.
-public enum PaymentMode: Equatable {
+public enum PaymentMode: Equatable, Sendable {
     case freeTrial
     case payAsYouGo
     case payUpFront
 }
 
 /// The eligible introductory offer for a subscription tier, pre-formatted for display.
-public struct IntroOfferInfo: Equatable {
+public struct IntroOfferInfo: Equatable, Sendable {
     public let displayPrice: String   // localized, e.g. "Free" or "$0.99"
     public let periodLabel: String    // "day" | "week" | "month" | "year"
     public let periodCount: Int       // number of intro periods, e.g. 7
@@ -43,7 +43,7 @@ public struct IntroOfferInfo: Equatable {
 /// One selectable subscription tier, pre-formatted for display. Localized price and
 /// period come straight from StoreKit at runtime (see `SubscriptionManager`), so this
 /// type never hardcodes currency or duration.
-public struct SubscriptionDisplayInfo: Equatable, Identifiable {
+public struct SubscriptionDisplayInfo: Equatable, Identifiable, Sendable {
     public let productID: String
     public let displayName: String    // e.g. "Monthly", "Yearly"
     public let displayPrice: String   // localized, e.g. "$1.99"
