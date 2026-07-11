@@ -8,7 +8,8 @@ import { writeVarint, writeField, writeLenField, writeStringField } from "../../
 const E = 1783321246;
 function stopTimeEvent(t: number) { return writeField(2, 0, writeVarint(t)); }
 function stu(seq: number, id: string, t: number) {
-  return [...writeField(1, 0, writeVarint(seq)), ...writeStringField(2, id), ...writeLenField(3, stopTimeEvent(t))];
+  // StopTimeUpdate: stop_sequence(1), arrival(2){time}, stop_id(4)
+  return [...writeField(1, 0, writeVarint(seq)), ...writeLenField(2, stopTimeEvent(t)), ...writeStringField(4, id)];
 }
 const trip = [...writeStringField(1, "12074830"), ...writeStringField(5, "SF:44"), ...writeField(6, 0, writeVarint(1))];
 const tu = [...writeLenField(1, trip), ...writeLenField(2, stu(10, "16393", E))];

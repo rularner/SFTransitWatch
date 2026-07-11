@@ -7,7 +7,8 @@ import { writeVarint, writeField, writeLenField, writeStringField } from "../../
 // Reuse the encoder helpers to synthesize an RG feed with one SF:44 trip through stop 16393.
 function stopTimeEvent(t: number) { return writeField(2, 0, writeVarint(t)); }
 function stu(seq: number, id: string, t: number) {
-  return [...writeField(1, 0, writeVarint(seq)), ...writeStringField(2, id), ...writeLenField(3, stopTimeEvent(t))];
+  // StopTimeUpdate: stop_sequence(1), arrival(2){time}, stop_id(4)
+  return [...writeField(1, 0, writeVarint(seq)), ...writeLenField(2, stopTimeEvent(t)), ...writeStringField(4, id)];
 }
 function feedBytes(nowSec: number): Uint8Array {
   const trip = [...writeStringField(1, "t1"), ...writeStringField(5, "SF:44"), ...writeField(6, 0, writeVarint(1))];

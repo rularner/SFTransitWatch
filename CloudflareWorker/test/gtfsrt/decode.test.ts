@@ -6,12 +6,12 @@ import { writeVarint, writeField, writeLenField, writeStringField } from "../../
 function stopTimeEvent(time: number): number[] {
   return writeField(2, 0, writeVarint(time));
 }
-// StopTimeUpdate { stop_sequence(1), stop_id(2), arrival(3){time} }
+// StopTimeUpdate { stop_sequence(1), arrival(2){time}, stop_id(4) }
 function stu(seq: number, stopId: string, time: number): number[] {
   return [
     ...writeField(1, 0, writeVarint(seq)),
-    ...writeStringField(2, stopId),
-    ...writeLenField(3, stopTimeEvent(time)),
+    ...writeLenField(2, stopTimeEvent(time)),
+    ...writeStringField(4, stopId),
   ];
 }
 // TripDescriptor { trip_id(1), route_id(5), direction_id(6) }
