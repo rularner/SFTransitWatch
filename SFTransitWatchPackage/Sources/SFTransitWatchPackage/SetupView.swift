@@ -2,11 +2,15 @@ import SwiftUI
 
 public struct SetupView: View {
     let canSubscribe: Bool
-    let onSubscribe: () -> Void
+    let tiers: [SubscriptionDisplayInfo]
+    let isPurchasing: Bool
+    let onSubscribe: (String) -> Void
     let onUseKey: () -> Void
 
-    public init(canSubscribe: Bool, onSubscribe: @escaping () -> Void, onUseKey: @escaping () -> Void) {
+    public init(canSubscribe: Bool, tiers: [SubscriptionDisplayInfo], isPurchasing: Bool, onSubscribe: @escaping (String) -> Void, onUseKey: @escaping () -> Void) {
         self.canSubscribe = canSubscribe
+        self.tiers = tiers
+        self.isPurchasing = isPurchasing
         self.onSubscribe = onSubscribe
         self.onUseKey = onUseKey
     }
@@ -33,13 +37,7 @@ public struct SetupView: View {
 
             VStack(spacing: 12) {
                 if canSubscribe {
-                    VStack(spacing: 4) {
-                        Button("Subscribe", action: onSubscribe)
-                            .buttonStyle(.borderedProminent)
-                        Text("Access transit via SF Transit Watch Server")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    PaywallView(tiers: tiers, isPurchasing: isPurchasing, onSubscribe: onSubscribe)
                 }
 
                 VStack(spacing: 4) {
@@ -59,10 +57,16 @@ public struct SetupView: View {
 
 #if DEBUG
 #Preview("Can subscribe") {
-    SetupView(canSubscribe: true, onSubscribe: {}, onUseKey: {})
+    SetupView(
+        canSubscribe: true,
+        tiers: [SubscriptionDisplayInfo(productID: "monthly", displayName: "Monthly", displayPrice: "$1.99", periodLabel: "month", introOffer: nil)],
+        isPurchasing: false,
+        onSubscribe: { _ in },
+        onUseKey: {}
+    )
 }
 
 #Preview("No subscription") {
-    SetupView(canSubscribe: false, onSubscribe: {}, onUseKey: {})
+    SetupView(canSubscribe: false, tiers: [], isPurchasing: false, onSubscribe: { _ in }, onUseKey: {})
 }
 #endif
