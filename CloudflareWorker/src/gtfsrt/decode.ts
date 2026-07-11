@@ -30,10 +30,11 @@ function readStopTimeUpdate(buf: Uint8Array): StopTimeUpdate {
   const out: StopTimeUpdate = { stopSequence: 0, stopId: "" };
   while (!r.eof()) {
     const { field, wire } = r.tag();
+    // GTFS-RT StopTimeUpdate: stop_sequence=1, arrival=2, departure=3, stop_id=4.
     if (field === 1 && wire === 0) out.stopSequence = r.varint();
-    else if (field === 2 && wire === 2) out.stopId = r.string();
-    else if (field === 3 && wire === 2) out.arrivalTime = readStopTimeEvent(r.bytes());
-    else if (field === 4 && wire === 2) out.departureTime = readStopTimeEvent(r.bytes());
+    else if (field === 2 && wire === 2) out.arrivalTime = readStopTimeEvent(r.bytes());
+    else if (field === 3 && wire === 2) out.departureTime = readStopTimeEvent(r.bytes());
+    else if (field === 4 && wire === 2) out.stopId = r.string();
     else r.skip(wire);
   }
   return out;
