@@ -10,6 +10,8 @@ struct SFTransitWatchApp: App {
     @State private var showingKeyEntry = false
     @State private var pendingKeyEntry = false
     @State private var provisionError: String?
+    @State private var subscriptionTiers: [SubscriptionDisplayInfo] = []
+    @State private var isPurchasing = false
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var slotsManager = CommuteSlotsManager()
     private let provisionService = SelfProvisionService.makeFromBundle()
@@ -45,12 +47,19 @@ struct SFTransitWatchApp: App {
                 }) {
                     SetupView(
                         canSubscribe: provisionService != nil,
-                        onSubscribe: { Task { await handleSubscribeAndProvision() } },
+                        tiers: subscriptionTiers,
+                        isPurchasing: isPurchasing,
+                        onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } },
                         onUseKey: {
                             pendingKeyEntry = true
                             showingSetup = false
                         }
                     )
+                    .task {
+                        if subscriptionTiers.isEmpty {
+                            subscriptionTiers = await subscriptionManager.loadDisplayInfo()
+                        }
+                    }
                 }
                 // 511.org key entry fallback
                 .sheet(isPresented: $showingKeyEntry) {
@@ -62,7 +71,7 @@ struct SFTransitWatchApp: App {
                     set: { if !$0 { provisionError = nil } }
                 )) {
                     Button("Try Again") {
-                        Task { await handleSubscribeAndProvision() }
+                        Task { await handleSubscribeAndProvision(productID: SubscriptionManager.workerProxyProductID) }
                     }
                     Button("Use 511.org key instead") {
                         provisionError = nil
@@ -104,14 +113,16 @@ struct SFTransitWatchApp: App {
         }
     }
 
-    private func handleSubscribeAndProvision() async {
+    private func handleSubscribeAndProvision(productID: String) async {
         guard let service = provisionService else { return }
+        isPurchasing = true
+        defer { isPurchasing = false }
         do {
             let originalTransactionId: String
             if let existing = await subscriptionManager.activeOriginalTransactionId() {
                 originalTransactionId = existing
             } else {
-                originalTransactionId = try await subscriptionManager.purchase()
+                originalTransactionId = try await subscriptionManager.purchase(productID: productID)
             }
 
             let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
