@@ -752,11 +752,17 @@ describe("POST /self-provision", () => {
     });
 });
 
+// NOTE: this block used to exercise /StopMonitoring, but that endpoint now serves from the
+// lazily-refreshed GTFS-RT snapshot (see gtfsrt/snapshot.ts) and no longer goes through the
+// generic hot-cache/rate-limit proxy path below. /StopTimetable still does, so it now stands
+// in for exercising that shared mechanism (Cache API HIT/STALE + rate-limit-after-cache).
+// Its TTLs come from TIMETABLE_TTL (24h fresh / 7d stale) rather than DEFAULT_TTL, hence the
+// different fetchedAtMs offsets vs. before.
 describe("cacheable SIRI endpoints (Cache API + rate-limit-after-cache)", () => {
     const SM_TOKEN = "cache-test-token";
-    const SM_URL = "https://example.com/StopMonitoring?agency=SF&stopCode=99999&MaximumNumberOfCallsOnwards=10";
+    const SM_URL = "https://example.com/StopTimetable?operatorref=SF&monitoringref=99999";
     // upstream URL the worker builds (params in the order buildUpstreamUrl emits them, then api_key, then format)
-    const UPSTREAM = "https://api.511.org/transit/StopMonitoring?agency=SF&stopCode=99999&MaximumNumberOfCallsOnwards=10&api_key=test-511-key&format=json";
+    const UPSTREAM = "https://api.511.org/transit/stoptimetable?operatorref=SF&monitoringref=99999&api_key=test-511-key&format=json";
 
     async function proxyKey(token: string): Promise<string> {
         const tokenHash = await sha256Hex(token);
@@ -791,7 +797,7 @@ describe("cacheable SIRI endpoints (Cache API + rate-limit-after-cache)", () => 
     });
 
     it("serves a fresh cache HIT even when the data bucket is full (hit does not require budget)", async () => {
-        await seedCache(Date.now()); // fresh (< 60s)
+        await seedCache(Date.now()); // fresh (< 24h)
         await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.put(
             await proxyKey(SM_TOKEN), String(PROXY_RATE_LIMIT.maxRequests), { expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2 },
         );
@@ -801,7 +807,7 @@ describe("cacheable SIRI endpoints (Cache API + rate-limit-after-cache)", () => 
     });
 
     it("serves STALE (not 429) when rate-limited but a stale cache entry exists", async () => {
-        await seedCache(Date.now() - 5 * 60 * 1000); // stale (> 60s fresh, < 6h)
+        await seedCache(Date.now() - 25 * 60 * 60 * 1000); // stale (> 24h fresh, < 7d stale)
         await (env as unknown as { TRANSIT_CACHE: KVNamespace }).TRANSIT_CACHE.put(
             await proxyKey(SM_TOKEN), String(PROXY_RATE_LIMIT.maxRequests), { expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2 },
         );
