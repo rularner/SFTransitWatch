@@ -87,4 +87,36 @@ final class WatchSnapshotUITests: XCTestCase {
                       "Expected Distance label in StopLocationView compass tab")
         try XCUISnapshotRunner.verify(app, named: "StopLocation", in: self, topPixelsToIgnore: 200)
     }
+
+    func testSnapshot_Paywall() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-SNAPSHOT_MODE",
+            "-SNAPSHOT_PAYWALL",
+            "-511_API_KEY", "",
+            "-WORKER_TOKEN", "",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["Subscribe"].waitForExistence(timeout: 10),
+                      "Onboarding paywall Subscribe button should appear")
+        XCTAssertTrue(app.staticTexts["$1.99/month"].waitForExistence(timeout: 10),
+                      "watch paywall should show the monthly price")
+        XCTAssertTrue(app.staticTexts["Free for 1 week"].exists,
+                      "watch paywall should show the free-trial intro offer")
+        // Text assertions above directly protect the price/trial (the compliance-
+        // critical content). The pixel-diff masks the top of the frame (clock/status
+        // area is nondeterministic here), matching the other watch snapshot tests.
+        try XCUISnapshotRunner.verify(app, named: "Paywall", in: self, topPixelsToIgnore: 200)
+
+        // SetupView is now wrapped in a ScrollView (below-the-fold content wasn't
+        // reachable before) — scroll to the bottom and capture a second frame so the
+        // auto-renewal disclosure and the watchOS-only Terms/Privacy URL text are
+        // actually exercised and visible in a golden, not just present off-screen.
+        app.scrollViews.firstMatch.swipeUp()
+        app.scrollViews.firstMatch.swipeUp()
+        XCTAssertTrue(app.staticTexts["https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"].waitForExistence(timeout: 10),
+                      "watch paywall should surface the Terms of Use URL as readable text (Link alone doesn't open a browser on watchOS)")
+        try XCUISnapshotRunner.verify(app, named: "Paywall_Scrolled", in: self, topPixelsToIgnore: 200)
+    }
 }
