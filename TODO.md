@@ -1,6 +1,39 @@
 Bugs:
   - Re-enable skipped StoreKit purchase-flow tests (testActiveOriginalTransactionIdReturnsIdAfterPurchase, testPurchaseReturnsOriginalTransactionId) once the SFTransitWatch scheme's Test action StoreKit Configuration is set to WorkerProxySubscription.storekit. Currently XCTSkipIf(true, ...).
 
+Code review 2026-07-12 (full app + worker; verified findings):
+  Correctness / user-visible — remaining:
+  - Worker SIRI DirectionRef carries GTFS-RT codes "IB"/"OB" (or "" when direction_id absent); siri.ts:19 + TransitCodecs.swift:191 display it verbatim as the arrival destination — blank or "IB"/"OB" shown instead of a headsign, opposite directions indistinguishable. Deeper: pass headsign/destination through the snapshot->SIRI translation.
+  - BusArrivalView.swift:238 "arriving soon" haptic dedupes on BusArrival.id, but id = fresh UUID() per parse (BusArrival.swift:4), so the haptic re-fires every 30s refresh for the same bus and notifiedArrivalIDs grows unbounded. Fix: derive a stable identity (route+stop+arrivalTime).
+  - NearbyFavoritesWidget is unreachable: @main is on the single SFTransitComplicationWidget with no WidgetBundle, and ComplicationUpdater.updateNearby has zero callers. Register it in a WidgetBundle (or delete) — see quick-win "watch complication for nearest stop".
+  - Telemetry.shared (Telemetry.swift:62) captures workerToken/workerBaseURL once (let) at first access; isEnabled and the POST token never reflect later provisioning or clearing until relaunch (also keeps POSTing a revoked token after clear). Fix: read config live.
+  - Agency.swift:60 EnabledAgencies.parse falls back to [Self.default] where default is the comma-joined "SF,BA,AC,..." string, so a stored "," / whitespace value yields a single bogus "agency code" that matches no Agency and disables all agencies. Fix: fall back to the parsed known list.
+  - WatchSession.swift:58 phone-synced key stored in a second store (UserDefaults.standard "511_API_KEY_FROM_PHONE") that TransitAPI.resolvedKey:30 ranks above the app-group key watch Settings edits — clearing/editing the key in watch Settings leaves the stale phone copy winning. Fix: single canonical store.
+  - WatchSession.swift:20 / PhoneSession.swift:56 UserDefaults.didChangeNotification observers (object: nil) fire on every write from any suite (ComplicationUpdater writes ~every 30s), generating echoing WatchConnectivity context traffic. Fix: scope observation / debounce / suppress self-writes.
+
+  Efficiency (watch requests / battery — this branch's theme):
+  - Watch TransitAPI (Watch App/TransitAPI.swift) is a diverged fork of the phone's, missing the 20s throttle cache, in-flight dedup, 429 backoff, keep-last stale cache/softBanner, and format=json/MaximumNumberOfCallsOnwards params. Every trigger hits the network; missing format=json also gives phone vs watch different worker cache keys (index.ts:213-224) doubling upstream 511 fetches. Deeper fix: one shared client in SFTransitWatchPackage.
+  - Watch TransitAPI.swift:145: empty real-time arrivals trigger an uncached fetchScheduledDepartures on every poll (schedule valid ~24h), doubling requests during GTFS-RT gaps. Fix: cache schedule client-side.
+  - stopLocationUpdates() (LocationManager.swift:44) is never called anywhere; startLocationUpdates runs in onAppear (BusArrivalView:191, BusStopListView:109) with best-accuracy GPS + 5deg heading, so location+compass hardware stays on for the whole session. Fix: stop on disappear / when location tab deselected; use hundred-meter accuracy for nearby list.
+  - BusStopListView.swift:114 onChange(currentLocation) re-runs loadNearbyStops (one /Stops per enabled agency) on every 10m GPS tick (distanceFilter=10). Fix: refetch only when moved >100-200m or >60s.
+  - Watch TransitAPI.swift:398 searchStops downloads the full agency stop list per agency on every search and filters client-side, no caching. Fix: server-side filter via worker /Stops, or cache the list for the session.
+  - snapshot.ts:106 handleStopMonitoring calls loadStopNames on every request (KV get + JSON.parse of full agency stop list + Map build) even on cache hits and when visits is empty. Fix: memoize per-isolate with TTL, or skip when visits empty.
+
+  Cleanup / duplication / altitude:
+  - Phone TransitAPI.swift:361/400 hand-rolls regex XML parsing (order-dependent, 0.0 default coords) while the watch already uses the shared SIRIXMLParser.parseRecords. Consolidate on the parser.
+  - BusArrivalView / BusStopListView duplicated across phone+watch and diverged (watch missing onReceive($pollInterval) countdown + softBanner; phone-only formatDistance/StopCodeEntryView/fetchRoutes/StopRoutesCache/debounced load). Move shared pieces (formatDistance, favorite-toggle + commute-prompt blocks) into SFTransitWatchPackage.
+  - Complication views duplicated: NearbyFavoritesEntryView + subviews byte-identical to ComplicationWidgetEntryView (ComplicationWidget.swift:119-209); NearbyFavoritesEntry == NextArrivalEntry minus one field. Parameterize a single entry view.
+  - SnapshotMode.isActive threaded through ~15 production call sites instead of injected once at the composition root behind URLSessionProtocol/LocationProvider. Deeper fix: swap in a fixture-backed implementation at startup.
+  - Magic constants duplicated: 511 base URL in 4 places (index.ts:4, snapshot.ts:12, both TransitAPI.swift); snapshot.ts:49 re-hardcodes the LAST_UPSTREAM_FETCH_KEY TTL as 6*60*60 instead of the imported STALE_TTL_SECONDS. One exported constant each (latent drift risk today).
+  - XCUISnapshotRunner.swift exists 3x (TestSupport/ and both UITest targets), two md5-identical, third differs only in one path component (line 314). Parameterize the directory, keep one canonical file.
+  - Dead code: APIError.decodingError/.networkError/.xmlParsingError never thrown (errorKind "parse" branch unreachable in both TransitAPI copies); NextArrivalEntry.unconfigured (ComplicationWidget.swift:24) unreferenced.
+  - project.pbxproj:810-976 hardcodes MARKETING_VERSION=1.0 / CURRENT_PROJECT_VERSION=1 in the four test-bundle configs (no baseConfigurationReference), so Config.xcconfig never applies there — pins test bundles at 1.0 regardless of the automated bump. Low severity (test bundles only), but contradicts the CLAUDE.md "MARKETING_VERSION lives in Config.xcconfig" rule.
+
+  Investigated, NOT bugs (do not chase):
+  - fromBase64Url padding math (index.ts:743) is correct for all valid inputs; a length ≡1 mod 4 is never valid base64url and both call sites catch the throw.
+  - StopTimetable operatorref/monitoringref params are spec-correct; the 412 is 511-side (matches project_gtfsrt_decoder.md investigation).
+  - Unconfirmed edge cases: negative-varint decode in the hand-rolled protobuf (malformed-feed only); BusArrialView per-render timer re-creation (runtime-dependent SwiftUI semantics).
+
 Privacy / compliance:
   - No telemetry opt-out. Telemetry.shared sends install_id/platform/version/endpoint/status/latency whenever a worker token+baseURL exist; isEnabled has no user toggle. Add a settings switch and confirm PrivacyInfo.xcprivacy declares the collection.
 

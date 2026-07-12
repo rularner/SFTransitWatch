@@ -99,14 +99,18 @@ export default {
 
 			const endpoint = url.pathname.split("/").filter(Boolean).pop() ?? "";
 			if (endpoint === "Stops") {
+				// Budget is enforced inside handleStopsRequest so a fresh cache HIT stays
+				// free (matching the XML proxy path below) instead of 429ing needlessly.
+				return await handleStopsRequest(url, env, auth.client.tokenHash);
+			}
+
+			if (endpoint === "StopMonitoring") {
+				// Bound this endpoint per token — it was previously ungated and could be
+				// polled without limit, contending for the shared upstream refresh lock.
 				const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
 				if (!allowed) {
 					return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
 				}
-				return await handleStopsRequest(url, env);
-			}
-
-			if (endpoint === "StopMonitoring") {
 				return await handleStopMonitoring(url, env, ctx);
 			}
 
@@ -136,8 +140,12 @@ export default {
 
 			const canRefreshNow = await canMakeUpstreamRequest(env, now);
 			if (!canRefreshNow && cached) {
-				const didSchedule = await scheduleBackgroundRefresh(env, ctx, upstream.url, now, ttl);
-				return xmlResponse(cached, didSchedule ? "STALE-REVALIDATE" : "STALE", ttl);
+				// Within the upstream min-interval: serve stale. A background revalidation
+				// here could not run anyway (it would re-check the same interval and no-op),
+				// and taking the shared refresh lock to do nothing can starve the GTFS-RT
+				// snapshot refresh. A later request outside the window refreshes synchronously
+				// via the MISS path below.
+				return xmlResponse(cached, "STALE", ttl);
 			}
 			if (!canRefreshNow && !cached) {
 				return jsonError("Rate limited by upstream policy. Retry in a few seconds.", 429, { "Retry-After": "60" });
@@ -251,30 +259,6 @@ export async function canMakeUpstreamRequest(env: Env, nowMs: number): Promise<b
 		return true;
 	}
 	return nowMs - lastMs >= MIN_UPSTREAM_INTERVAL_MS;
-}
-
-async function scheduleBackgroundRefresh(
-	env: Env,
-	ctx: ExecutionContext,
-	upstreamUrl: URL,
-	nowMs: number,
-	ttl: TtlPair,
-): Promise<boolean> {
-	const gotLock = await tryAcquireRefreshLock(env);
-	if (!gotLock) return false;
-
-	ctx.waitUntil(
-		(async () => {
-			try {
-				const allowed = await canMakeUpstreamRequest(env, nowMs);
-				if (!allowed) return;
-				await fetchAndCacheUpstream(env, upstreamUrl, Date.now(), ttl);
-			} finally {
-				await releaseRefreshLock(env);
-			}
-		})(),
-	);
-	return true;
 }
 
 async function fetchAndCacheUpstream(
@@ -400,7 +384,7 @@ async function handleLog(request: Request, env: Env, tokenHash: string): Promise
 	return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
-async function handleStopsRequest(url: URL, env: Env): Promise<Response> {
+async function handleStopsRequest(url: URL, env: Env, tokenHash: string): Promise<Response> {
 	const agency = url.searchParams.get("agency") ?? url.searchParams.get("operator_id");
 	if (!agency) {
 		return jsonError("agency parameter required.", 400);
@@ -415,8 +399,19 @@ async function handleStopsRequest(url: URL, env: Env): Promise<Response> {
 
 	let active: CachedStops;
 	if (isFresh) {
+		// Fresh cache HIT: free — does not consume the token budget.
 		active = cached;
 	} else {
+		// Work (an upstream fetch) is required — now gate on the per-token budget. On limit,
+		// serve stale cache if we have it rather than failing the client outright.
+		const allowed = await checkRateLimit(env, "proxy-token", tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+		if (!allowed) {
+			if (cached) {
+				active = cached;
+				return stopsJsonResponse(applyStopsFilter(url, active), active.fetchedAtMs);
+			}
+			return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+		}
 		const result = await fetchAndCacheAllStops(env, agency, now);
 		if (result.ok) {
 			active = result.value;
@@ -427,16 +422,17 @@ async function handleStopsRequest(url: URL, env: Env): Promise<Response> {
 		}
 	}
 
+	return stopsJsonResponse(applyStopsFilter(url, active), active.fetchedAtMs);
+}
+
+function applyStopsFilter(url: URL, active: CachedStops): CachedStop[] {
 	const lat = parseFloat(url.searchParams.get("lat") ?? url.searchParams.get("latitude") ?? "");
 	const lon = parseFloat(url.searchParams.get("lon") ?? url.searchParams.get("longitude") ?? "");
 	const radius = parseInt(url.searchParams.get("radius") ?? "1000", 10);
 
-	const filtered =
-		Number.isFinite(lat) && Number.isFinite(lon)
-			? active.stops.filter((s) => distanceMeters(s.lat, s.lon, lat, lon) <= (Number.isFinite(radius) ? radius : 1000))
-			: active.stops;
-
-	return stopsJsonResponse(filtered, active.fetchedAtMs);
+	return Number.isFinite(lat) && Number.isFinite(lon)
+		? active.stops.filter((s) => distanceMeters(s.lat, s.lon, lat, lon) <= (Number.isFinite(radius) ? radius : 1000))
+		: active.stops;
 }
 
 function isValidCachedStops(raw: unknown): raw is CachedStops {
@@ -634,6 +630,13 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
 
     const jwt = (parsed as { jwt: string }).jwt;
     const originalTransactionId = (parsed as { originalTransactionId: string }).originalTransactionId;
+    // App Store originalTransactionId is a numeric string. Enforce that so it cannot be
+    // used to inject path segments / query params into the authenticated App Store Server
+    // API request (see fetchSubscriptionStatus).
+    if (!/^[0-9]+$/.test(originalTransactionId)) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "bad_transaction_id" }));
+        return jsonError("originalTransactionId must be a numeric string.", 400);
+    }
     const parts = jwt.split(".");
     if (parts.length !== 3) {
         console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "malformed_jwt" }));
@@ -701,6 +704,17 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "sig_invalid" }));
         return jsonError("JWT signature is invalid.", 401);
     }
+
+    // Replay defense: the JWT is otherwise reusable until exp, so an intercepted request
+    // body could be replayed within its (<=5 min) window to mint extra tokens. Record a
+    // one-time marker keyed by the signature; legitimate retries rebuild a fresh JWT (new
+    // iat -> new signature), so this only blocks true replays.
+    const replayKey = `selfprov-jti:${(await sha256Hex(encodedSig)).slice(0, 32)}`;
+    if (await env.TRANSIT_CACHE.get(replayKey)) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_replayed" }));
+        return jsonError("JWT has already been used.", 401);
+    }
+    await env.TRANSIT_CACHE.put(replayKey, "1", { expirationTtl: Math.max(1, (payload.exp as number) - nowSec) });
 
     const subscription = await verifySubscription(env, originalTransactionId);
     if (!subscription.active) {

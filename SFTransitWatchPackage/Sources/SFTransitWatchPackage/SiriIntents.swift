@@ -84,8 +84,9 @@ public struct CheckStopArrivalsIntent: AppIntent {
 
     @MainActor
     static func dialogText(agency: TransitAgencyChoice?, stopName: String?) -> String {
-        let key = ConfigurationManager.shared.apiKey
-        guard !key.isEmpty else {
+        // A worker-provisioned user has no 511 key but is fully configured, so gate on the
+        // same predicate the rest of the app uses rather than the raw API key.
+        guard ConfigurationManager.shared.isConfigured else {
             return "Please configure your 511.org API key in SF Transit Watch settings."
         }
         let prefix = agency.map { "\($0.displayName) " } ?? ""

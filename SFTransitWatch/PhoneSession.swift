@@ -81,7 +81,12 @@ final class PhoneSession: NSObject, WCSessionDelegate {
                            appGroup: UserDefaults? = UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName)) {
         let appGroup = appGroup
 
-        if let agencies = context["enabledAgencies"] as? String {
+        // The payload always carries every key, empty when the *watch* has it unset. An
+        // empty value means "nothing to share," not "clear yours" — so a freshly-installed
+        // watch must not wipe settings the user configured on the phone. Only non-empty
+        // values are applied (the `!= current` guards additionally suppress no-op writes
+        // that would otherwise churn the UserDefaults.didChange observer).
+        if let agencies = context["enabledAgencies"] as? String, !agencies.isEmpty {
             let current = appGroup?.string(forKey: EnabledAgencies.storageKey) ?? ""
             if agencies != current {
                 appGroup?.set(agencies, forKey: EnabledAgencies.storageKey)
@@ -89,30 +94,25 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         }
 
         let morningKey = CommuteSlotsManager.Slot.morning.storageKey
-        if let morningId = context["commuteMorning"] as? String {
+        if let morningId = context["commuteMorning"] as? String, !morningId.isEmpty {
             let current = appGroup?.string(forKey: morningKey) ?? ""
             if morningId != current {
-                morningId.isEmpty
-                    ? appGroup?.removeObject(forKey: morningKey)
-                    : appGroup?.set(morningId, forKey: morningKey)
+                appGroup?.set(morningId, forKey: morningKey)
             }
         }
 
         let afternoonKey = CommuteSlotsManager.Slot.afternoon.storageKey
-        if let afternoonId = context["commuteAfternoon"] as? String {
+        if let afternoonId = context["commuteAfternoon"] as? String, !afternoonId.isEmpty {
             let current = appGroup?.string(forKey: afternoonKey) ?? ""
             if afternoonId != current {
-                afternoonId.isEmpty
-                    ? appGroup?.removeObject(forKey: afternoonKey)
-                    : appGroup?.set(afternoonId, forKey: afternoonKey)
+                appGroup?.set(afternoonId, forKey: afternoonKey)
             }
         }
 
-        if let favoritesData = context["favoriteStops"] as? Data {
+        if let favoritesData = context["favoriteStops"] as? Data, !favoritesData.isEmpty {
             let current = UserDefaults.standard.data(forKey: "FavoriteStops") ?? Data()
             if favoritesData != current {
-                UserDefaults.standard.set(favoritesData.isEmpty ? nil : favoritesData,
-                                          forKey: "FavoriteStops")
+                UserDefaults.standard.set(favoritesData, forKey: "FavoriteStops")
             }
         }
     }
