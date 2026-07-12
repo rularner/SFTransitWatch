@@ -12,7 +12,8 @@ struct BusArrivalView: View {
     @State private var selectedRoute: String? = nil
     @State private var showCommutePrompt = false
     @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
-    @State private var pollInterval: TimeInterval = 30
+    @StateObject private var countdown = RefreshCountdown(interval: 30)
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     private var isLandscape: Bool { verticalSizeClass == .compact }
@@ -210,11 +211,14 @@ struct BusArrivalView: View {
             locationManager.startLocationUpdates()
             Task { await loadArrivals() }
         }
-        .onReceive(Timer.publish(every: pollInterval, on: .main, in: .common).autoconnect()) { _ in
-            Task { await loadArrivals() }
+        .onReceive(ticker) { _ in
+            guard !transitAPI.isLoading else { return }
+            if countdown.tick() {
+                Task { await loadArrivals() }
+            }
         }
         .onReceive(transitAPI.$pollInterval) { newInterval in
-            if newInterval != pollInterval { pollInterval = newInterval }
+            countdown.setInterval(Int(newInterval))
         }
         .confirmationDialog(
             "Add to commute?",
@@ -235,6 +239,7 @@ struct BusArrivalView: View {
     private func loadArrivals() async {
         arrivals = await transitAPI.fetchArrivals(for: stop.id, agency: stop.agency)
         lastUpdated = Date()
+        countdown.reset()
     }
 
     private func formatTime(_ date: Date) -> String {
