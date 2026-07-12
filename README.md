@@ -143,7 +143,17 @@ The app intelligently learns your route preferences:
    cd SFTransitWatch
    ```
 
-2. **(Optional) Override signing locally**:
+2. **Install git hooks**:
+   ```bash
+   ./bin/install-git-hooks.sh
+   ```
+   Installs a `commit-msg` hook that enforces Conventional Commits on commit
+   subjects (mirroring `.github/workflows/validate-pr-title.yml`'s PR-title
+   check) plus a `post-checkout` hook used by worktrees. Hook source lives in
+   `.githooks/` since git hooks aren't versioned by git itself; run this
+   script once per clone (not per worktree — `.git/hooks` is shared).
+
+3. **(Optional) Override signing locally**:
    ```bash
    cp Developer.xcconfig.sample Developer.xcconfig
    # Edit Developer.xcconfig and fill in YOUR_TEAM_ID and SELF_PROVISION_PRIVATE_KEY

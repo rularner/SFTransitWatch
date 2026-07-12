@@ -1,0 +1,24 @@
+#!/bin/sh
+# Symlink docs/superpowers into linked worktrees so the gitignored
+# superpowers plans/specs are shared with the main checkout.
+# Hooks live in the shared .git/hooks dir, so this fires for every
+# worktree (including `git worktree add`'s implicit checkout).
+#
+# Installed via bin/install-git-hooks.sh (git hooks aren't versioned by git
+# itself, so this file is just the tracked source).
+
+GIT_DIR=$(git rev-parse --git-dir)
+GIT_COMMON=$(git rev-parse --git-common-dir)
+
+# Not a linked worktree (main checkout) - nothing to do.
+[ "$GIT_DIR" = "$GIT_COMMON" ] && exit 0
+
+TOPLEVEL=$(git rev-parse --show-toplevel)
+MAIN_TOPLEVEL=$(cd "$GIT_COMMON/.." && pwd)
+TARGET="$MAIN_TOPLEVEL/docs/superpowers"
+LINK="$TOPLEVEL/docs/superpowers"
+
+if [ ! -e "$LINK" ] && [ ! -L "$LINK" ] && [ -d "$TARGET" ]; then
+    mkdir -p "$TOPLEVEL/docs"
+    ln -s "$TARGET" "$LINK"
+fi

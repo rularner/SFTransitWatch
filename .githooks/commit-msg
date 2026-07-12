@@ -1,0 +1,46 @@
+#!/bin/sh
+# Enforce Conventional Commits on the commit subject, mirroring
+# .github/workflows/validate-pr-title.yml's PR-title check. GitHub squash-
+# merges each PR using the PR title as the merge commit message, so keeping
+# local commit subjects conventional avoids finding out about a bad title
+# only after opening the PR.
+#
+# Installed via bin/install-git-hooks.sh (git hooks aren't versioned by git
+# itself, so this file is just the tracked source).
+
+subject=$(head -n1 "$1")
+
+# Merge commits and fixup/squash commits aren't PR titles; don't block them.
+case "$subject" in
+    "Merge "*|fixup!*|squash!*)
+        exit 0
+        ;;
+esac
+
+pattern='^(feat|fix|docs|chore|refactor|test|build|ci|perf|style)(\([^)]+\))?!?: [^A-Z].+$'
+
+if echo "$subject" | grep -qE "$pattern"; then
+    exit 0
+fi
+
+cat <<EOF >&2
+error: commit subject does not follow Conventional Commits.
+
+Your subject: '$subject'
+
+Expected format: <type>(<scope>)?!?: <subject>
+  <type>: one of feat, fix, docs, chore, refactor, test, build, ci, perf, style
+  <scope>: optional, any non-empty text in parens
+  !: optional, marks a breaking change
+  <subject>: must start with a lowercase letter (or digit/symbol)
+
+Examples:
+  feat: add favorites sync
+  fix(siri): stop crash on empty list
+  feat!: drop watchOS 9 support
+
+This is the same pattern .github/workflows/validate-pr-title.yml enforces on
+PR titles. If this commit genuinely isn't meant to become a PR title (e.g.
+WIP you'll squash later), bypass with: git commit --no-verify
+EOF
+exit 1
