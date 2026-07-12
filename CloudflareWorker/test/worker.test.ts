@@ -437,13 +437,15 @@ describe("per-token rate limiting on proxy routes", () => {
         await CACHE().delete(key);
     });
 
+    // agency=BA has no seeded stops cache, so serving it needs an upstream fetch — that is
+    // the path the per-token budget gates. (A fresh cache HIT is exempt; see the test below.)
     it("returns 429 when the per-token request count has reached the limit", async () => {
         const key = await rateLimitKeyForToken(RL_TOKEN);
         await CACHE().put(key, String(PROXY_RATE_LIMIT.maxRequests), {
             expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2,
         });
 
-        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+        const res = await SELF.fetch("https://example.com/Stops?agency=BA", {
             headers: { "X-App-Token": RL_TOKEN },
         });
         expect(res.status).toBe(429);
@@ -455,10 +457,23 @@ describe("per-token rate limiting on proxy routes", () => {
             expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2,
         });
 
-        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+        const res = await SELF.fetch("https://example.com/Stops?agency=BA", {
             headers: { "X-App-Token": RL_TOKEN },
         });
         expect(res.headers.get("Retry-After")).toBe(String(PROXY_RATE_LIMIT.windowSeconds));
+    });
+
+    it("serves a fresh cached /Stops for free even when the token is at the limit", async () => {
+        const key = await rateLimitKeyForToken(RL_TOKEN);
+        await CACHE().put(key, String(PROXY_RATE_LIMIT.maxRequests), {
+            expirationTtl: PROXY_RATE_LIMIT.windowSeconds * 2,
+        });
+
+        // stops:SF is seeded fresh, so no upstream work is needed and the budget must not apply.
+        const res = await SELF.fetch("https://example.com/Stops?agency=SF", {
+            headers: { "X-App-Token": RL_TOKEN },
+        });
+        expect(res.status).toBe(200);
     });
 
     it("does not rate limit a different token when one token is at the limit", async () => {

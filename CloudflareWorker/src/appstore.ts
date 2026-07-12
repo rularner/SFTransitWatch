@@ -75,7 +75,10 @@ export async function checkAppStoreAuth(env: AppStoreEnv): Promise<{ ok: boolean
 }
 
 async function fetchSubscriptionStatus(host: string, originalTransactionId: string, jwt: string): Promise<Response> {
-	return fetch(`https://${host}/inApps/v1/subscriptions/${originalTransactionId}`, {
+	// Encode the id into the path: it is caller-supplied, and an unescaped "../" or "?"
+	// would let it redirect this JWT-authenticated request to an arbitrary App Store
+	// Server API endpoint. handleSelfProvision also validates it as a numeric string.
+	return fetch(`https://${host}/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`, {
 		headers: { Authorization: `Bearer ${jwt}` },
 	});
 }

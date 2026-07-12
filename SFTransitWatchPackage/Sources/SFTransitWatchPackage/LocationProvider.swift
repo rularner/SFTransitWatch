@@ -15,11 +15,21 @@ public final class LocationProvider: NSObject, CLLocationManagerDelegate {
     }
 
     private func fetch() async throws -> CLLocation {
-        try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
-            manager.delegate = self
-            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-            manager.requestLocation()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+                manager.delegate = self
+                manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+                manager.requestLocation()
+            }
+        } onCancel: {
+            // Without this, a cancelled awaiting Task (e.g. a killed background refresh)
+            // would leak the continuation and hang forever, silently stopping the refresh chain.
+            Task { @MainActor [weak self] in
+                guard let c = self?.continuation else { return }
+                self?.continuation = nil
+                c.resume(throwing: CancellationError())
+            }
         }
     }
 
@@ -30,7 +40,11 @@ public final class LocationProvider: NSObject, CLLocationManagerDelegate {
         Task { @MainActor [weak self] in
             guard let c = self?.continuation else { return }
             self?.continuation = nil
-            c.resume(returning: locations[0])
+            if let location = locations.first {
+                c.resume(returning: location)
+            } else {
+                c.resume(throwing: CLError(.locationUnknown))
+            }
         }
     }
 

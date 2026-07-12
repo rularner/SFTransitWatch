@@ -112,7 +112,9 @@ class TransitAPI: ObservableObject {
     private func applyBackoff(retryAfter: String?) {
         consecutive429 += 1
         if let retryAfter, let seconds = TimeInterval(retryAfter), seconds > 0 {
-            pollInterval = min(seconds, maxPollInterval)
+            // Clamp to at least the base interval: a small Retry-After must never make us
+            // poll *faster* than normal while we're being rate-limited.
+            pollInterval = min(max(seconds, basePollInterval), maxPollInterval)
             return
         }
         let raw = basePollInterval * pow(2.0, Double(consecutive429))   // 60, 120, 240, …

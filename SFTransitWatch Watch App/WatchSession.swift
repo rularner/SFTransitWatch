@@ -51,15 +51,23 @@ final class WatchSession: NSObject, WCSessionDelegate {
     }
 
     private func applyContext(_ context: [String: Any]) {
-        let key = (context["transitKey"] as? String) ?? ""
-        // Write to both stores: App Group (for SettingsView) and standard (for
-        // TransitAPI's @AppStorage reactive updates).
-        ConfigurationManager.shared.apiKey = key
-        UserDefaults.standard.set(key, forKey: "511_API_KEY_FROM_PHONE")
+        // The payload always carries every key, empty when the *sender* has it unset.
+        // An empty value therefore means "I have nothing to share," not "clear yours" —
+        // applying it would let an unconfigured companion phone wipe credentials/slots the
+        // user set directly on the watch. Only non-empty values are applied (mirrors the
+        // enabledAgencies/favoriteStops handling that was already guarded this way).
+        if let key = context["transitKey"] as? String, !key.isEmpty {
+            // Write to both stores: App Group (for SettingsView) and standard (for
+            // TransitAPI's @AppStorage reactive updates).
+            ConfigurationManager.shared.apiKey = key
+            UserDefaults.standard.set(key, forKey: "511_API_KEY_FROM_PHONE")
+        }
 
         let token = (context["workerToken"] as? String) ?? ""
         let url = (context["workerBaseURL"] as? String) ?? ""
-        ConfigurationManager.shared.setWorkerConfig(url: url, token: token)
+        if !token.isEmpty, !url.isEmpty {
+            ConfigurationManager.shared.setWorkerConfig(url: url, token: token)
+        }
 
         let appGroup = UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName)
 
@@ -68,16 +76,12 @@ final class WatchSession: NSObject, WCSessionDelegate {
         }
 
         let morningKey = CommuteSlotsManager.Slot.morning.storageKey
-        if let morningId = context["commuteMorning"] as? String {
-            morningId.isEmpty
-                ? appGroup?.removeObject(forKey: morningKey)
-                : appGroup?.set(morningId, forKey: morningKey)
+        if let morningId = context["commuteMorning"] as? String, !morningId.isEmpty {
+            appGroup?.set(morningId, forKey: morningKey)
         }
         let afternoonKey = CommuteSlotsManager.Slot.afternoon.storageKey
-        if let afternoonId = context["commuteAfternoon"] as? String {
-            afternoonId.isEmpty
-                ? appGroup?.removeObject(forKey: afternoonKey)
-                : appGroup?.set(afternoonId, forKey: afternoonKey)
+        if let afternoonId = context["commuteAfternoon"] as? String, !afternoonId.isEmpty {
+            appGroup?.set(afternoonId, forKey: afternoonKey)
         }
 
         if let favoritesData = context["favoriteStops"] as? Data, !favoritesData.isEmpty {

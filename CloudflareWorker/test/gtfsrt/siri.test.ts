@@ -8,8 +8,9 @@ const visit: Visit = {
 };
 
 describe("isoFromEpoch", () => {
-  it("formats epoch seconds as ISO8601 UTC", () => {
-    expect(isoFromEpoch(1783321246)).toBe(new Date(1783321246 * 1000).toISOString());
+  it("formats epoch seconds as second-precision ISO8601 UTC matching the 511 SIRI feed", () => {
+    // No ".000Z" fraction — the app's ISO8601DateFormatter rejects fractional seconds.
+    expect(isoFromEpoch(1783321246)).toBe("2026-07-06T07:00:46Z");
   });
 });
 
