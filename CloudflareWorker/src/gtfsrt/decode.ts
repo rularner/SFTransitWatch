@@ -1,5 +1,16 @@
 import { Reader } from "./protobuf";
 
+// Field numbers below are from the canonical gtfs-realtime.proto:
+// https://github.com/google/transit/blob/master/gtfs-realtime/proto/gtfs-realtime.proto
+// Getting these wrong does not fail loudly — a mismatched length-delimited field
+// just misaligns the reader and eventually throws "unsupported wire type N". The
+// numbers that bite (verified against a real 511 RG feed):
+//   FeedMessage.entity=2  FeedEntity.trip_update=3
+//   TripUpdate{ trip=1, stop_time_update=2, vehicle=3 }
+//   TripDescriptor{ trip_id=1, route_id=5, direction_id=6 }
+//   StopTimeUpdate{ stop_sequence=1, arrival=2, departure=3, stop_id=4 }
+//   StopTimeEvent.time=2   VehicleDescriptor.id=1
+
 export interface StopTimeUpdate {
   stopSequence: number;
   stopId: string;
@@ -30,10 +41,11 @@ function readStopTimeUpdate(buf: Uint8Array): StopTimeUpdate {
   const out: StopTimeUpdate = { stopSequence: 0, stopId: "" };
   while (!r.eof()) {
     const { field, wire } = r.tag();
+    // GTFS-RT StopTimeUpdate field numbers: 1=stop_sequence, 2=arrival, 3=departure, 4=stop_id.
     if (field === 1 && wire === 0) out.stopSequence = r.varint();
-    else if (field === 2 && wire === 2) out.stopId = r.string();
-    else if (field === 3 && wire === 2) out.arrivalTime = readStopTimeEvent(r.bytes());
-    else if (field === 4 && wire === 2) out.departureTime = readStopTimeEvent(r.bytes());
+    else if (field === 2 && wire === 2) out.arrivalTime = readStopTimeEvent(r.bytes());
+    else if (field === 3 && wire === 2) out.departureTime = readStopTimeEvent(r.bytes());
+    else if (field === 4 && wire === 2) out.stopId = r.string();
     else r.skip(wire);
   }
   return out;
