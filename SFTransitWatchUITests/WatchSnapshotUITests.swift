@@ -108,5 +108,15 @@ final class WatchSnapshotUITests: XCTestCase {
         // critical content). The pixel-diff masks the top of the frame (clock/status
         // area is nondeterministic here), matching the other watch snapshot tests.
         try XCUISnapshotRunner.verify(app, named: "Paywall", in: self, topPixelsToIgnore: 200)
+
+        // SetupView is now wrapped in a ScrollView (below-the-fold content wasn't
+        // reachable before) — scroll to the bottom and capture a second frame so the
+        // auto-renewal disclosure and the watchOS-only Terms/Privacy URL text are
+        // actually exercised and visible in a golden, not just present off-screen.
+        app.scrollViews.firstMatch.swipeUp()
+        app.scrollViews.firstMatch.swipeUp()
+        XCTAssertTrue(app.staticTexts["https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"].waitForExistence(timeout: 10),
+                      "watch paywall should surface the Terms of Use URL as readable text (Link alone doesn't open a browser on watchOS)")
+        try XCUISnapshotRunner.verify(app, named: "Paywall_Scrolled", in: self, topPixelsToIgnore: 200)
     }
 }

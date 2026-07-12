@@ -16,41 +16,43 @@ public struct SetupView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 20) {
-            VStack(spacing: 12) {
-                Image(systemName: "bus.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.tint)
+        ScrollView {
+            VStack(spacing: 20) {
+                VStack(spacing: 12) {
+                    Image(systemName: "bus.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.tint)
 
-                VStack(spacing: 6) {
-                    Text("SF Transit Watch")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text("Set up data access to see nearby stops.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 6) {
+                        Text("SF Transit Watch")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        Text("Set up data access to see nearby stops.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("SF Transit Watch. Set up data access to see nearby stops.")
+
+                VStack(spacing: 12) {
+                    if canSubscribe {
+                        PaywallView(tiers: tiers, isPurchasing: isPurchasing, onSubscribe: onSubscribe)
+                    }
+
+                    VStack(spacing: 4) {
+                        Button("Use 511.org API Key", action: onUseKey)
+                            .buttonStyle(.bordered)
+                        Text("Free key from 511.org — set it up yourself")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("SF Transit Watch. Set up data access to see nearby stops.")
-
-            VStack(spacing: 12) {
-                if canSubscribe {
-                    PaywallView(tiers: tiers, isPurchasing: isPurchasing, onSubscribe: onSubscribe)
-                }
-
-                VStack(spacing: 4) {
-                    Button("Use 511.org API Key", action: onUseKey)
-                        .buttonStyle(.bordered)
-                    Text("Free key from 511.org — set it up yourself")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            .frame(maxWidth: .infinity)
+            .padding()
         }
-        .frame(maxWidth: .infinity)
-        .padding()
         .interactiveDismissDisabled(true)
     }
 }

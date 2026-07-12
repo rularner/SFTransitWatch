@@ -100,6 +100,7 @@ public struct PaywallView: View {
         }
     }
 
+    @ViewBuilder
     private var legalLinks: some View {
         HStack(spacing: 12) {
             Link("Terms of Use", destination: SubscriptionLegal.termsOfUseURL)
@@ -107,6 +108,18 @@ public struct PaywallView: View {
             Link("Privacy Policy", destination: SubscriptionLegal.privacyPolicyURL)
         }
         .font(.caption2)
+
+        #if os(watchOS)
+        // watchOS `Link` only offers iPhone handoff and can't open a browser,
+        // so the terms wouldn't actually be readable on-watch without this.
+        VStack(spacing: 2) {
+            Text(SubscriptionLegal.termsOfUseURL.absoluteString)
+            Text(SubscriptionLegal.privacyPolicyURL.absoluteString)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        #endif
     }
 }
 
