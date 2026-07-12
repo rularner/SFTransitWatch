@@ -100,6 +100,13 @@ final class WatchSnapshotUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["Subscribe"].waitForExistence(timeout: 10),
                       "Onboarding paywall Subscribe button should appear")
+        XCTAssertTrue(app.staticTexts["$1.99/month"].waitForExistence(timeout: 10),
+                      "watch paywall should show the monthly price")
+        XCTAssertTrue(app.staticTexts["Free for 1 week"].exists,
+                      "watch paywall should show the free-trial intro offer")
+        // Text assertions above directly protect the price/trial (the compliance-
+        // critical content). The pixel-diff masks the top of the frame (clock/status
+        // area is nondeterministic here), matching the other watch snapshot tests.
         try XCUISnapshotRunner.verify(app, named: "Paywall", in: self, topPixelsToIgnore: 200)
     }
 }

@@ -128,5 +128,4 @@ final class PhoneSnapshotUITests: XCTestCase {
                       "Paywall should show the free-trial intro offer")
         try XCUISnapshotRunner.verify(app, named: "Paywall", in: self, topPixelsToIgnore: 140)
     }
-
 }
