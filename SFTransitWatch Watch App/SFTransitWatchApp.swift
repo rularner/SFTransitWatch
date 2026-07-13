@@ -149,6 +149,9 @@ struct SFTransitWatchApp: App {
 
     private func refreshSubscriptionIfNeeded() async {
         guard let service = provisionService, ConfigurationManager.shared.isWorkerConfigured else { return }
+        let now = Date()
+        guard ProvisionRefreshGate.shouldRefresh(lastRefreshAt: ConfigurationManager.shared.lastProvisionRefreshAt, now: now) else { return }
+        ConfigurationManager.shared.lastProvisionRefreshAt = now
         guard let originalTransactionId = await subscriptionManager.activeOriginalTransactionId() else { return }
         _ = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
     }

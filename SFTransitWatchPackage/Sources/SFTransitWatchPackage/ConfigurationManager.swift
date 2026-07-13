@@ -11,6 +11,7 @@ public class ConfigurationManager: @unchecked Sendable {
     private let apiKeyKey = "511_API_KEY"
     private let workerTokenKey = "WORKER_TOKEN"
     private let workerBaseURLKey = "WORKER_BASE_URL"
+    private let lastProvisionRefreshAtKey = "LAST_PROVISION_REFRESH_AT"
 
     private init() {
         guard let userDefaults = UserDefaults(suiteName: Self.appGroupSuiteName) else {
@@ -55,6 +56,16 @@ public class ConfigurationManager: @unchecked Sendable {
         !workerToken.isEmpty && !workerBaseURL.isEmpty
     }
 
+    /// When the passive, foreground-triggered subscription refresh last called
+    /// `/self-provision`. See `ProvisionRefreshGate`.
+    public var lastProvisionRefreshAt: Date? {
+        get {
+            let interval = userDefaults.double(forKey: lastProvisionRefreshAtKey)
+            return interval == 0 ? nil : Date(timeIntervalSince1970: interval)
+        }
+        set { userDefaults.set(newValue?.timeIntervalSince1970, forKey: lastProvisionRefreshAtKey) }
+    }
+
     public var isConfigured: Bool {
         isWorkerConfigured || !apiKey.isEmpty
     }
@@ -67,5 +78,6 @@ public class ConfigurationManager: @unchecked Sendable {
     public func clearWorkerConfig() {
         workerToken = ""
         workerBaseURL = ""
+        lastProvisionRefreshAt = nil
     }
 }
