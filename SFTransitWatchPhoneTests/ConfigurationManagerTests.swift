@@ -10,6 +10,7 @@ final class ConfigurationManagerTests: XCTestCase {
             userDefaults.removeObject(forKey: "511_API_KEY")
             userDefaults.removeObject(forKey: "WORKER_TOKEN")
             userDefaults.removeObject(forKey: "WORKER_BASE_URL")
+            userDefaults.removeObject(forKey: "LAST_PROVISION_REFRESH_AT")
         }
     }
 
@@ -20,6 +21,7 @@ final class ConfigurationManagerTests: XCTestCase {
             userDefaults.removeObject(forKey: "511_API_KEY")
             userDefaults.removeObject(forKey: "WORKER_TOKEN")
             userDefaults.removeObject(forKey: "WORKER_BASE_URL")
+            userDefaults.removeObject(forKey: "LAST_PROVISION_REFRESH_AT")
         }
     }
 
@@ -79,6 +81,21 @@ final class ConfigurationManagerTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testLastProvisionRefreshAtIsNilWhenNotSet() {
+        XCTAssertNil(ConfigurationManager.shared.lastProvisionRefreshAt)
+    }
+
+    @MainActor
+    func testLastProvisionRefreshAtRoundTrips() {
+        let now = Date()
+        ConfigurationManager.shared.lastProvisionRefreshAt = now
+
+        // Allow for the precision lost round-tripping through a Double.
+        XCTAssertEqual(ConfigurationManager.shared.lastProvisionRefreshAt?.timeIntervalSince1970 ?? 0,
+                        now.timeIntervalSince1970, accuracy: 0.001)
+    }
+
     // MARK: - setWorkerConfig Method Tests
 
     @MainActor
@@ -129,6 +146,17 @@ final class ConfigurationManagerTests: XCTestCase {
                        "workerToken should be empty after clear")
         XCTAssertEqual(ConfigurationManager.shared.workerBaseURL, "",
                        "workerBaseURL should be empty after clear")
+    }
+
+    @MainActor
+    func testClearWorkerConfigRemovesLastProvisionRefreshAt() {
+        ConfigurationManager.shared.setWorkerConfig(url: "https://worker.example.com", token: "test-token")
+        ConfigurationManager.shared.lastProvisionRefreshAt = Date()
+
+        ConfigurationManager.shared.clearWorkerConfig()
+
+        XCTAssertNil(ConfigurationManager.shared.lastProvisionRefreshAt,
+                      "lastProvisionRefreshAt should be cleared alongside worker config")
     }
 
     @MainActor
