@@ -28,13 +28,13 @@ final class SubscriptionManagerTests: XCTestCase {
         XCTAssertNil(result)
     }
 
-    // Known issue: AppStore.sync() blocks indefinitely under SKTestSession when no
-    // real Sandbox Apple ID is signed into the simulator's Settings > App Store —
-    // it isn't part of StoreKitTest's mockable surface the way Transaction.currentEntitlements
-    // and product.purchase() are. Confirmed by observing the xcodebuild test process sit at
-    // near-zero CPU for minutes (blocked, not looping) instead of completing. Skipped until
-    // a Sandbox tester is signed in on the test simulator, or Apple's StoreKitTest support
-    // for AppStore.sync() improves.
+    // Known issue: AppStore.sync() blocks indefinitely under SKTestSession in this
+    // environment — it isn't part of StoreKitTest's mockable surface the way
+    // Transaction.currentEntitlements and product.purchase() are. Confirmed by
+    // observing the xcodebuild test process sit at near-zero CPU for minutes
+    // (blocked, not looping) instead of completing; the exact trigger (e.g. no
+    // Sandbox Apple ID signed into the simulator) is a hypothesis, not confirmed.
+    // Skipped until that's root-caused, or Apple's StoreKitTest support improves.
     func testRestoreThrowsNoActiveSubscriptionWhenNoneExists() async throws {
         try XCTSkipIf(true, "AppStore.sync() blocks indefinitely under SKTestSession without a signed-in Sandbox tester.")
 
