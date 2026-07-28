@@ -6,6 +6,7 @@ public enum SubscriptionManagerError: Error, Equatable {
     case purchaseCancelled
     case purchaseFailed
     case verificationFailed
+    case noActiveSubscription
 }
 
 public final class SubscriptionManager {
@@ -85,6 +86,17 @@ public final class SubscriptionManager {
         @unknown default:
             throw SubscriptionManagerError.purchaseFailed
         }
+    }
+
+    /// Force-refreshes entitlements from Apple's servers (may prompt for Apple ID
+    /// sign-in), then returns the active worker-proxy subscription's
+    /// `originalTransactionId`. Throws `.noActiveSubscription` if none is found.
+    public func restore() async throws -> String {
+        try await AppStore.sync()
+        guard let id = await activeOriginalTransactionId() else {
+            throw SubscriptionManagerError.noActiveSubscription
+        }
+        return id
     }
 
     // MARK: - StoreKit → value-type mapping
