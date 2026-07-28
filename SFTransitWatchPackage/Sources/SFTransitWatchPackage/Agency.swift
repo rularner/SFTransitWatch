@@ -46,8 +46,9 @@ public struct Agency: Hashable, Codable, Identifiable, Sendable {
 }
 
 /// Parsing/formatting for the `enabled_agencies` UserDefault, which stores a
-/// comma-separated list of 511 agency codes (e.g. "SF,BA"). Empty / missing
-/// always falls back to Muni so we never query 511 with no agency.
+/// comma-separated list of 511 agency codes (e.g. "SF,BA"). Empty / missing /
+/// unparseable always falls back to every known agency so we never query 511
+/// with no agency enabled.
 public enum EnabledAgencies {
     public static let storageKey = "enabled_agencies"
     public static let `default`: String = Agency.known.map(\.code).joined(separator: ",")
@@ -57,7 +58,7 @@ public enum EnabledAgencies {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        return codes.isEmpty ? [Self.default] : codes
+        return codes.isEmpty ? Agency.known.map(\.code) : codes
     }
 
     public static func format(_ codes: [String]) -> String {

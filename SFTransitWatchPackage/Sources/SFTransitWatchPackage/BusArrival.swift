@@ -62,6 +62,14 @@ public struct BusArrival: Identifiable, Codable, Sendable {
             return "\(minutesAway) min"
         }
     }
+
+    /// Identifies the same physical arrival across repeated polls of the same
+    /// stop. `id` is a fresh `UUID()` per parse and can't be used for this —
+    /// two fetches of the same upcoming bus produce different `id`s but the
+    /// same route/arrivalTime.
+    public var stableIdentity: String {
+        "\(route)|\(arrivalTime.timeIntervalSince1970)"
+    }
 }
 
 public extension Array where Element == BusArrival {

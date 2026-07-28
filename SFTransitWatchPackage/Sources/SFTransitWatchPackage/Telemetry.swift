@@ -40,8 +40,16 @@ public final class Telemetry: @unchecked Sendable {
     private let queue = DispatchQueue(label: "org.larner.SFTransitWatch.telemetry")
     private let session: URLSession
     private let defaults: UserDefaults
-    private let token: String?
-    private let baseURL: String?
+    /// Closures, not stored values: `Telemetry.shared` is a long-lived
+    /// singleton, but the worker token/URL can be provisioned or cleared
+    /// (subscribe, unsubscribe, switch to a 511.org key) at any point during
+    /// that lifetime. Capturing them once at init meant `isEnabled` never
+    /// turned on after a later provision, and kept POSTing a revoked token
+    /// after a clear, until the app relaunched.
+    private let tokenProvider: () -> String?
+    private let baseURLProvider: () -> String?
+    private var token: String? { tokenProvider() }
+    private var baseURL: String? { baseURLProvider() }
     private let platform: String
     private let appVersion: String
     private let build: String
@@ -59,10 +67,6 @@ public final class Telemetry: @unchecked Sendable {
 
     public convenience init() {
         let info = Bundle.main.infoDictionary ?? [:]
-        let storedToken = ConfigurationManager.shared.workerToken
-        let storedBase = ConfigurationManager.shared.workerBaseURL
-        let token: String? = storedToken.isEmpty ? nil : storedToken
-        let baseURL: String? = storedBase.isEmpty ? nil : storedBase
         let appVersion = (info["CFBundleShortVersionString"] as? String) ?? "0"
         let build = (info["CFBundleVersion"] as? String) ?? "0"
         #if os(watchOS)
@@ -72,8 +76,14 @@ public final class Telemetry: @unchecked Sendable {
         #endif
         self.init(
             defaults: .standard,
-            token: token,
-            baseURL: baseURL,
+            tokenProvider: {
+                let stored = ConfigurationManager.shared.workerToken
+                return stored.isEmpty ? nil : stored
+            },
+            baseURLProvider: {
+                let stored = ConfigurationManager.shared.workerBaseURL
+                return stored.isEmpty ? nil : stored
+            },
             platform: platform,
             appVersion: appVersion,
             build: build,
@@ -81,7 +91,7 @@ public final class Telemetry: @unchecked Sendable {
         )
     }
 
-    public init(
+    public convenience init(
         defaults: UserDefaults,
         token: String?,
         baseURL: String?,
@@ -90,9 +100,29 @@ public final class Telemetry: @unchecked Sendable {
         build: String,
         session: URLSession = .shared
     ) {
+        self.init(
+            defaults: defaults,
+            tokenProvider: { token },
+            baseURLProvider: { baseURL },
+            platform: platform,
+            appVersion: appVersion,
+            build: build,
+            session: session
+        )
+    }
+
+    private init(
+        defaults: UserDefaults,
+        tokenProvider: @escaping () -> String?,
+        baseURLProvider: @escaping () -> String?,
+        platform: String,
+        appVersion: String,
+        build: String,
+        session: URLSession
+    ) {
         self.defaults = defaults
-        self.token = token
-        self.baseURL = baseURL
+        self.tokenProvider = tokenProvider
+        self.baseURLProvider = baseURLProvider
         self.platform = platform
         self.appVersion = appVersion
         self.build = build
@@ -167,8 +197,12 @@ public final class Telemetry: @unchecked Sendable {
     }
 
     private func flushLocked() {
-        guard isEnabled, !flushInFlight, !buffer.isEmpty else { return }
-        guard let url = URL(string: "\(baseURL!)/log") else { return }
+        // Snapshot once per attempt rather than re-reading the (live) token/baseURL
+        // property multiple times below, so a config change mid-flush can't race
+        // between the nil-check and the force-unwrap use.
+        guard let token, !token.isEmpty, let baseURL, !baseURL.isEmpty else { return }
+        guard !flushInFlight, !buffer.isEmpty else { return }
+        guard let url = URL(string: "\(baseURL)/log") else { return }
         let snapshot = buffer
         flushInFlight = true
 
