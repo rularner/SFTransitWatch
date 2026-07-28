@@ -18,6 +18,8 @@ struct SettingsView: View {
     @State private var hasActiveSubscription = false
     @State private var isSubscribing = false
     @State private var subscribeError: String?
+    @State private var isRestoring = false
+    @State private var restoreError: String?
     @State private var subscriptionTiers: [SubscriptionDisplayInfo] = []
     private let subscriptionManager = SubscriptionManager()
     private let provisionService = SelfProvisionService.makeFromBundle()
@@ -69,7 +71,7 @@ struct SettingsView: View {
 
             Section(
                 header: Text("Worker proxy (optional)"),
-                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…, or subscribe to connect automatically. Leave blank to call 511.org directly with your own API key.")
+                footer: Text("Routes API calls through a Cloudflare Worker (yours or a family-shared one) instead of calling 511.org directly. Configure by opening a worker bootstrap link of the form sftransitwatch://wt?u=…&c=…, or subscribe to connect automatically. Leave blank to call 511.org directly with your own API key. Already subscribed on another device? Tap Restore Purchases below to reconnect.")
             ) {
                 if ConfigurationManager.shared.isWorkerConfigured {
                     HStack {
@@ -97,7 +99,9 @@ struct SettingsView: View {
                     PaywallView(
                         tiers: subscriptionTiers,
                         isPurchasing: isSubscribing,
-                        onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } }
+                        onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } },
+                        isRestoring: isRestoring,
+                        onRestore: { Task { await handleRestore() } }
                     )
                 }
             }
@@ -317,6 +321,14 @@ struct SettingsView: View {
         } message: {
             Text(subscribeError ?? "")
         }
+        .alert("Restore Purchases", isPresented: Binding(
+            get: { restoreError != nil },
+            set: { if !$0 { restoreError = nil } }
+        )) {
+            Button("OK") { restoreError = nil }
+        } message: {
+            Text(restoreError ?? "")
+        }
         .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
     }
     
@@ -379,6 +391,26 @@ struct SettingsView: View {
             // user cancelled, no error shown
         } catch {
             subscribeError = "Could not complete the subscription purchase. Check your internet connection and try again."
+        }
+    }
+
+    private func handleRestore() async {
+        guard let service = provisionService else { return }
+        isRestoring = true
+        defer { isRestoring = false }
+        do {
+            let originalTransactionId = try await subscriptionManager.restore()
+            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            switch result {
+            case .success:
+                hasActiveSubscription = true
+            case .failure:
+                restoreError = "Could not connect to the transit server. Check your internet connection and try again."
+            }
+        } catch SubscriptionManagerError.noActiveSubscription {
+            restoreError = "No active subscription found for this Apple ID."
+        } catch {
+            restoreError = "Could not restore your purchase. Check your internet connection and try again."
         }
     }
 }
