@@ -5,13 +5,25 @@ public struct SetupView: View {
     let tiers: [SubscriptionDisplayInfo]
     let isPurchasing: Bool
     let onSubscribe: (String) -> Void
+    let isRestoring: Bool
+    let onRestore: () -> Void
     let onUseKey: () -> Void
 
-    public init(canSubscribe: Bool, tiers: [SubscriptionDisplayInfo], isPurchasing: Bool, onSubscribe: @escaping (String) -> Void, onUseKey: @escaping () -> Void) {
+    public init(
+        canSubscribe: Bool,
+        tiers: [SubscriptionDisplayInfo],
+        isPurchasing: Bool,
+        onSubscribe: @escaping (String) -> Void,
+        isRestoring: Bool,
+        onRestore: @escaping () -> Void,
+        onUseKey: @escaping () -> Void
+    ) {
         self.canSubscribe = canSubscribe
         self.tiers = tiers
         self.isPurchasing = isPurchasing
         self.onSubscribe = onSubscribe
+        self.isRestoring = isRestoring
+        self.onRestore = onRestore
         self.onUseKey = onUseKey
     }
 
@@ -38,7 +50,7 @@ public struct SetupView: View {
 
                 VStack(spacing: 12) {
                     if canSubscribe {
-                        PaywallView(tiers: tiers, isPurchasing: isPurchasing, onSubscribe: onSubscribe)
+                        PaywallView(tiers: tiers, isPurchasing: isPurchasing, onSubscribe: onSubscribe, isRestoring: isRestoring, onRestore: onRestore)
                     }
 
                     VStack(spacing: 4) {
@@ -64,11 +76,13 @@ public struct SetupView: View {
         tiers: [SubscriptionDisplayInfo(productID: "monthly", displayName: "Monthly", displayPrice: "$1.99", periodLabel: "month", introOffer: nil)],
         isPurchasing: false,
         onSubscribe: { _ in },
+        isRestoring: false,
+        onRestore: {},
         onUseKey: {}
     )
 }
 
 #Preview("No subscription") {
-    SetupView(canSubscribe: false, tiers: [], isPurchasing: false, onSubscribe: { _ in }, onUseKey: {})
+    SetupView(canSubscribe: false, tiers: [], isPurchasing: false, onSubscribe: { _ in }, isRestoring: false, onRestore: {}, onUseKey: {})
 }
 #endif

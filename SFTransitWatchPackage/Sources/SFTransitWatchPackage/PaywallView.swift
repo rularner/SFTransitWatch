@@ -11,13 +11,23 @@ public struct PaywallView: View {
     private let tiers: [SubscriptionDisplayInfo]
     private let isPurchasing: Bool
     private let onSubscribe: (String) -> Void
+    private let isRestoring: Bool
+    private let onRestore: () -> Void
 
     @State private var selectedProductID: String?
 
-    public init(tiers: [SubscriptionDisplayInfo], isPurchasing: Bool, onSubscribe: @escaping (String) -> Void) {
+    public init(
+        tiers: [SubscriptionDisplayInfo],
+        isPurchasing: Bool,
+        onSubscribe: @escaping (String) -> Void,
+        isRestoring: Bool,
+        onRestore: @escaping () -> Void
+    ) {
         self.tiers = tiers
         self.isPurchasing = isPurchasing
         self.onSubscribe = onSubscribe
+        self.isRestoring = isRestoring
+        self.onRestore = onRestore
     }
 
     private var selectedTier: SubscriptionDisplayInfo? {
@@ -52,6 +62,12 @@ public struct PaywallView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
+
+                Button(isRestoring ? "Restoring…" : "Restore Purchases") {
+                    onRestore()
+                }
+                .buttonStyle(.bordered)
+                .disabled(isPurchasing || isRestoring)
 
                 legalLinks
             }
@@ -128,7 +144,9 @@ public struct PaywallView: View {
     PaywallView(
         tiers: [SubscriptionDisplayInfo(productID: "monthly", displayName: "Monthly", displayPrice: "$1.99", periodLabel: "month", introOffer: nil)],
         isPurchasing: false,
-        onSubscribe: { _ in }
+        onSubscribe: { _ in },
+        isRestoring: false,
+        onRestore: {}
     )
     .padding()
 }
@@ -141,13 +159,15 @@ public struct PaywallView: View {
             SubscriptionDisplayInfo(productID: "yearly", displayName: "Yearly", displayPrice: "$19.99", periodLabel: "year", introOffer: nil),
         ],
         isPurchasing: false,
-        onSubscribe: { _ in }
+        onSubscribe: { _ in },
+        isRestoring: false,
+        onRestore: {}
     )
     .padding()
 }
 
 #Preview("Loading") {
-    PaywallView(tiers: [], isPurchasing: false, onSubscribe: { _ in })
+    PaywallView(tiers: [], isPurchasing: false, onSubscribe: { _ in }, isRestoring: false, onRestore: {})
         .padding()
 }
 #endif
