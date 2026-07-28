@@ -28,6 +28,18 @@ final class SubscriptionManagerTests: XCTestCase {
         XCTAssertNil(result)
     }
 
+    func testRestoreThrowsNoActiveSubscriptionWhenNoneExists() async {
+        let manager = SubscriptionManager()
+        do {
+            _ = try await manager.restore()
+            XCTFail("Expected restore() to throw noActiveSubscription")
+        } catch SubscriptionManagerError.noActiveSubscription {
+            // expected
+        } catch {
+            XCTFail("Expected noActiveSubscription, got \(error)")
+        }
+    }
+
     // Known issue: Product.products(for:) returns productNotFound unless the SFTransitWatch
     // scheme's Test action StoreKit Configuration is set to WorkerProxySubscription.storekit.
     // These stay skipped until that scheme setting is applied (see CLAUDE.md / README).
