@@ -4,10 +4,7 @@ Bugs:
 Code review 2026-07-12 (full app + worker; verified findings):
   Correctness / user-visible — remaining:
   - Worker SIRI DirectionRef carries GTFS-RT codes "IB"/"OB" (or "" when direction_id absent); siri.ts:19 + TransitCodecs.swift:191 display it verbatim as the arrival destination — blank or "IB"/"OB" shown instead of a headsign, opposite directions indistinguishable. Deeper: pass headsign/destination through the snapshot->SIRI translation.
-  - BusArrivalView.swift:238 "arriving soon" haptic dedupes on BusArrival.id, but id = fresh UUID() per parse (BusArrival.swift:4), so the haptic re-fires every 30s refresh for the same bus and notifiedArrivalIDs grows unbounded. Fix: derive a stable identity (route+stop+arrivalTime).
   - NearbyFavoritesWidget is unreachable: @main is on the single SFTransitComplicationWidget with no WidgetBundle, and ComplicationUpdater.updateNearby has zero callers. Register it in a WidgetBundle (or delete) — see quick-win "watch complication for nearest stop".
-  - Telemetry.shared (Telemetry.swift:62) captures workerToken/workerBaseURL once (let) at first access; isEnabled and the POST token never reflect later provisioning or clearing until relaunch (also keeps POSTing a revoked token after clear). Fix: read config live.
-  - Agency.swift:60 EnabledAgencies.parse falls back to [Self.default] where default is the comma-joined "SF,BA,AC,..." string, so a stored "," / whitespace value yields a single bogus "agency code" that matches no Agency and disables all agencies. Fix: fall back to the parsed known list.
   - WatchSession.swift:58 phone-synced key stored in a second store (UserDefaults.standard "511_API_KEY_FROM_PHONE") that TransitAPI.resolvedKey:30 ranks above the app-group key watch Settings edits — clearing/editing the key in watch Settings leaves the stale phone copy winning. Fix: single canonical store.
   - WatchSession.swift:20 / PhoneSession.swift:56 UserDefaults.didChangeNotification observers (object: nil) fire on every write from any suite (ComplicationUpdater writes ~every 30s), generating echoing WatchConnectivity context traffic. Fix: scope observation / debounce / suppress self-writes.
 
@@ -39,10 +36,6 @@ Privacy / compliance:
 
 Quick wins (polish / watch-phone parity):
   - Watch complication to show next bus to nearest stop
-  - Add configuration for minimum time-to-stop for morning and evening
-  - Add early/late times for morning and evening
-  - Add ability to disable alerts
-  - Add detection of at stop to disable that stop's alerts for rest of day
   - Add MUNI metro line colors to phone BusArrivalRow (watch has J/K/L/M/N/T/F/S colors; phone uses generic hash fallback)
   - Stop direction not obvious in list, not easy using voice
   - tag only works on comments, not PR names. But we only validate PR names. Fix that.
