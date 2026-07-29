@@ -36,7 +36,7 @@ final class SubscriptionManagerTests: XCTestCase {
     // Sandbox Apple ID signed into the simulator) is a hypothesis, not confirmed.
     // Skipped until that's root-caused, or Apple's StoreKitTest support improves.
     func testRestoreThrowsNoActiveSubscriptionWhenNoneExists() async throws {
-        try XCTSkipIf(true, "AppStore.sync() blocks indefinitely under SKTestSession without a signed-in Sandbox tester.")
+        try XCTSkipIf(true, "AppStore.sync() blocks indefinitely under SKTestSession in this environment (exact trigger unconfirmed).")
 
         let manager = SubscriptionManager()
         do {

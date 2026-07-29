@@ -54,7 +54,7 @@ public struct PaywallView: View {
                     if let id = selectedTier?.productID { onSubscribe(id) }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isPurchasing || selectedTier == nil)
+                .disabled(isPurchasing || isRestoring || selectedTier == nil)
 
                 if let tier = selectedTier {
                     Text(tier.autoRenewalDisclosure)
