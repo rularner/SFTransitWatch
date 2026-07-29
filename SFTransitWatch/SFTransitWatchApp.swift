@@ -66,6 +66,14 @@ struct SFTransitWatchApp: App {
                                 : await subscriptionManager.loadDisplayInfo()
                         }
                     }
+                    .alert("Restore Purchases", isPresented: Binding(
+                        get: { restoreError != nil },
+                        set: { if !$0 { restoreError = nil } }
+                    )) {
+                        Button("OK") { restoreError = nil }
+                    } message: {
+                        Text(restoreError ?? "")
+                    }
                 }
                 // 511.org key entry fallback
                 .sheet(isPresented: $showingKeyEntry) {
@@ -86,14 +94,6 @@ struct SFTransitWatchApp: App {
                     Button("Cancel", role: .cancel) { provisionError = nil }
                 } message: {
                     Text(provisionError ?? "")
-                }
-                .alert("Restore Purchases", isPresented: Binding(
-                    get: { restoreError != nil },
-                    set: { if !$0 { restoreError = nil } }
-                )) {
-                    Button("OK") { restoreError = nil }
-                } message: {
-                    Text(restoreError ?? "")
                 }
                 // Existing deep-link worker bootstrap dialog
                 .confirmationDialog(
