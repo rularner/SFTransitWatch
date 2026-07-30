@@ -29,7 +29,11 @@ public struct RouteFilterPill: View {
                 .fontWeight(isSelected ? .semibold : .regular)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
+#if os(macOS)
+                .background(isSelected ? Color.accentColor : Color.gray.opacity(0.2))
+#else
                 .background(isSelected ? Color.accentColor : Color(.systemGray5))
+#endif
                 .foregroundColor(isSelected ? .white : .secondary)
                 .clipShape(Capsule())
 #endif

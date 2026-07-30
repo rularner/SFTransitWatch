@@ -75,7 +75,9 @@ public struct CommuteSlotPickerView: View {
                 }
             }
             .navigationTitle("\(slot.displayName) Stop")
+            #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
 }
