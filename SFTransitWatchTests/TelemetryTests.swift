@@ -89,4 +89,28 @@ final class TelemetryTests: XCTestCase {
         XCTAssertEqual(event.kind, "fetch_outcome")
         XCTAssertEqual(event.cacheStatus, "HIT")
     }
+
+    // MARK: - Live config (regression: token/baseURL used to be captured once
+    // at init, so provisioning after first access never turned telemetry on,
+    // and clearing config left it POSTing a revoked token until relaunch).
+
+    func testIsEnabledReflectsProvisioningAfterConstruction() {
+        ConfigurationManager.shared.clearWorkerConfig()
+        let t = Telemetry()
+        XCTAssertFalse(t.isEnabled, "should be disabled with no worker config")
+
+        ConfigurationManager.shared.setWorkerConfig(url: "https://worker.example.com", token: "live-token")
+        XCTAssertTrue(t.isEnabled, "should turn on once config is provisioned, without recreating Telemetry")
+
+        ConfigurationManager.shared.clearWorkerConfig()
+    }
+
+    func testIsEnabledReflectsClearingAfterConstruction() {
+        ConfigurationManager.shared.setWorkerConfig(url: "https://worker.example.com", token: "live-token")
+        let t = Telemetry()
+        XCTAssertTrue(t.isEnabled, "should be enabled with worker config already present")
+
+        ConfigurationManager.shared.clearWorkerConfig()
+        XCTAssertFalse(t.isEnabled, "should turn off once config is cleared, without recreating Telemetry")
+    }
 }

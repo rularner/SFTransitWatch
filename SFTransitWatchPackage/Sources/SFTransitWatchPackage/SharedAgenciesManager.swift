@@ -15,11 +15,7 @@ public class SharedAgenciesManager: ObservableObject {
         let ud = userDefaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
         self.userDefaults = ud
         let stored = ud.string(forKey: EnabledAgencies.storageKey) ?? ""
-        if stored.isEmpty {
-            self.enabledCodes = Set(Agency.known.map(\.code))
-        } else {
-            self.enabledCodes = Set(EnabledAgencies.parse(stored))
-        }
+        self.enabledCodes = Set(EnabledAgencies.parse(stored))
         NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification,
             object: nil,
@@ -31,7 +27,7 @@ public class SharedAgenciesManager: ObservableObject {
 
     private func reloadFromDefaults() {
         let stored = userDefaults.string(forKey: EnabledAgencies.storageKey) ?? ""
-        let newCodes = stored.isEmpty ? Set(Agency.known.map(\.code)) : Set(EnabledAgencies.parse(stored))
+        let newCodes = Set(EnabledAgencies.parse(stored))
         if newCodes != enabledCodes { enabledCodes = newCodes }
     }
 

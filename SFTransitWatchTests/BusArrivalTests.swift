@@ -328,4 +328,37 @@ final class BusArrivalTests: XCTestCase {
         XCTAssertEqual(decoded.onwardStops.count, 1)
         XCTAssertEqual(decoded.onwardStops[0].id, "X")
     }
+
+    // MARK: - stableIdentity
+
+    /// Regression: `id` is a fresh UUID() per parse, so two independent
+    /// parses of the same real-world arrival (e.g. two 30s polls of the same
+    /// stop) must not be treated as different arrivals by dedup logic.
+    func testStableIdentityMatchesAcrossIndependentParsesOfSameArrival() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = BusArrival(route: "38", destination: "Downtown",
+                                arrivalTime: now.addingTimeInterval(90), now: now)
+        let second = BusArrival(route: "38", destination: "Downtown",
+                                 arrivalTime: now.addingTimeInterval(90), now: now)
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertEqual(first.stableIdentity, second.stableIdentity)
+    }
+
+    func testStableIdentityDiffersForDifferentRoutes() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let a = BusArrival(route: "38", destination: "Downtown",
+                            arrivalTime: now.addingTimeInterval(90), now: now)
+        let b = BusArrival(route: "5", destination: "Downtown",
+                            arrivalTime: now.addingTimeInterval(90), now: now)
+        XCTAssertNotEqual(a.stableIdentity, b.stableIdentity)
+    }
+
+    func testStableIdentityDiffersForDifferentArrivalTimes() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let a = BusArrival(route: "38", destination: "Downtown",
+                            arrivalTime: now.addingTimeInterval(90), now: now)
+        let b = BusArrival(route: "38", destination: "Downtown",
+                            arrivalTime: now.addingTimeInterval(120), now: now)
+        XCTAssertNotEqual(a.stableIdentity, b.stableIdentity)
+    }
 }

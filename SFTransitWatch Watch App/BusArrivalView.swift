@@ -13,7 +13,7 @@ struct BusArrivalView: View {
     @State private var arrivals: [BusArrival] = []
     @State private var lastUpdated = Date()
     @StateObject private var countdown = RefreshCountdown(interval: BusArrivalView.refreshInterval)
-    @State private var notifiedArrivalIDs: Set<UUID> = []
+    @State private var notifiedArrivalIDs: Set<String> = []
     @State private var selectedRoute: String? = nil
     @State private var showCommutePrompt = false
     @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
@@ -235,8 +235,8 @@ struct BusArrivalView: View {
 
     private func fireHapticsIfNeeded() {
         for arrival in arrivals where arrival.minutesAway <= 2 {
-            guard !notifiedArrivalIDs.contains(arrival.id) else { continue }
-            notifiedArrivalIDs.insert(arrival.id)
+            guard !notifiedArrivalIDs.contains(arrival.stableIdentity) else { continue }
+            notifiedArrivalIDs.insert(arrival.stableIdentity)
             WKInterfaceDevice.current().play(.notification)
         }
     }
