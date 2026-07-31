@@ -204,3 +204,4 @@ CloudflareWorker/*.tsbuildinfo
 CloudflareWorker/.wrangler.generated.jsonc
 .mcp.json
 ExportOptions.plist
+.wrangler

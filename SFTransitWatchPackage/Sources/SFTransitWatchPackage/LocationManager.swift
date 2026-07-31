@@ -8,14 +8,21 @@ public class LocationManager: NSObject, ObservableObject {
     @Published public var currentLocation: CLLocation?
     @Published public var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published public var isLocationEnabled = false
+    // Heading (compass) is only available on iOS/watchOS. The macOS build of this
+    // package exists purely so `swift test` can run the logic tests on the host,
+    // so heading is compiled out there. CLHeading itself doesn't exist on macOS.
+    #if !os(macOS)
     @Published public var currentHeading: CLHeading?
+    #endif
 
     public override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 10
+        #if !os(macOS)
         locationManager.headingFilter = 5
+        #endif
 
         if SnapshotMode.isActive {
             currentLocation = SnapshotMode.fixedLocation
@@ -27,23 +34,35 @@ public class LocationManager: NSObject, ObservableObject {
         locationManager.requestWhenInUseAuthorization()
     }
 
+    private var isAuthorized: Bool {
+        #if os(macOS)
+        return authorizationStatus == .authorizedAlways
+        #else
+        return authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
+        #endif
+    }
+
     public func startLocationUpdates() {
         if SnapshotMode.isActive {
             currentLocation = SnapshotMode.fixedLocation
             return
         }
-        guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
+        guard isAuthorized else {
             requestLocationPermission()
             return
         }
         locationManager.startUpdatingLocation()
+        #if !os(macOS)
         locationManager.startUpdatingHeading()
+        #endif
         isLocationEnabled = true
     }
 
     public func stopLocationUpdates() {
         locationManager.stopUpdatingLocation()
+        #if !os(macOS)
         locationManager.stopUpdatingHeading()
+        #endif
         isLocationEnabled = false
     }
 }
@@ -63,22 +82,19 @@ extension LocationManager: CLLocationManagerDelegate {
     public nonisolated func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         Task { @MainActor in
             authorizationStatus = status
-            switch status {
-            case .authorizedWhenInUse, .authorizedAlways:
+            if isAuthorized {
                 startLocationUpdates()
-            case .denied, .restricted:
+            } else if status == .denied || status == .restricted {
                 isLocationEnabled = false
-            case .notDetermined:
-                break
-            @unknown default:
-                break
             }
         }
     }
 
+    #if !os(macOS)
     public nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         Task { @MainActor in
             currentHeading = newHeading
         }
     }
+    #endif
 }
