@@ -97,7 +97,9 @@ struct SettingsView: View {
                     PaywallView(
                         tiers: subscriptionTiers,
                         isPurchasing: isSubscribing,
-                        onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } }
+                        onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } },
+                        isRestoring: false,
+                        onRestore: {}
                     )
                 }
             }

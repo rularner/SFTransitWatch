@@ -57,6 +57,8 @@ struct SFTransitWatchApp: App {
                         tiers: subscriptionTiers,
                         isPurchasing: isPurchasing,
                         onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } },
+                        isRestoring: false,
+                        onRestore: {},
                         onUseKey: {
                             pendingKeyEntry = true
                             showingSetup = false
