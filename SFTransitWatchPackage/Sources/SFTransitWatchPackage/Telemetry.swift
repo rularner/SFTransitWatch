@@ -76,13 +76,23 @@ public final class Telemetry: @unchecked Sendable {
         #endif
         self.init(
             defaults: .standard,
+            // Read ConfigurationManager on the main thread even when called from
+            // Telemetry's background queue: hitting the app-group UserDefaults
+            // suite for the first time off-main during the earliest, most fragile
+            // window of app launch is suspected of stalling XCTest's hosted-test
+            // bootstrap handshake on this simulator (see watchos-hang-reapply
+            // investigation, 2026-07-31).
             tokenProvider: {
-                let stored = ConfigurationManager.shared.workerToken
-                return stored.isEmpty ? nil : stored
+                Self.onMain {
+                    let stored = ConfigurationManager.shared.workerToken
+                    return stored.isEmpty ? nil : stored
+                }
             },
             baseURLProvider: {
-                let stored = ConfigurationManager.shared.workerBaseURL
-                return stored.isEmpty ? nil : stored
+                Self.onMain {
+                    let stored = ConfigurationManager.shared.workerBaseURL
+                    return stored.isEmpty ? nil : stored
+                }
             },
             platform: platform,
             appVersion: appVersion,
@@ -252,6 +262,13 @@ public final class Telemetry: @unchecked Sendable {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.string(from: Date())
+    }
+
+    private static func onMain<T>(_ body: () -> T) -> T {
+        if Thread.isMainThread {
+            return body()
+        }
+        return DispatchQueue.main.sync(execute: body)
     }
 }
 
