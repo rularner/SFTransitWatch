@@ -2,12 +2,16 @@ import Foundation
 @testable import SFTransitWatch_Watch_App
 
 class MockURLSession: URLSessionProtocol {
-    var requests: [URLRequest] = []
+    // `data(for:)` is called concurrently by tests that fan out one request per
+    // agency (e.g. searchStops via withTaskGroup) — an unsynchronized array append
+    // there is a data race that silently drops requests under real concurrency.
+    private let lock = NSLock()
+    private var _requests: [URLRequest] = []
     var responses: [URL: (data: Data, response: HTTPURLResponse)] = [:]
     var errors: [URL: Error] = [:]
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        requests.append(request)
+        lock.withLock { _requests.append(request) }
 
         guard let url = request.url else {
             throw URLError(.badURL)
@@ -50,15 +54,15 @@ class MockURLSession: URLSessionProtocol {
     }
 
     func lastRequest() -> URLRequest? {
-        return requests.last
+        lock.withLock { _requests.last }
     }
 
     func requestCount() -> Int {
-        return requests.count
+        lock.withLock { _requests.count }
     }
 
     func clearHistory() {
-        requests.removeAll()
+        lock.withLock { _requests.removeAll() }
         responses.removeAll()
         errors.removeAll()
     }

@@ -8,6 +8,10 @@ let package = Package(
     platforms: [
         .iOS(.v17),
         .watchOS(.v10),
+        // macOS is not a shipping target — it exists so `swift test` can run the
+        // package's logic tests on the host without a simulator (CI runs them
+        // this way to avoid the flaky watchOS app-hosted test runner).
+        .macOS(.v14),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.

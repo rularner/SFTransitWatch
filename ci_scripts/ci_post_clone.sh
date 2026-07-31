@@ -19,6 +19,16 @@ if [ -z "${CI_PRIMARY_REPOSITORY_PATH:-}" ]; then
   exit 0
 fi
 
+# Run the package's logic-test suite via `swift test` (no simulator) rather than
+# relying on the "SFTransitWatch Watch App" scheme's watchOS-hosted test action,
+# which hangs intermittently on Xcode Cloud's watchOS simulator ("The test runner
+# hung before establishing connection." / "unknown to FrontBoard") — confirmed to
+# be a CI-environment issue, not app code (same tests pass locally every time).
+# Fails the whole CI action (set -e) if package logic is actually broken, same as
+# a normal test-action failure would.
+echo "=== Running SFTransitWatchPackage tests (swift test, no simulator) ==="
+(cd "${CI_PRIMARY_REPOSITORY_PATH}/SFTransitWatchPackage" && swift test)
+
 XCCONFIG="${CI_PRIMARY_REPOSITORY_PATH}/Config.xcconfig"
 
 if [ -z "${CI_BUILD_NUMBER:-}" ]; then

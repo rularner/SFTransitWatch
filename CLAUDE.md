@@ -91,16 +91,20 @@ Use the `SFTransitWatch Watch App` scheme with an Apple Watch SE 3 (44mm) watchO
 
 ```
 scheme: SFTransitWatch Watch App
-destination: platform=watchOS Simulator,id=BE4F30CB-89F7-45F5-A868-A250522FB4E0
+destination: platform=watchOS Simulator,id=F61E6E7E-4F34-4819-BA66-B3F716E5BF0E
 code_signing_allowed_no: true
 ```
 
 Or raw xcodebuild:
 ```bash
 xcodebuild test -scheme 'SFTransitWatch Watch App' \
-  -destination 'platform=watchOS Simulator,id=BE4F30CB-89F7-45F5-A868-A250522FB4E0' \
+  -destination 'platform=watchOS Simulator,id=F61E6E7E-4F34-4819-BA66-B3F716E5BF0E' \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
 ```
+
+> UDID drifts whenever Xcode/simulator runtimes are reinstalled or updated — if this
+> stops matching, run `xcrun simctl list devices` and look for "Apple Watch SE 3
+> (44mm)" under the current watchOS runtime.
 
 No special signing setup required — all tests pass with default simulator signing.
 
