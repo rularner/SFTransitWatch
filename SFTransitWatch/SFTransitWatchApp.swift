@@ -12,6 +12,8 @@ struct SFTransitWatchApp: App {
     @State private var provisionError: String?
     @State private var subscriptionTiers: [SubscriptionDisplayInfo] = []
     @State private var isPurchasing = false
+    @State private var isRestoring = false
+    @State private var restoreError: String?
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var slotsManager = CommuteSlotsManager()
     private let provisionService = SelfProvisionService.makeFromBundle()
@@ -50,8 +52,8 @@ struct SFTransitWatchApp: App {
                         tiers: subscriptionTiers,
                         isPurchasing: isPurchasing,
                         onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } },
-                        isRestoring: false,
-                        onRestore: {},
+                        isRestoring: isRestoring,
+                        onRestore: { Task { await handleRestore() } },
                         onUseKey: {
                             pendingKeyEntry = true
                             showingSetup = false
@@ -63,6 +65,14 @@ struct SFTransitWatchApp: App {
                                 ? SnapshotMode.subscriptionTiers
                                 : await subscriptionManager.loadDisplayInfo()
                         }
+                    }
+                    .alert("Restore Purchases", isPresented: Binding(
+                        get: { restoreError != nil },
+                        set: { if !$0 { restoreError = nil } }
+                    )) {
+                        Button("OK") { restoreError = nil }
+                    } message: {
+                        Text(restoreError ?? "")
                     }
                 }
                 // 511.org key entry fallback
@@ -142,6 +152,26 @@ struct SFTransitWatchApp: App {
         } catch {
             showingSetup = false
             provisionError = "Could not complete the subscription purchase. Check your internet connection and try again."
+        }
+    }
+
+    private func handleRestore() async {
+        guard let service = provisionService else { return }
+        isRestoring = true
+        defer { isRestoring = false }
+        do {
+            let originalTransactionId = try await subscriptionManager.restore()
+            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            switch result {
+            case .success:
+                showingSetup = false
+            case .failure:
+                restoreError = "Could not connect to the transit server. Check your internet connection and try again."
+            }
+        } catch SubscriptionManagerError.noActiveSubscription {
+            restoreError = "No active subscription found for this Apple ID."
+        } catch {
+            restoreError = "Could not restore your purchase. Check your internet connection and try again."
         }
     }
 
