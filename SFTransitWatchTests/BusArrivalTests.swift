@@ -309,6 +309,100 @@ final class BusArrivalTests: XCTestCase {
         XCTAssertEqual(arrivals?.first?.onwardStops[0].name, "Ferry Building")
     }
 
+    // MARK: - TransitJSON DirectionRef labeling
+
+    func testDecodeArrivalsMapsIBToInbound() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "IB",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Inbound")
+    }
+
+    func testDecodeArrivalsMapsOBToOutbound() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "OB",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Outbound")
+    }
+
+    func testDecodeArrivalsMapsEmptyDirectionRefToUnknownDirection() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Unknown direction")
+    }
+
+    func testDecodeArrivalsPassesThroughOther511DirectionRefCodes() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "N",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "N")
+    }
+
     func testBusArrivalRoundTrips() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let stop = OnwardStop(id: "X", name: "Stop X",
