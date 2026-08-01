@@ -55,4 +55,22 @@ describe("buildArrivalsIndex", () => {
     expect(idx["SF"]["A"][0].expectedArrival).toBe(500);
     expect(idx["SF"]["B"]).toBeUndefined();
   });
+
+  it("caps onward stops at MAX_ONWARD_STOPS instead of the full remaining trip", () => {
+    const manyStops: TripUpdateEntity = {
+      tripId: "t4", routeId: "SF:1", directionId: 1, vehicleId: "9999",
+      stopTimeUpdates: Array.from({ length: 25 }, (_, i) => ({
+        stopSequence: i + 1,
+        stopId: `stop-${i + 1}`,
+        arrivalTime: 1000 + i * 60,
+      })),
+    };
+    const idx = buildArrivalsIndex([manyStops]);
+    // 25 stops total, so the first stop has 24 possible onward stops — must be capped.
+    expect(idx["SF"]["stop-1"][0].onward.length).toBe(15);
+    expect(idx["SF"]["stop-1"][0].onward[0]).toEqual({ stopId: "stop-2", time: 1060 });
+    expect(idx["SF"]["stop-1"][0].onward[14]).toEqual({ stopId: "stop-16", time: 1000 + 15 * 60 });
+    // A stop near the end of the trip has fewer than 15 remaining — must not pad or error.
+    expect(idx["SF"]["stop-20"][0].onward.length).toBe(5);
+  });
 });
