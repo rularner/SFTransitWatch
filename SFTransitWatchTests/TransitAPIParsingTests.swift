@@ -56,6 +56,38 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(arrivals[0].route, "38")
     }
 
+    /// Regression: the SIRI-XML fallback parser (used in direct-511 mode,
+    /// which the watch hits often) assigns `destination` from the raw
+    /// DirectionRef field. It must map through directionLabel, same as the
+    /// JSON decode path, so "IB"/"OB" never leak to the UI.
+    @MainActor
+    func testParseArrivalsWithValidXMLMapsDirectionRefToInbound() async {
+        let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ServiceDelivery>
+          <StopMonitoringDelivery>
+            <MonitoredStopVisit>
+              <MonitoredVehicleJourney>
+                <LineRef>38</LineRef>
+                <DirectionRef>IB</DirectionRef>
+                <MonitoredCall>
+                  <ExpectedDepartureTime>\(isoDate)</ExpectedDepartureTime>
+                </MonitoredCall>
+              </MonitoredVehicleJourney>
+            </MonitoredStopVisit>
+          </StopMonitoringDelivery>
+        </ServiceDelivery>
+        """.data(using: .utf8)!
+
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: xml)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertFalse(arrivals.isEmpty)
+        XCTAssertEqual(arrivals[0].destination, "Inbound")
+    }
+
     @MainActor
     func testParseArrivalsWithEmptyXML() async {
         let xml = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!

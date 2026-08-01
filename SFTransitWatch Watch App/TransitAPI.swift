@@ -311,7 +311,7 @@ class TransitAPI: ObservableObject {
             else { return nil }
             return BusArrival(
                 route: TransitJSON.cleanLineRef(route),
-                destination: destination,
+                destination: TransitJSON.directionLabel(destination),
                 arrivalTime: arrivalTime,
                 isRealTime: true,
                 alerts: alerts

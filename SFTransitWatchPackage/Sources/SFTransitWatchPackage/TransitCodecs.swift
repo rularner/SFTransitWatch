@@ -88,7 +88,7 @@ public enum TransitJSON {
             guard let rawTime, let arrivalTime = formatter.date(from: rawTime) else { return nil }
             let destination = journey.targetedCall.destinationDisplay
                 ?? journey.vehicleJourneyName
-                ?? journey.directionRef
+                ?? Self.directionLabel(journey.directionRef)
             return BusArrival(
                 route: cleanLineRef(journey.lineRef),
                 destination: destination,
