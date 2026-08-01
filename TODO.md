@@ -4,9 +4,8 @@ Bugs:
 
 Code review 2026-07-12 (full app + worker; verified findings):
   Correctness / user-visible — remaining:
-  - Worker SIRI DirectionRef carries GTFS-RT codes "IB"/"OB" (or "" when direction_id absent); siri.ts:19 + TransitCodecs.swift:191 display it verbatim as the arrival destination — blank or "IB"/"OB" shown instead of a headsign, opposite directions indistinguishable. Deeper: pass headsign/destination through the snapshot->SIRI translation.
-  - NearbyFavoritesWidget is unreachable: @main is on the single SFTransitComplicationWidget with no WidgetBundle, and ComplicationUpdater.updateNearby has zero callers. Register it in a WidgetBundle (or delete) — see quick-win "watch complication for nearest stop".
-  - WatchSession.swift:58 phone-synced key stored in a second store (UserDefaults.standard "511_API_KEY_FROM_PHONE") that TransitAPI.resolvedKey:30 ranks above the app-group key watch Settings edits — clearing/editing the key in watch Settings leaves the stale phone copy winning. Fix: single canonical store.
+  - [LIGHT FIX 2026-07-31] Worker SIRI DirectionRef "IB"/"OB"/"" now maps to "Inbound"/"Outbound"/"Unknown direction" for display (TransitCodecs.swift TransitJSON.directionLabel). Still no real headsign — two buses going opposite directions on the same route both just say "Inbound"/"Outbound", not a destination name. Deeper fix (unscoped): thread a headsign through the snapshot->SIRI translation, which requires a new worker-side data source (static GTFS trips.txt has no equivalent in the GTFS-RT feed this worker consumes).
+  - [PARTIAL FIX 2026-07-31] NearbyFavoritesWidget is now registered in a WidgetBundle (SFTransitWidgetBundle in ComplicationWidget.swift) and addable to a watch face. It still always shows unconfigured (bus icon) because ComplicationUpdater.updateNearby still has zero callers — see quick-win "watch complication for nearest stop" for wiring the actual nearest-favorite-stop lookup.
   - WatchSession.swift:20 / PhoneSession.swift:56 UserDefaults.didChangeNotification observers (object: nil) fire on every write from any suite (ComplicationUpdater writes ~every 30s), generating echoing WatchConnectivity context traffic. Fix: scope observation / debounce / suppress self-writes.
 
   Efficiency (watch requests / battery — this branch's theme):
