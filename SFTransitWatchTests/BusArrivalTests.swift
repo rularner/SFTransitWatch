@@ -309,6 +309,134 @@ final class BusArrivalTests: XCTestCase {
         XCTAssertEqual(arrivals?.first?.onwardStops[0].name, "Ferry Building")
     }
 
+    // MARK: - TransitJSON DirectionRef labeling
+
+    func testDecodeArrivalsMapsIBToInbound() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "IB",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Inbound")
+    }
+
+    func testDecodeArrivalsMapsOBToOutbound() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "OB",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Outbound")
+    }
+
+    func testDecodeArrivalsMapsEmptyDirectionRefToUnknownDirection() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Unknown direction")
+    }
+
+    func testDecodeArrivalsPassesThroughOther511DirectionRefCodes() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "SF:38",
+                  "DirectionRef": "N",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "N")
+    }
+
+    /// Regression: decodeScheduledDepartures's destination fallback chain
+    /// (DestinationDisplay ?? VehicleJourneyName ?? DirectionRef) must map
+    /// its raw-DirectionRef fallback through directionLabel, same as
+    /// decodeArrivals does, so "IB"/"OB" never leak to the UI when the
+    /// StopTimetable payload has no display text or journey name.
+    func testDecodeScheduledDeparturesMapsDirectionRefFallbackToInbound() {
+        let isoIn5min = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let json = """
+        {
+          "Siri": {
+            "ServiceDelivery": {
+              "StopTimetableDelivery": {
+                "TimetabledStopVisit": [
+                  {
+                    "MonitoringRef": "70021",
+                    "TargetedVehicleJourney": {
+                      "LineRef": "Local Weekday",
+                      "DirectionRef": "IB",
+                      "TargetedCall": {
+                        "AimedArrivalTime": "\(isoIn5min)"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeScheduledDepartures(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Inbound")
+    }
+
     func testBusArrivalRoundTrips() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let stop = OnwardStop(id: "X", name: "Stop X",

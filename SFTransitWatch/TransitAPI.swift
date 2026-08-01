@@ -378,7 +378,7 @@ class TransitAPI: ObservableObject {
                 if let arrivalTime = formatter.date(from: timeString) {
                     arrivals.append(BusArrival(
                         route: route,
-                        destination: destination,
+                        destination: TransitJSON.directionLabel(destination),
                         arrivalTime: arrivalTime,
                         isRealTime: true,
                         alerts: alerts
