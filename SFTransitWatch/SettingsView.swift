@@ -374,13 +374,22 @@ struct SettingsView: View {
         isSubscribing = true
         defer { isSubscribing = false }
         do {
-            let originalTransactionId: String
+            var originalTransactionId: String
+            var usedExistingEntitlement = false
             if let existing = await subscriptionManager.activeOriginalTransactionId() {
                 originalTransactionId = existing
+                usedExistingEntitlement = true
             } else {
                 originalTransactionId = try await subscriptionManager.purchase(productID: productID)
             }
-            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            var result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            if case .failure = result, usedExistingEntitlement {
+                // The cached entitlement didn't hold up server-side (e.g. it actually
+                // expired since the local check ran) — fall back to a real purchase
+                // instead of leaving the user stuck with no way to subscribe.
+                originalTransactionId = try await subscriptionManager.purchase(productID: productID)
+                result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            }
             switch result {
             case .success:
                 hasActiveSubscription = true

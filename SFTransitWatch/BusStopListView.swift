@@ -19,6 +19,13 @@ struct BusStopListView: View {
         return Agency.named(selectedAgencyRaw)
     }
 
+    /// True once CoreLocation has actually told us location is unusable (permission
+    /// denied/restricted). Before that — e.g. still waiting on the permission prompt
+    /// or the first fix — `currentLocation` is nil too, but that's not the same thing.
+    private var isLocationDenied: Bool {
+        locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted
+    }
+
     var body: some View {
         List {
             filterBanner
@@ -34,6 +41,8 @@ struct BusStopListView: View {
                     }
                     .listRowBackground(Color.clear)
                 }
+            } else if nearbyStops.isEmpty, locationManager.currentLocation == nil, !isLocationDenied {
+                loadingSection
             } else if nearbyStops.isEmpty {
                 locationPromptSection
             } else {
