@@ -12,9 +12,6 @@ extension URLSession: URLSessionProtocol {}
 @MainActor
 class TransitAPI: ObservableObject {
     private let defaultBaseURL = "https://api.511.org/transit"
-    @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
-    @AppStorage("511_API_KEY", store: UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName))
-    private var localAPIKey = ""
     @AppStorage("WORKER_TOKEN", store: UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName))
     private var workerToken = ""
 
@@ -27,11 +24,11 @@ class TransitAPI: ObservableObject {
     init() {}
 
     private var resolvedKey: String {
-        return phoneAPIKey.isEmpty ? localAPIKey : phoneAPIKey
+        return ConfigurationManager.shared.apiKey
     }
 
     private var hasUsableKey: Bool {
-        return !phoneAPIKey.isEmpty || !localAPIKey.isEmpty
+        return !ConfigurationManager.shared.apiKey.isEmpty
     }
 
     private var isDirect511Mode: Bool {
