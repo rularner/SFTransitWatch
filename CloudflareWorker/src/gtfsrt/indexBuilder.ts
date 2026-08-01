@@ -9,6 +9,14 @@ export interface Visit {
 }
 export type ArrivalsIndex = Record<string, Record<string, Visit[]>>;
 
+// Every current client asks for at most 10 onward stops (phone hardcodes
+// MaximumNumberOfCallsOnwards=10; watch omits the param and gets the worker's
+// own default of 10 in snapshot.ts). toStopMonitoringJson truncates to the
+// per-request value anyway (siri.ts), so computing the full remaining-trip
+// onward list here is pure wasted CPU on every refresh. 15 leaves headroom
+// above the only value any client actually sends.
+const MAX_ONWARD_STOPS = 15;
+
 export function splitAgency(routeId: string): { agency: string; line: string } {
   const i = routeId.indexOf(":");
   if (i === -1) return { agency: "", line: routeId };
@@ -32,7 +40,8 @@ export function buildArrivalsIndex(entities: TripUpdateEntity[]): ArrivalsIndex 
       const time = stu.arrivalTime ?? stu.departureTime;
       if (time === undefined) continue;
       const onward: { stopId: string; time: number }[] = [];
-      for (let j = i + 1; j < stus.length; j++) {
+      const jEnd = Math.min(stus.length, i + 1 + MAX_ONWARD_STOPS);
+      for (let j = i + 1; j < jEnd; j++) {
         const t = stus[j].arrivalTime ?? stus[j].departureTime;
         if (t !== undefined) onward.push({ stopId: stus[j].stopId, time: t });
       }
