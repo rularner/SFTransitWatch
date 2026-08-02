@@ -10,8 +10,8 @@ export interface Visit {
 export type ArrivalsIndex = Record<string, Record<string, Visit[]>>;
 
 // Every current client asks for at most 10 onward stops (phone hardcodes
-// MaximumNumberOfCallsOnwards=10; watch omits the param and gets the worker's
-// own default of 10 in snapshot.ts). toStopMonitoringJson truncates to the
+// MaximumNumberOfCallsOnwards=10; watch omits the param and gets the reader
+// Lambda's own default of 10 — see render.ts). toStopMonitoringJson truncates to the
 // per-request value anyway (siri.ts), so computing the full remaining-trip
 // onward list here is pure wasted CPU on every refresh. 15 leaves headroom
 // above the only value any client actually sends.

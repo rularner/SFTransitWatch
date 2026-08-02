@@ -2,8 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda
 import type { S3Client } from "@aws-sdk/client-s3";
 import { toStopMonitoringJson } from "../gtfsrt/siri";
 import { getSnapshotObject } from "../gtfsrt/s3Snapshot";
-import { decodeSnapshot, type StoredSnapshot } from "../gtfsrt/snapshotCodec";
-import { SNAPSHOT_KEY } from "../refresher/refresh";
+import { decodeSnapshot, SNAPSHOT_KEY, type StoredSnapshot } from "../gtfsrt/snapshotCodec";
 
 const LOCAL_CACHE_MS = 30_000;
 
@@ -34,16 +33,27 @@ export function createReader(
 
     const now = clock();
     if (cached === null || now - cachedAt >= LOCAL_CACHE_MS) {
-      const body = await getSnapshotObject(s3, bucket, SNAPSHOT_KEY);
-      cached = body === null ? null : decodeSnapshot(body);
-      cachedAt = now;
+      try {
+        const body = await getSnapshotObject(s3, bucket, SNAPSHOT_KEY);
+        cached = body === null ? null : decodeSnapshot(body);
+        cachedAt = now;
+      } catch (error) {
+        // Keep serving whatever `cached` already holds (possibly null, if this is the very
+        // first request) and deliberately don't update cachedAt — the next request retries
+        // immediately instead of waiting out the rest of the 30s window on a bad read.
+        console.error("GTFS-RT snapshot reload from S3 failed:", error);
+      }
     }
 
     const visits = cached?.index[agency]?.[stopCode] ?? [];
     const json = toStopMonitoringJson({ stopCode, visits, maxOnward, stopName: (id) => id });
+    const headers: Record<string, string> = { "content-type": "application/json; charset=utf-8" };
+    if (cached !== null) {
+      headers["x-snapshot-age-ms"] = String(Math.max(0, clock() - cached.fetchedAtMs));
+    }
     return {
       statusCode: 200,
-      headers: { "content-type": "application/json; charset=utf-8" },
+      headers,
       body: JSON.stringify(json),
     };
   };

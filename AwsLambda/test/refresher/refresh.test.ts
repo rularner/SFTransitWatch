@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { gzipSync } from "node:zlib";
 import type { S3Client } from "@aws-sdk/client-s3";
-import { refreshSnapshot, SNAPSHOT_KEY } from "../../src/refresher/refresh";
-import { decodeSnapshot } from "../../src/gtfsrt/snapshotCodec";
+import { refreshSnapshot } from "../../src/refresher/refresh";
+import { decodeSnapshot, SNAPSHOT_KEY } from "../../src/gtfsrt/snapshotCodec";
 import { writeVarint, writeField, writeLenField, writeStringField } from "../../src/gtfsrt/protobuf";
 
 function stopTimeEvent(t: number) { return writeField(2, 0, writeVarint(t)); }

@@ -72,6 +72,45 @@ describe("createReader", () => {
     expect(body.ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisit).toEqual([]);
   });
 
+  it("returns 200 with an empty visit list when S3 throws and there is no prior cache", async () => {
+    const s3 = { send: vi.fn(async () => { throw new Error("boom"); }) } as unknown as S3Client;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const reader = createReader(s3, "bucket", "secret");
+
+    const res = (await reader(event("agency=SF&stopCode=16393"))) as APIGatewayProxyStructuredResultV2;
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisit).toEqual([]);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("keeps serving previously-cached data when a later S3 reload throws", async () => {
+    let now = 1_000_000;
+    const send = vi.fn(async () => {
+      if (send.mock.calls.length === 1) {
+        return { Body: Readable.from([Buffer.from(encodeSnapshot(INDEX, Date.now()))]) };
+      }
+      throw new Error("transient S3 error");
+    });
+    const s3 = { send } as unknown as S3Client;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const reader = createReader(s3, "bucket", "secret", () => now);
+
+    const first = (await reader(event("agency=SF&stopCode=16393"))) as APIGatewayProxyStructuredResultV2;
+    expect(JSON.parse(first.body as string).ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisit).toHaveLength(1);
+
+    now += 35_000; // past the 30s local-cache window, triggers a reload attempt that will throw
+    const second = (await reader(event("agency=SF&stopCode=16393"))) as APIGatewayProxyStructuredResultV2;
+
+    expect(second.statusCode).toBe(200);
+    const body = JSON.parse(second.body as string);
+    expect(body.ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisit).toHaveLength(1);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it("re-fetches from S3 only after the 30s local-cache window elapses", async () => {
     const s3 = fakeS3(encodeSnapshot(INDEX, Date.now()));
     let now = 1_000_000;

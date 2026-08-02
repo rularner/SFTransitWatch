@@ -41,8 +41,8 @@ Resources:
   RefresherFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/refresher/
-      Handler: index.handler
+      CodeUri: ./
+      Handler: src/refresher/index.handler
       ReservedConcurrentExecutions: 1
       Environment:
         Variables:
@@ -59,18 +59,23 @@ Resources:
           Properties:
             Schedule: rate(2 minutes)
             Description: Refresh the RG GTFS-RT snapshot every 2 minutes.
+    # NOTE: this esbuild config has NOT been verified with a real `sam build` —
+    # no aws/sam CLI is available in the sandbox this was authored in. Run
+    # `sam build` (and ideally `sam validate --lint`) before the first real
+    # deploy and fix up CodeUri/Handler/EntryPoints if SAM's dependency
+    # resolution needs something different than what's written here.
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
         Target: node22
-        EntryPoints: ["index.ts"]
+        EntryPoints: ["src/refresher/index.ts"]
 
   ReaderFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/reader/
-      Handler: index.handler
+      CodeUri: ./
+      Handler: src/reader/index.handler
       ReservedConcurrentExecutions: 5
       Environment:
         Variables:
@@ -83,12 +88,17 @@ Resources:
               Resource: !Sub "${SnapshotBucket.Arn}/snapshots/RG.json"
       FunctionUrlConfig:
         AuthType: NONE
+    # NOTE: this esbuild config has NOT been verified with a real `sam build` —
+    # no aws/sam CLI is available in the sandbox this was authored in. Run
+    # `sam build` (and ideally `sam validate --lint`) before the first real
+    # deploy and fix up CodeUri/Handler/EntryPoints if SAM's dependency
+    # resolution needs something different than what's written here.
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
         Target: node22
-        EntryPoints: ["index.ts"]
+        EntryPoints: ["src/reader/index.ts"]
 
   MonthlyBudget:
     Type: AWS::Budgets::Budget
