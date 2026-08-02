@@ -1,0 +1,8 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "sftransitwatch-gtfsrt"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+region = "us-west-2"
+confirm_changeset = false
