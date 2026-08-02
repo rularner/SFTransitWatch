@@ -33,6 +33,8 @@ export default defineConfig({
                     APPSTORE_PRIVATE_KEY: toBase64(appStorePkcs8),
                     APPSTORE_BUNDLE_ID: "org.larner.SFTransitWatch",
                     HEALTHCHECK_TOKEN: "test-healthcheck-token",
+                    GTFSRT_READER_URL: "https://reader.example.com/",
+                    GTFSRT_INTERNAL_KEY: "test-internal-key",
                 },
                 kvNamespaces: ["CLIENT_TOKENS", "TRANSIT_CACHE"],
             },
