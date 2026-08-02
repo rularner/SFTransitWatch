@@ -198,6 +198,9 @@ Thumbs.db
 CloudflareWorker/node_modules/
 CloudflareWorker/.wrangler/
 CloudflareWorker/.dev.vars*
+
+# AWS Lambda migration (AwsLambda)
+AwsLambda/node_modules/
 !CloudflareWorker/.dev.vars.example
 CloudflareWorker/.env*
 !CloudflareWorker/.env.example
