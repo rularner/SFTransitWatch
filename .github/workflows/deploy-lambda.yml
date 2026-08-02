@@ -14,6 +14,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-lambda
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -46,6 +49,10 @@ jobs:
 
       - name: sam deploy
         working-directory: AwsLambda
+        env:
+          API_511_KEY: ${{ secrets.API_511_KEY }}
+          GTFSRT_INTERNAL_KEY: ${{ secrets.GTFSRT_INTERNAL_KEY }}
+          BUDGET_ALERT_EMAIL: ${{ secrets.BUDGET_ALERT_EMAIL }}
         run: |
           sam deploy \
             --stack-name sftransitwatch-gtfsrt \
@@ -54,6 +61,6 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --resolve-s3 \
             --parameter-overrides \
-              Api511Key=${{ secrets.API_511_KEY }} \
-              InternalSharedKey=${{ secrets.GTFSRT_INTERNAL_KEY }} \
-              BudgetAlertEmail=${{ secrets.BUDGET_ALERT_EMAIL }}
+              "Api511Key=$API_511_KEY" \
+              "InternalSharedKey=$GTFSRT_INTERNAL_KEY" \
+              "BudgetAlertEmail=$BUDGET_ALERT_EMAIL"
