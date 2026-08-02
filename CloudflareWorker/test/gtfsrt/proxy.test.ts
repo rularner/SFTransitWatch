@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { SELF, env } from "cloudflare:test";
 import { sha256Hex } from "../../src/index";
+import { loadStopNames } from "../../src/gtfsrt/proxy";
 
 const TOKEN = "test-token";
+
+// The normalized cache key proxy.ts now builds for agency=SF&stopCode=16393 with no explicit
+// MaximumNumberOfCallsOnwards (defaults to "10"). Kept in sync with normalizedQuery() in
+// src/gtfsrt/proxy.ts.
+const NORMALIZED_CACHE_KEY = "https://gtfsrt-proxy.internal/StopMonitoring?agency=SF&stopCode=16393&MaximumNumberOfCallsOnwards=10";
 
 function siriBody(onward: { StopPointRef: string; StopPointName: string; ExpectedArrivalTime: string }[] = []): string {
   return JSON.stringify({
@@ -33,7 +39,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   vi.restoreAllMocks();
-  await caches.default.delete(new Request("https://gtfsrt-proxy.internal/StopMonitoring?agency=SF&stopCode=16393"));
+  await caches.default.delete(new Request(NORMALIZED_CACHE_KEY));
 });
 
 describe("/StopMonitoring proxy", () => {
@@ -77,7 +83,7 @@ describe("/StopMonitoring proxy", () => {
     // attempts the Lambda call (and falls through to the STALE path) instead of being served
     // as a fresh HIT — two SELF.fetch calls in a row execute far faster than 60s of real time.
     // Mirrors the seedCache() pattern in test/worker.test.ts.
-    const cacheKey = new Request("https://gtfsrt-proxy.internal/StopMonitoring?agency=SF&stopCode=16393");
+    const cacheKey = new Request(NORMALIZED_CACHE_KEY);
     const cachedRes = await caches.default.match(cacheKey);
     const cachedBody = await cachedRes!.text();
     await caches.default.put(cacheKey, new Response(cachedBody, {
@@ -99,5 +105,39 @@ describe("/StopMonitoring proxy", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
     expect(body.ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisit).toEqual([]);
+  });
+
+  it("normalizes the query string so reordered/extra params still produce a cache HIT", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(siriBody(), { status: 200 }));
+    // First request: canonical param order, no explicit MaximumNumberOfCallsOnwards (defaults to 10).
+    await SELF.fetch("https://example.com/StopMonitoring?agency=SF&stopCode=16393", { headers: { "X-App-Token": TOKEN } });
+    fetchMock.mockClear();
+
+    // Second request: same three logical params, reordered, plus junk params and an explicit
+    // MaximumNumberOfCallsOnwards=10 matching the default the first request got implicitly.
+    // Should hit the same normalized cache entry rather than bypassing the cache.
+    const res = await SELF.fetch(
+      "https://example.com/StopMonitoring?extra=junk&stopCode=16393&MaximumNumberOfCallsOnwards=10&agency=SF&another=noise",
+      { headers: { "X-App-Token": TOKEN } },
+    );
+
+    expect(res.headers.get("X-Cache-Status")).toBe("HIT");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("memoizes the parsed stops:${agency} Map, skipping a second KV fetch within the TTL window", async () => {
+    // Uses a dedicated agency/key so this test can't be affected by other tests' prior calls to
+    // loadStopNames("SF") having already warmed the module-scope memoization cache.
+    const agency = "TEST-MEMO-AGENCY";
+    await (env as any).TRANSIT_CACHE.put(`stops:${agency}`, JSON.stringify({
+      stops: [{ id: "1", name: "One", lat: 0, lon: 0 }], fetchedAtMs: Date.now(),
+    }));
+    const getSpy = vi.spyOn((env as any).TRANSIT_CACHE, "get");
+
+    await loadStopNames(env as any, agency);
+    expect(getSpy).toHaveBeenCalledTimes(1);
+
+    await loadStopNames(env as any, agency);
+    expect(getSpy).toHaveBeenCalledTimes(1); // still 1 — served from the in-memory memoization
   });
 });

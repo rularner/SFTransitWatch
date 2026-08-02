@@ -767,9 +767,9 @@ describe("POST /self-provision", () => {
     });
 });
 
-// NOTE: this block used to exercise /StopMonitoring, but that endpoint now serves from the
-// lazily-refreshed GTFS-RT snapshot (see gtfsrt/snapshot.ts) and no longer goes through the
-// generic hot-cache/rate-limit proxy path below. /StopTimetable still does, so it now stands
+// NOTE: this block used to exercise /StopMonitoring, but that endpoint now proxies to the
+// AWS Lambda reader (see gtfsrt/proxy.ts) and no longer goes through the generic
+// hot-cache/rate-limit proxy path below. /StopTimetable still does, so it now stands
 // in for exercising that shared mechanism (Cache API HIT/STALE + rate-limit-after-cache).
 // Its TTLs come from TIMETABLE_TTL (24h fresh / 7d stale) rather than DEFAULT_TTL, hence the
 // different fetchedAtMs offsets vs. before.
