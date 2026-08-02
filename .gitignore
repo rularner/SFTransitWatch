@@ -172,6 +172,9 @@ fastlane/test_output/
 # linked worktrees get via .git/hooks/post-checkout.
 docs/superpowers
 
+# Subagent-driven-development scratch workspace (ledgers, briefs, review packages)
+.superpowers/
+
 # Developer-specific signing config (contains team ID)
 Developer.xcconfig
 
