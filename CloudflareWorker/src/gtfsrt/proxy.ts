@@ -1,11 +1,28 @@
 import { type Env, type CachedStops } from "../index";
 
 const PROXY_CACHE_FRESH_MS = 60_000;
+// Deliberately NOT imported from index.ts's STALE_TTL_SECONDS (same value, 6 * 60 * 60): proxy.ts
+// is imported BY index.ts, and importing a value (not just types) back from index.ts here creates
+// a real circular runtime dependency that breaks module init order (Cache-Control ends up
+// "max-age=undefined" until index.ts finishes evaluating). Kept as its own constant instead.
 const PROXY_CACHE_RETENTION_SECONDS = 6 * 60 * 60;
 const PROXY_TIMEOUT_MS = 3_000;
+const STOP_NAMES_TTL_MS = 5 * 60_000;
+
+// Builds a normalized query string from exactly the params this endpoint understands, in a
+// fixed order. Used for BOTH the cache key and the outbound Lambda call so that extra/reordered
+// query params from a client can't multiply cache entries (and Lambda invocations) for what is
+// logically the same request.
+function normalizedQuery(url: URL): string {
+  const p = new URLSearchParams();
+  p.set("agency", url.searchParams.get("agency") ?? "SF");
+  p.set("stopCode", url.searchParams.get("stopCode") ?? "");
+  p.set("MaximumNumberOfCallsOnwards", url.searchParams.get("MaximumNumberOfCallsOnwards") ?? "10");
+  return p.toString();
+}
 
 function cacheKeyFor(url: URL): Request {
-  return new Request(`https://gtfsrt-proxy.internal${url.pathname}${url.search}`);
+  return new Request(`https://gtfsrt-proxy.internal${url.pathname}?${normalizedQuery(url)}`);
 }
 
 async function readCachedProxyResponse(cacheKey: Request): Promise<{ body: string; fetchedAtMs: number } | null> {
@@ -46,24 +63,42 @@ function emptyStopMonitoringBody(): string {
   });
 }
 
+// Module-scope memoization of the parsed stops:${agency} Map. SF is ~3000 stops; re-fetching
+// from KV and re-parsing that blob on every cache-miss request was the dominant CPU cost on
+// this path. A flat cache keyed by agency with a fixed TTL is enough here — there are only a
+// handful of agencies, no need for LRU eviction.
+const stopNamesCache = new Map<string, { map: Map<string, string>; loadedAt: number }>();
+
 export async function loadStopNames(env: Env, agency: string): Promise<(stopId: string) => string> {
+  const now = Date.now();
+  const memoized = stopNamesCache.get(agency);
+  if (memoized && now - memoized.loadedAt < STOP_NAMES_TTL_MS) {
+    return (stopId: string) => memoized.map.get(stopId) ?? stopId;
+  }
+
   const raw = await env.TRANSIT_CACHE.get(`stops:${agency}`);
   const map = new Map<string, string>();
   if (raw) {
     const cached = JSON.parse(raw) as CachedStops;
     for (const s of cached.stops) map.set(s.id, s.name);
   }
+  stopNamesCache.set(agency, { map, loadedAt: now });
   return (stopId: string) => map.get(stopId) ?? stopId;
 }
 
-function resolveOnwardNames(body: string, stopName: (stopId: string) => string): string {
-  const json = JSON.parse(body) as any;
+function hasOnwardCalls(json: any): boolean {
+  for (const visit of json?.ServiceDelivery?.StopMonitoringDelivery?.MonitoredStopVisit ?? []) {
+    if ((visit?.MonitoredVehicleJourney?.OnwardCalls?.OnwardCall ?? []).length > 0) return true;
+  }
+  return false;
+}
+
+function resolveOnwardNames(json: any, stopName: (stopId: string) => string): void {
   for (const visit of json?.ServiceDelivery?.StopMonitoringDelivery?.MonitoredStopVisit ?? []) {
     for (const oc of visit?.MonitoredVehicleJourney?.OnwardCalls?.OnwardCall ?? []) {
       oc.StopPointName = stopName(oc.StopPointRef);
     }
   }
-  return JSON.stringify(json);
 }
 
 // Thin authenticated proxy: forwards to the reader Lambda's Function URL, resolves onward-call
@@ -83,15 +118,25 @@ export async function handleStopMonitoring(url: URL, env: Env): Promise<Response
 
   try {
     const lambdaUrl = new URL(env.GTFSRT_READER_URL);
-    lambdaUrl.search = url.search;
+    lambdaUrl.search = normalizedQuery(url);
     const res = await fetch(lambdaUrl.toString(), {
       headers: { "X-Internal-Key": env.GTFSRT_INTERNAL_KEY },
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`reader lambda responded HTTP ${res.status}`);
 
-    const stopName = await loadStopNames(env, agency);
-    const body = resolveOnwardNames(await res.text(), stopName);
+    const rawBody = await res.text();
+    const json = JSON.parse(rawBody);
+    let body: string;
+    if (hasOnwardCalls(json)) {
+      const stopName = await loadStopNames(env, agency);
+      resolveOnwardNames(json, stopName);
+      body = JSON.stringify(json);
+    } else {
+      // Nothing to resolve — skip the (possibly memoized, possibly not) stops:${agency} KV
+      // lookup entirely and cache the Lambda's response verbatim.
+      body = rawBody;
+    }
     await writeCachedProxyResponse(cacheKey, body, now);
     return clientResponse(body, "MISS");
   } catch (error) {

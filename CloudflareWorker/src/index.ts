@@ -142,10 +142,9 @@ export default {
 			const canRefreshNow = await canMakeUpstreamRequest(env, now);
 			if (!canRefreshNow && cached) {
 				// Within the upstream min-interval: serve stale. A background revalidation
-				// here could not run anyway (it would re-check the same interval and no-op),
-				// and taking the shared refresh lock to do nothing can starve the GTFS-RT
-				// snapshot refresh. A later request outside the window refreshes synchronously
-				// via the MISS path below.
+				// here could not run anyway (it would re-check the same interval and no-op).
+				// A later request outside the window refreshes synchronously via the MISS
+				// path below.
 				return xmlResponse(cached, "STALE", ttl);
 			}
 			if (!canRefreshNow && !cached) {
