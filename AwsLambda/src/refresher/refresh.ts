@@ -3,10 +3,9 @@ import { decodeTripUpdates } from "../gtfsrt/decode";
 import { buildArrivalsIndex } from "../gtfsrt/indexBuilder";
 import { gunzipIfNeeded } from "../gtfsrt/gunzip";
 import { putSnapshotObject } from "../gtfsrt/s3Snapshot";
-import { encodeSnapshot } from "../gtfsrt/snapshotCodec";
+import { encodeSnapshot, SNAPSHOT_KEY } from "../gtfsrt/snapshotCodec";
 
 const UPSTREAM = "https://api.511.org/transit/tripupdates";
-export const SNAPSHOT_KEY = "snapshots/RG.json";
 
 // Called only from the scheduled handler in index.ts, never from a request path. Any failure —
 // network error, non-OK upstream, corrupt protobuf — is caught and logged here; the prior S3

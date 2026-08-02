@@ -1,5 +1,9 @@
 import type { ArrivalsIndex } from "./indexBuilder";
 
+// Shared, dependency-free constant used by both the refresher (writes) and the reader (reads),
+// so the reader's bundle doesn't have to transitively pull in refresher/decode/indexBuilder code.
+export const SNAPSHOT_KEY = "snapshots/RG.json";
+
 export interface StoredSnapshot {
   fetchedAtMs: number;
   index: ArrivalsIndex;
