@@ -1,0 +1,59 @@
+name: Deploy GTFS-RT Lambda Stack
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'AwsLambda/**'
+      - '.github/workflows/deploy-lambda.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: AwsLambda
+        run: npm ci
+
+      - name: Run tests
+        working-directory: AwsLambda
+        run: npm test
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-sftransitwatch-deploy
+          aws-region: us-west-2
+
+      - name: Set up AWS SAM
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: sam build
+        working-directory: AwsLambda
+        run: sam build
+
+      - name: sam deploy
+        working-directory: AwsLambda
+        run: |
+          sam deploy \
+            --stack-name sftransitwatch-gtfsrt \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_IAM \
+            --resolve-s3 \
+            --parameter-overrides \
+              Api511Key=${{ secrets.API_511_KEY }} \
+              InternalSharedKey=${{ secrets.GTFSRT_INTERNAL_KEY }} \
+              BudgetAlertEmail=${{ secrets.BUDGET_ALERT_EMAIL }}
