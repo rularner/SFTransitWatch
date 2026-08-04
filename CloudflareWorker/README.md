@@ -24,7 +24,9 @@ Worker secrets:
 - `GTFSRT_INTERNAL_KEY` — the shared secret the Worker sends as `X-Internal-Key`.
 
 Both require the `AwsLambda/` SAM stack to already be deployed before they can be set (the
-Function URL isn't known until the stack exists). Because `.github/workflows/deploy-lambda.yml`
+Function URL isn't known until the stack exists) — see `AwsLambda/README.md` for the one-time
+AWS OIDC bootstrap and required GitHub secrets needed before that stack can deploy at all.
+Because `.github/workflows/deploy-lambda.yml`
 auto-deploys on push to `main` for `AwsLambda/**` changes, and Cloudflare's own Git integration
 auto-deploys the Worker on *any* push to `main`, merging both sides in one shot risks the Worker
 going live before the secrets are set.
