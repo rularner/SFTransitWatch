@@ -354,30 +354,40 @@ describe("GET /Stops (stops cache)", () => {
         expect(body.Contents.dataObjects.ScheduledStopPoint).toHaveLength(3);
     });
 
-    it("filters stops by proximity when lat/lon and radius provided", async () => {
-        // 200 m around Market & 4th — should include Market & 5th but not Mission & 24th
+    it("orders stops by proximity when lat/lon provided (radius param is ignored)", async () => {
+        // radius=1 would have excluded every stop under the old radius-cutoff behavior.
+        // Closest-N selection ignores radius entirely and returns everything, nearest first.
         const res = await SELF.fetch(
-            "https://example.com/Stops?agency=SF&lat=37.7844&lon=-122.4062&radius=200",
+            "https://example.com/Stops?agency=SF&lat=37.7844&lon=-122.4062&radius=1",
             { headers: { "X-App-Token": VALID_TOKEN } },
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as StopsBody;
         const ids = body.Contents.dataObjects.ScheduledStopPoint.map((s) => s.id);
-        expect(ids).toContain("15725");
-        expect(ids).toContain("15726");
-        expect(ids).not.toContain("16000");
+        expect(ids).toEqual(["15725", "15726", "16000"]);
+    });
+
+    it("returns the closest stops even when far from every stop in the fixture", async () => {
+        // Roughly Truckee/Tahoe — ~300km from every SF stop below. Under the old radius
+        // cutoff this returned []; closest-N selection always returns the nearest stops.
+        const res = await SELF.fetch(
+            "https://example.com/Stops?agency=SF&lat=39.3088&lon=-120.9070",
+            { headers: { "X-App-Token": VALID_TOKEN } },
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as StopsBody;
+        expect(body.Contents.dataObjects.ScheduledStopPoint).toHaveLength(3);
     });
 
     it("also accepts latitude/longitude param names", async () => {
         const res = await SELF.fetch(
-            "https://example.com/Stops?agency=SF&latitude=37.7844&longitude=-122.4062&radius=200",
+            "https://example.com/Stops?agency=SF&latitude=37.7844&longitude=-122.4062",
             { headers: { "X-App-Token": VALID_TOKEN } },
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as StopsBody;
         const ids = body.Contents.dataObjects.ScheduledStopPoint.map((s) => s.id);
-        expect(ids).toContain("15725");
-        expect(ids).not.toContain("16000");
+        expect(ids[0]).toBe("15725");
     });
 
     it("returns JSON matching the StopsResponse shape the app parses", async () => {
@@ -404,6 +414,74 @@ describe("GET /Stops (stops cache)", () => {
             headers: { "X-App-Token": VALID_TOKEN },
         });
         expect(res.status).toBe(502);
+    });
+});
+
+describe("GET /Stops count param (closest-N selection)", () => {
+    // 150 stops on the equator, one step of 0.001° longitude apart (~111 m/step). Distance
+    // from (0,0) increases monotonically with index, so "closest N" == "first N by id".
+    const COUNT_STOPS_BLOB = JSON.stringify({
+        fetchedAtMs: Date.now(),
+        stops: Array.from({ length: 150 }, (_, i) => ({
+            id: `s${i}`,
+            name: `Stop ${i}`,
+            lat: 0,
+            lon: i * 0.001,
+        })),
+    });
+
+    beforeAll(async () => {
+        await STOPS_CACHE().put("stops:CX", COUNT_STOPS_BLOB);
+    });
+
+    it("defaults to the closest 30 stops when count is omitted", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=CX&lat=0&lon=0", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        const body = (await res.json()) as StopsBody;
+        const ids = body.Contents.dataObjects.ScheduledStopPoint.map((s) => s.id);
+        expect(ids).toHaveLength(30);
+        expect(ids[0]).toBe("s0");
+        expect(ids[29]).toBe("s29");
+    });
+
+    it("honors an explicit count within range", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=CX&lat=0&lon=0&count=10", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        const body = (await res.json()) as StopsBody;
+        const ids = body.Contents.dataObjects.ScheduledStopPoint.map((s) => s.id);
+        expect(ids).toEqual(Array.from({ length: 10 }, (_, i) => `s${i}`));
+    });
+
+    it("clamps count above 100 down to 100", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=CX&lat=0&lon=0&count=500", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        const body = (await res.json()) as StopsBody;
+        expect(body.Contents.dataObjects.ScheduledStopPoint).toHaveLength(100);
+    });
+
+    it("falls back to the default of 30 for a non-positive or invalid count", async () => {
+        const resNegative = await SELF.fetch("https://example.com/Stops?agency=CX&lat=0&lon=0&count=-5", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        const negativeBody = (await resNegative.json()) as StopsBody;
+        expect(negativeBody.Contents.dataObjects.ScheduledStopPoint).toHaveLength(30);
+
+        const resInvalid = await SELF.fetch("https://example.com/Stops?agency=CX&lat=0&lon=0&count=notanumber", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        const invalidBody = (await resInvalid.json()) as StopsBody;
+        expect(invalidBody.Contents.dataObjects.ScheduledStopPoint).toHaveLength(30);
+    });
+
+    it("caps at count when no lat/lon is provided", async () => {
+        const res = await SELF.fetch("https://example.com/Stops?agency=CX&count=5", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        const body = (await res.json()) as StopsBody;
+        expect(body.Contents.dataObjects.ScheduledStopPoint).toHaveLength(5);
     });
 });
 

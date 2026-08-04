@@ -8,6 +8,8 @@ export const STALE_TTL_SECONDS = 6 * 60 * 60;
 const MIN_UPSTREAM_INTERVAL_MS = 60_000;
 export const LAST_UPSTREAM_FETCH_KEY = "meta:last_upstream_fetch_ms";
 const STOPS_FRESH_TTL_SECONDS = 24 * 60 * 60;
+const DEFAULT_STOPS_COUNT = 30;
+const MAX_STOPS_COUNT = 100;
 const TIMETABLE_FRESH_TTL_SECONDS = 24 * 60 * 60;
 const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
@@ -395,7 +397,7 @@ async function handleStopsRequest(url: URL, env: Env, tokenHash: string): Promis
 		if (!allowed) {
 			if (cached) {
 				active = cached;
-				return stopsJsonResponse(applyStopsFilter(url, active), active.fetchedAtMs);
+				return stopsJsonResponse(selectClosestStops(url, active), active.fetchedAtMs);
 			}
 			return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
 		}
@@ -409,17 +411,24 @@ async function handleStopsRequest(url: URL, env: Env, tokenHash: string): Promis
 		}
 	}
 
-	return stopsJsonResponse(applyStopsFilter(url, active), active.fetchedAtMs);
+	return stopsJsonResponse(selectClosestStops(url, active), active.fetchedAtMs);
 }
 
-function applyStopsFilter(url: URL, active: CachedStops): CachedStop[] {
+function selectClosestStops(url: URL, active: CachedStops): CachedStop[] {
 	const lat = parseFloat(url.searchParams.get("lat") ?? url.searchParams.get("latitude") ?? "");
 	const lon = parseFloat(url.searchParams.get("lon") ?? url.searchParams.get("longitude") ?? "");
-	const radius = parseInt(url.searchParams.get("radius") ?? "1000", 10);
+	const rawCount = parseInt(url.searchParams.get("count") ?? "", 10);
+	const count = Number.isFinite(rawCount) && rawCount > 0
+		? Math.min(rawCount, MAX_STOPS_COUNT)
+		: DEFAULT_STOPS_COUNT;
 
-	return Number.isFinite(lat) && Number.isFinite(lon)
-		? active.stops.filter((s) => distanceMeters(s.lat, s.lon, lat, lon) <= (Number.isFinite(radius) ? radius : 1000))
-		: active.stops;
+	if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+		return active.stops.slice(0, count);
+	}
+
+	return [...active.stops]
+		.sort((a, b) => distanceMeters(a.lat, a.lon, lat, lon) - distanceMeters(b.lat, b.lon, lat, lon))
+		.slice(0, count);
 }
 
 function isValidCachedStops(raw: unknown): raw is CachedStops {
