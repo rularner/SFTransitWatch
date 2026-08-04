@@ -39,9 +39,17 @@ jobs:
 
       - name: List changed files
         id: changed
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/changed-files.txt
-          echo "--- changed files ---"
+          # Use the real merge-base against the current base branch tip, not the PR's recorded
+          # base.sha literally -- if this branch has since merged the base branch into itself
+          # (common for a long-lived PR kept up to date with main), base.sha can lag behind, and
+          # a plain base.sha..head.sha diff would then include content that came in via that
+          # merge and already exists on main, misreporting it as unique to this PR.
+          MERGE_BASE=$(git merge-base "origin/$BASE_REF" HEAD)
+          git diff --name-only "$MERGE_BASE" HEAD > /tmp/changed-files.txt
+          echo "--- changed files (vs merge-base $MERGE_BASE) ---"
           cat /tmp/changed-files.txt
 
       - name: 'Shim "Workers Builds: sftransitwatch" if no Worker files changed'
