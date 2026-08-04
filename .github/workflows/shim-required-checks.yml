@@ -1,0 +1,83 @@
+name: Shim Skipped External Checks
+
+# Cloudflare Workers Builds and Xcode Cloud report via GitHub's Commit Status API and are
+# configured to skip (via their own dashboard path filters) when a push/PR doesn't touch their
+# relevant files. A skipped external status check never gets posted at all — so if branch
+# protection requires it, an unrelated PR (e.g. AwsLambda-only) would be stuck pending forever.
+#
+# This job computes the real changed-file list for the PR and, ONLY when it can positively
+# confirm every changed file is irrelevant to a given external build, posts a synthetic
+# `success` status under that build's exact context name — standing in for the skip.
+#
+# Safety posture: each check below is phrased as "skip only if every changed file falls inside
+# a known-IRRELEVANT set" rather than "skip if no changed file is in a known-relevant set". That
+# ordering matters — a newly-added/renamed directory this file doesn't know about defaults to
+# NOT being skipped (safe: the real build still gets a chance to run and report for real),
+# rather than defaulting to skipped (unsafe: a real change could silently never get built/tested).
+#
+# Keep this in sync by hand with:
+#   - Cloudflare dashboard → Workers & Pages → sftransitwatch → Settings → Builds → Build watch paths
+#   - App Store Connect → Xcode Cloud → SFTransitWatch workflow → Start Conditions
+# If either dashboard's filter changes, update the corresponding list below to match, or this
+# shim can drift into producing a false "success" for a build that should have actually run.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  shim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List changed files
+        id: changed
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > /tmp/changed-files.txt
+          echo "--- changed files ---"
+          cat /tmp/changed-files.txt
+
+      - name: Shim "Workers Builds: sftransitwatch" if no Worker files changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # IRRELEVANT set for the Cloudflare Worker build: everything except CloudflareWorker/**.
+          # Skip (post fake success) only if every changed file is OUTSIDE CloudflareWorker/**.
+          if grep -qE '^CloudflareWorker/' /tmp/changed-files.txt; then
+            echo "CloudflareWorker/ files changed — leaving the real Cloudflare status alone."
+          else
+            gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+              -f state=success \
+              -f context="Workers Builds: sftransitwatch" \
+              -f description="No CloudflareWorker/ changes — shimmed by shim-required-checks.yml"
+          fi
+
+      - name: Shim Xcode Cloud test statuses if no app files changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # IRRELEVANT set for the Xcode app build: AwsLambda/, CloudflareWorker/, docs/,
+          # .github/, and top-level repo-meta files. Everything else (SFTransitWatch*/,
+          # TestSupport/, *.xcodeproj, ci_scripts/, bin/, Config.xcconfig, etc.) is treated as
+          # potentially relevant and will NOT be skipped, even if this list is incomplete.
+          IRRELEVANT_PATTERN='^(AwsLambda/|CloudflareWorker/|docs/|\.github/|CLAUDE\.md$|LICENSE$|README\.md$|TODO\.md$|build\.log$)'
+          if grep -vE "$IRRELEVANT_PATTERN" /tmp/changed-files.txt | grep -q .; then
+            echo "App-relevant files changed — leaving the real Xcode Cloud statuses alone."
+          else
+            for CTX in \
+              "SFTransitWatch | Test Run" \
+              "SFTransitWatch | Test Run | Test - iOS" \
+              "SFTransitWatch | Test Run | Test - watchOS"; do
+              gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+                -f state=success \
+                -f context="$CTX" \
+                -f description="No app-relevant changes — shimmed by shim-required-checks.yml"
+            done
+          fi
