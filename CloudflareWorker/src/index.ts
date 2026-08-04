@@ -1,5 +1,5 @@
 import { verifySubscription, checkAppStoreAuth } from "./appstore";
-import { handleStopMonitoring } from "./gtfsrt/snapshot";
+import { handleStopMonitoring } from "./gtfsrt/proxy";
 
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
 const EXPECTED_ISS = "org.larner.SFTransitWatch";
@@ -7,7 +7,6 @@ const FRESH_TTL_SECONDS = 60;
 export const STALE_TTL_SECONDS = 6 * 60 * 60;
 const MIN_UPSTREAM_INTERVAL_MS = 60_000;
 export const LAST_UPSTREAM_FETCH_KEY = "meta:last_upstream_fetch_ms";
-const REFRESH_LOCK_KEY = "meta:refresh_lock";
 const STOPS_FRESH_TTL_SECONDS = 24 * 60 * 60;
 const TIMETABLE_FRESH_TTL_SECONDS = 24 * 60 * 60;
 const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -38,6 +37,8 @@ export interface Env {
 	APPSTORE_PRIVATE_KEY: string;
 	APPSTORE_BUNDLE_ID: string;
 	HEALTHCHECK_TOKEN: string;
+	GTFSRT_READER_URL: string;
+	GTFSRT_INTERNAL_KEY: string;
 }
 
 type CachedResponse = {
@@ -111,7 +112,7 @@ export default {
 				if (!allowed) {
 					return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
 				}
-				return await handleStopMonitoring(url, env, ctx);
+				return await handleStopMonitoring(url, env);
 			}
 
 			const upstream = buildUpstreamUrl(request.url, env.API_511_KEY);
@@ -141,10 +142,9 @@ export default {
 			const canRefreshNow = await canMakeUpstreamRequest(env, now);
 			if (!canRefreshNow && cached) {
 				// Within the upstream min-interval: serve stale. A background revalidation
-				// here could not run anyway (it would re-check the same interval and no-op),
-				// and taking the shared refresh lock to do nothing can starve the GTFS-RT
-				// snapshot refresh. A later request outside the window refreshes synchronously
-				// via the MISS path below.
+				// here could not run anyway (it would re-check the same interval and no-op).
+				// A later request outside the window refreshes synchronously via the MISS
+				// path below.
 				return xmlResponse(cached, "STALE", ttl);
 			}
 			if (!canRefreshNow && !cached) {
@@ -299,19 +299,6 @@ async function fetchAndCacheUpstream(
 	const keyHashPrefix = (await sha256Hex(env.API_511_KEY)).slice(0, 12);
 	console.error(`Upstream error: HTTP ${response.status} for ${safeUrl} — key_hash_prefix: ${keyHashPrefix} — body: ${body.slice(0, 300)}`);
 	return { ok: false, error: `Upstream responded with HTTP ${response.status}.` };
-}
-
-export async function tryAcquireRefreshLock(env: Env): Promise<boolean> {
-	const existing = await env.TRANSIT_CACHE.get(REFRESH_LOCK_KEY);
-	if (existing) {
-		return false;
-	}
-	await env.TRANSIT_CACHE.put(REFRESH_LOCK_KEY, "1", { expirationTtl: 60 });
-	return true;
-}
-
-export async function releaseRefreshLock(env: Env): Promise<void> {
-	await env.TRANSIT_CACHE.delete(REFRESH_LOCK_KEY);
 }
 
 const REG_CODE_PREFIX = "reg:";

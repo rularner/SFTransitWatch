@@ -15,6 +15,38 @@ The deploy script generates `.wrangler.generated.jsonc` from `wrangler.jsonc`,
 substituting both `__TRANSIT_CACHE_KV_ID__` and `__CLIENT_TOKENS_KV_ID__`
 before running Wrangler deploy.
 
+## GTFS-RT Lambda dependency (read before merging AwsLambda changes)
+
+`/StopMonitoring` proxies to an AWS Lambda reader (see `AwsLambda/`) and depends on two
+Worker secrets:
+
+- `GTFSRT_READER_URL` — the reader Lambda's Function URL.
+- `GTFSRT_INTERNAL_KEY` — the shared secret the Worker sends as `X-Internal-Key`.
+
+Both require the `AwsLambda/` SAM stack to already be deployed before they can be set (the
+Function URL isn't known until the stack exists) — see `AwsLambda/README.md` for the one-time
+AWS OIDC bootstrap and required GitHub secrets needed before that stack can deploy at all.
+Because `.github/workflows/deploy-lambda.yml`
+auto-deploys on push to `main` for `AwsLambda/**` changes, and Cloudflare's own Git integration
+auto-deploys the Worker on *any* push to `main`, merging both sides in one shot risks the Worker
+going live before the secrets are set.
+
+**Recommended rollout order:**
+
+1. Merge `AwsLambda/**` changes to `main` first and let `deploy-lambda.yml` provision/update the
+   SAM stack.
+2. Verify the reader Function URL directly (e.g. `curl` it with the internal key) once the stack
+   is deployed.
+3. Set the two Worker secrets with `wrangler secret put GTFSRT_READER_URL` and
+   `wrangler secret put GTFSRT_INTERNAL_KEY` (value must match the stack's `InternalSharedKey`
+   parameter).
+4. Only then merge/deploy the Worker proxy change.
+
+If the Worker proxy code is deployed before the secrets are set, `/StopMonitoring` degrades to
+returning an empty `MonitoredStopVisit[]` (HTTP 200, no error) rather than failing — so it's a
+silent-but-safe transitional state, not an outage in the sense of errors, but it does mean no
+live arrivals data until the secrets are set.
+
 ## Local Development
 
 Use the same variables locally:
@@ -115,3 +147,4 @@ it.
 - `SELF_PROVISION_PUBLIC_KEY` is required for the `/self-provision` endpoint to work. Without it, all self-provision attempts will fail with 401.
 - `.wrangler.generated.jsonc` is generated at runtime and is gitignored.
 - `HEALTHCHECK_TOKEN` and `WORKERS_DEV_URL` are required for `npm run postdeploy` to work, in addition to the `WORKER_HOSTNAME` already required by `npm run deploy`. See "Apple communication health check" above.
+- `GTFSRT_READER_URL` and `GTFSRT_INTERNAL_KEY` are required for `/StopMonitoring` to return live data. `GTFSRT_READER_URL` is the AWS Lambda reader's Function URL (the `AwsLambda` SAM stack's `ReaderFunctionUrl` output); `GTFSRT_INTERNAL_KEY` is the shared secret the Worker sends as `X-Internal-Key` and must match the SAM stack's `InternalSharedKey` parameter. Both are set via `wrangler secret put`. See "GTFS-RT Lambda dependency" above for rollout ordering. Without them, `/StopMonitoring` degrades to an empty `MonitoredStopVisit[]` rather than erroring.
