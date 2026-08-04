@@ -102,7 +102,8 @@ cat > /tmp/sftransitwatch-gha-deploy-policy.json <<'EOF'
     { "Effect": "Allow", "Action": ["iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PassRole", "iam:TagRole"], "Resource": "arn:aws:iam::ACCOUNT_ID:role/sftransitwatch-gtfsrt-*" },
     { "Effect": "Allow", "Action": ["scheduler:*", "events:*"], "Resource": "*" },
     { "Effect": "Allow", "Action": ["budgets:*"], "Resource": "*" },
-    { "Effect": "Allow", "Action": ["s3:CreateBucket", "s3:PutBucketPolicy", "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock"], "Resource": "arn:aws:s3:::sam-*" }
+    { "Effect": "Allow", "Action": ["s3:CreateBucket", "s3:PutBucketPolicy", "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock"], "Resource": "arn:aws:s3:::sam-*" },
+    { "Effect": "Allow", "Action": ["s3:CreateBucket", "s3:DeleteBucket", "s3:PutBucketPolicy", "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock", "s3:PutBucketTagging", "s3:GetBucketPolicy", "s3:GetEncryptionConfiguration", "s3:GetBucketPublicAccessBlock"], "Resource": "arn:aws:s3:::sftransitwatch-gtfsrt-*" }
   ]
 }
 EOF
