@@ -172,6 +172,9 @@ fastlane/test_output/
 # linked worktrees get via .git/hooks/post-checkout.
 docs/superpowers
 
+# Subagent-driven-development scratch workspace (ledgers, briefs, review packages)
+.superpowers/
+
 # Developer-specific signing config (contains team ID)
 Developer.xcconfig
 
@@ -195,6 +198,9 @@ Thumbs.db
 CloudflareWorker/node_modules/
 CloudflareWorker/.wrangler/
 CloudflareWorker/.dev.vars*
+
+# AWS Lambda migration (AwsLambda)
+AwsLambda/node_modules/
 !CloudflareWorker/.dev.vars.example
 CloudflareWorker/.env*
 !CloudflareWorker/.env.example
@@ -205,3 +211,4 @@ CloudflareWorker/.wrangler.generated.jsonc
 .mcp.json
 ExportOptions.plist
 .wrangler
+AwsLambda/.aws-sam

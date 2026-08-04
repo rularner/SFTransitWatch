@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SFTransitWatch GTFS-RT pipeline: a scheduled refresher Lambda decodes the 511 Regional
+  Gateway feed into S3; a Function URL reader Lambda slices per-stop SIRI JSON for the
+  Cloudflare Worker to proxy. See docs/superpowers/specs/2026-08-01-gtfsrt-lambda-migration-design.md.
+
+Parameters:
+  Api511Key:
+    Type: String
+    NoEcho: true
+    Description: 511.org API key used by the refresher to fetch the RG GTFS-RT feed.
+  InternalSharedKey:
+    Type: String
+    NoEcho: true
+    Description: Shared secret the Cloudflare Worker sends as X-Internal-Key; the reader rejects any request without a match.
+  BudgetAlertEmail:
+    Type: String
+    Description: >
+      Email address notified when the monthly AWS Budgets threshold is crossed, and when
+      QuotaWatcherFunction detects the account's Lambda concurrency limit has risen (see below).
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    MemorySize: 256
+    Timeout: 10
+    Architectures: [arm64]
+
+Resources:
+  SnapshotBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  RefresherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src/refresher/index.handler
+      # ReservedConcurrentExecutions IS THE DESIGN'S COST/BLAST-RADIUS GUARDRAIL AND IS
+      # TEMPORARILY REMOVED, NOT ABANDONED. This account's Lambda concurrency limit is currently
+      # throttled to 10 (a common new-AWS-account anti-fraud default) — AWS requires at least 10
+      # units of *unreserved* concurrency account-wide, so any nonzero reservation here violates
+      # that floor and CREATE_FAILED. RESTORE `ReservedConcurrentExecutions: 1` here (and `5` on
+      # ReaderFunction below) the moment QuotaWatcherFunction's alert email arrives, or once you've
+      # otherwise confirmed the account limit has risen past 10 — see TODO.md and
+      # src/quotaWatcher/checkQuota.ts for the full context.
+      Environment:
+        Variables:
+          SNAPSHOT_BUCKET: !Ref SnapshotBucket
+          API_511_KEY: !Ref Api511Key
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "${SnapshotBucket.Arn}/snapshots/RG.json"
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(2 minutes)
+            Description: Refresh the RG GTFS-RT snapshot every 2 minutes.
+    # NOTE: this esbuild config has NOT been verified with a real `sam build` —
+    # no aws/sam CLI is available in the sandbox this was authored in. Run
+    # `sam build` (and ideally `sam validate --lint`) before the first real
+    # deploy and fix up CodeUri/Handler/EntryPoints if SAM's dependency
+    # resolution needs something different than what's written here.
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node22
+        EntryPoints: ["src/refresher/index.ts"]
+
+  ReaderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src/reader/index.handler
+      # See the matching NOTE on RefresherFunction above — same account-wide 10-unit throttle,
+      # same restore-when-the-limit-rises plan. RESTORE `ReservedConcurrentExecutions: 5` here.
+      Environment:
+        Variables:
+          SNAPSHOT_BUCKET: !Ref SnapshotBucket
+          INTERNAL_SHARED_KEY: !Ref InternalSharedKey
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "${SnapshotBucket.Arn}/snapshots/RG.json"
+      FunctionUrlConfig:
+        AuthType: NONE
+    # NOTE: this esbuild config has NOT been verified with a real `sam build` —
+    # no aws/sam CLI is available in the sandbox this was authored in. Run
+    # `sam build` (and ideally `sam validate --lint`) before the first real
+    # deploy and fix up CodeUri/Handler/EntryPoints if SAM's dependency
+    # resolution needs something different than what's written here.
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node22
+        EntryPoints: ["src/reader/index.ts"]
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: SFTransitWatch GTFS-RT alerts
+
+  AlertTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref BudgetAlertEmail
+
+  # Daily check for AWS lifting this account's Lambda concurrency throttle (see the NOTE on
+  # RefresherFunction/ReaderFunction above) — emails AlertTopic when it does, so the reserved-
+  # concurrency guardrail removal doesn't quietly become permanent.
+  QuotaWatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src/quotaWatcher/index.handler
+      Environment:
+        Variables:
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: lambda:GetAccountSettings
+              Resource: "*" # GetAccountSettings is account-level; it has no resource-scoped ARN.
+            - Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref AlertTopic
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+            Description: Check whether the account's Lambda concurrency limit has risen above the known throttled baseline.
+    # NOTE: this esbuild config has NOT been verified with a real `sam build` —
+    # no aws/sam CLI is available in the sandbox this was authored in. Run
+    # `sam build` (and ideally `sam validate --lint`) before the first real
+    # deploy and fix up CodeUri/Handler/EntryPoints if SAM's dependency
+    # resolution needs something different than what's written here.
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node22
+        EntryPoints: ["src/quotaWatcher/index.ts"]
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: sftransitwatch-gtfsrt-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 1
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetAlertEmail
+
+Outputs:
+  ReaderFunctionUrl:
+    Description: Function URL the Cloudflare Worker calls for per-stop SIRI JSON. Set as GTFSRT_READER_URL via `wrangler secret put`.
+    Value: !GetAtt ReaderFunctionUrl.FunctionUrl

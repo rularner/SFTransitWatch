@@ -211,7 +211,6 @@ struct ComplicationWidgetEntryView: View {
 
 // MARK: - Widget
 
-@main
 struct SFTransitComplicationWidget: Widget {
     let kind = "SFTransitNextArrival"
 
@@ -227,5 +226,13 @@ struct SFTransitComplicationWidget: Widget {
             .accessoryCorner,
             .accessoryInline
         ])
+    }
+}
+
+@main
+struct SFTransitWidgetBundle: WidgetBundle {
+    var body: some Widget {
+        SFTransitComplicationWidget()
+        NearbyFavoritesWidget()
     }
 }

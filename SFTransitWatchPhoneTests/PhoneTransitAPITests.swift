@@ -67,6 +67,37 @@ final class PhoneTransitAPITests: XCTestCase {
         XCTAssertEqual(mockSession.requestCount(), 1)
     }
 
+    /// Regression: the phone's regex-based XML fallback parser
+    /// (parseXMLArrivals) assigns `destination` from the raw DirectionRef
+    /// capture group. It must map through directionLabel, same as the JSON
+    /// decode path, so "IB"/"OB" never leak to the UI.
+    func testParseArrivalsWithValidXMLMapsDirectionRefToOutbound() async {
+        let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ServiceDelivery>
+          <StopMonitoringDelivery>
+            <MonitoredStopVisit>
+              <MonitoredVehicleJourney>
+                <LineRef>38</LineRef>
+                <DirectionRef>OB</DirectionRef>
+                <MonitoredCall>
+                  <ExpectedDepartureTime>\(isoDate)</ExpectedDepartureTime>
+                </MonitoredCall>
+              </MonitoredVehicleJourney>
+            </MonitoredStopVisit>
+          </StopMonitoringDelivery>
+        </ServiceDelivery>
+        """.data(using: .utf8)!
+
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: xml)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertFalse(arrivals.isEmpty)
+        XCTAssertEqual(arrivals[0].destination, "Outbound")
+    }
+
     func testSearchStopsByExactCode() async {
         let xml = """
         <StopPlaces>
