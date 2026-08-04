@@ -95,12 +95,16 @@ cat > /tmp/sftransitwatch-gha-deploy-policy.json <<'EOF'
   "Version": "2012-10-17",
   "Statement": [
     { "Effect": "Allow", "Action": "cloudformation:*", "Resource": "arn:aws:cloudformation:*:ACCOUNT_ID:stack/sftransitwatch-gtfsrt/*" },
+    { "Effect": "Allow", "Action": "cloudformation:*", "Resource": "arn:aws:cloudformation:*:ACCOUNT_ID:stack/aws-sam-cli-managed-default/*" },
+    { "Effect": "Allow", "Action": "cloudformation:CreateChangeSet", "Resource": "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31" },
     { "Effect": "Allow", "Action": ["s3:*"], "Resource": ["arn:aws:s3:::aws-sam-cli-managed-*", "arn:aws:s3:::aws-sam-cli-managed-*/*"] },
     { "Effect": "Allow", "Action": ["lambda:*"], "Resource": "arn:aws:lambda:*:ACCOUNT_ID:function:sftransitwatch-gtfsrt-*" },
     { "Effect": "Allow", "Action": ["iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PassRole", "iam:TagRole"], "Resource": "arn:aws:iam::ACCOUNT_ID:role/sftransitwatch-gtfsrt-*" },
     { "Effect": "Allow", "Action": ["scheduler:*", "events:*"], "Resource": "*" },
     { "Effect": "Allow", "Action": ["budgets:*"], "Resource": "*" },
-    { "Effect": "Allow", "Action": ["s3:CreateBucket", "s3:PutBucketPolicy", "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock"], "Resource": "arn:aws:s3:::sam-*" }
+    { "Effect": "Allow", "Action": ["s3:CreateBucket", "s3:PutBucketPolicy", "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock"], "Resource": "arn:aws:s3:::sam-*" },
+    { "Effect": "Allow", "Action": ["s3:CreateBucket", "s3:DeleteBucket", "s3:PutBucketPolicy", "s3:PutEncryptionConfiguration", "s3:PutBucketPublicAccessBlock", "s3:PutBucketTagging", "s3:GetBucketPolicy", "s3:GetEncryptionConfiguration", "s3:GetBucketPublicAccessBlock"], "Resource": "arn:aws:s3:::sftransitwatch-gtfsrt-*" },
+    { "Effect": "Allow", "Action": "sns:*", "Resource": "arn:aws:sns:*:ACCOUNT_ID:sftransitwatch-gtfsrt-*" }
   ]
 }
 EOF
@@ -123,9 +127,14 @@ Set these in the repo's Settings → Secrets and variables → Actions:
 | `AWS_ACCOUNT_ID` | The 12-digit AWS account ID used above |
 | `API_511_KEY` | The same 511.org API key already used by the Worker (this Lambda gets its own copy — it calls 511.org independently of the Worker) |
 | `GTFSRT_INTERNAL_KEY` | A newly generated random secret (e.g. `openssl rand -hex 32`) — becomes the `X-Internal-Key` value both the Worker and the reader Lambda must agree on. **This same value also has to be set as the `GTFSRT_INTERNAL_KEY` Worker secret** (`wrangler secret put`, see `CloudflareWorker/README.md`) — it's one shared value, not two independent ones. |
-| `BUDGET_ALERT_EMAIL` | Email address for the $1/month AWS Budgets alert |
+| `BUDGET_ALERT_EMAIL` | Email address for the $1/month AWS Budgets alert, and for QuotaWatcherFunction's Lambda-concurrency-limit-increased alert |
 
 ### After first deploy
+
+SNS email subscriptions require confirmation — check the `BudgetAlertEmail` inbox for an
+"AWS Notification - Subscription Confirmation" message from `AlertTopicSubscription` and click
+the confirm link, or the quota-watcher alert stays silently unconfirmed and never actually
+emails you. (The separate AWS Budgets notification isn't SNS-backed and needs no confirmation.)
 
 Get the reader Function URL from the stack output and verify it directly
 before pointing the Worker at it:
