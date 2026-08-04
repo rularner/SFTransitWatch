@@ -211,3 +211,4 @@ CloudflareWorker/.wrangler.generated.jsonc
 .mcp.json
 ExportOptions.plist
 .wrangler
+AwsLambda/.aws-sam
