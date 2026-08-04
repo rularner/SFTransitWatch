@@ -16,7 +16,9 @@ Parameters:
     Description: Shared secret the Cloudflare Worker sends as X-Internal-Key; the reader rejects any request without a match.
   BudgetAlertEmail:
     Type: String
-    Description: Email address notified when the monthly AWS Budgets threshold is crossed.
+    Description: >
+      Email address notified when the monthly AWS Budgets threshold is crossed, and when
+      QuotaWatcherFunction detects the account's Lambda concurrency limit has risen (see below).
 
 Globals:
   Function:
@@ -43,7 +45,14 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/refresher/index.handler
-      ReservedConcurrentExecutions: 1
+      # ReservedConcurrentExecutions IS THE DESIGN'S COST/BLAST-RADIUS GUARDRAIL AND IS
+      # TEMPORARILY REMOVED, NOT ABANDONED. This account's Lambda concurrency limit is currently
+      # throttled to 10 (a common new-AWS-account anti-fraud default) — AWS requires at least 10
+      # units of *unreserved* concurrency account-wide, so any nonzero reservation here violates
+      # that floor and CREATE_FAILED. RESTORE `ReservedConcurrentExecutions: 1` here (and `5` on
+      # ReaderFunction below) the moment QuotaWatcherFunction's alert email arrives, or once you've
+      # otherwise confirmed the account limit has risen past 10 — see TODO.md and
+      # src/quotaWatcher/checkQuota.ts for the full context.
       Environment:
         Variables:
           SNAPSHOT_BUCKET: !Ref SnapshotBucket
@@ -76,7 +85,8 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: src/reader/index.handler
-      ReservedConcurrentExecutions: 5
+      # See the matching NOTE on RefresherFunction above — same account-wide 10-unit throttle,
+      # same restore-when-the-limit-rises plan. RESTORE `ReservedConcurrentExecutions: 5` here.
       Environment:
         Variables:
           SNAPSHOT_BUCKET: !Ref SnapshotBucket
@@ -99,6 +109,55 @@ Resources:
         Minify: true
         Target: node22
         EntryPoints: ["src/reader/index.ts"]
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: SFTransitWatch GTFS-RT alerts
+
+  AlertTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref BudgetAlertEmail
+
+  # Daily check for AWS lifting this account's Lambda concurrency throttle (see the NOTE on
+  # RefresherFunction/ReaderFunction above) — emails AlertTopic when it does, so the reserved-
+  # concurrency guardrail removal doesn't quietly become permanent.
+  QuotaWatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src/quotaWatcher/index.handler
+      Environment:
+        Variables:
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: lambda:GetAccountSettings
+              Resource: "*" # GetAccountSettings is account-level; it has no resource-scoped ARN.
+            - Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref AlertTopic
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+            Description: Check whether the account's Lambda concurrency limit has risen above the known throttled baseline.
+    # NOTE: this esbuild config has NOT been verified with a real `sam build` —
+    # no aws/sam CLI is available in the sandbox this was authored in. Run
+    # `sam build` (and ideally `sam validate --lint`) before the first real
+    # deploy and fix up CodeUri/Handler/EntryPoints if SAM's dependency
+    # resolution needs something different than what's written here.
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: node22
+        EntryPoints: ["src/quotaWatcher/index.ts"]
 
   MonthlyBudget:
     Type: AWS::Budgets::Budget
