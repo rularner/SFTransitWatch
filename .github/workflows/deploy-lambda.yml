@@ -1,6 +1,10 @@
-name: Deploy GTFS-RT Lambda Stack
+name: GTFS-RT Lambda Stack
 
 on:
+  pull_request:
+    paths:
+      - 'AwsLambda/**'
+      - '.github/workflows/deploy-lambda.yml'
   push:
     branches: [main]
     paths:
@@ -12,7 +16,42 @@ permissions:
   contents: read
 
 jobs:
+  # Runs on every PR touching AwsLambda/** — no AWS credentials needed (sam validate/sam build
+  # don't deploy anything), so this is a fast, safe check that catches template/handler defects
+  # before merge instead of only surfacing them when deploy actually runs.
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: AwsLambda
+        run: npm ci
+
+      - name: Run tests
+        working-directory: AwsLambda
+        run: npm test
+
+      - name: Set up AWS SAM
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: sam validate
+        working-directory: AwsLambda
+        run: sam validate --lint
+
+      - name: sam build
+        working-directory: AwsLambda
+        run: sam build
+
   deploy:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-lambda
