@@ -58,13 +58,17 @@ jobs:
         run: |
           # IRRELEVANT set for the Cloudflare Worker build: everything except CloudflareWorker/**.
           # Skip (post fake success) only if every changed file is OUTSIDE CloudflareWorker/**.
-          if grep -qE '^CloudflareWorker/' /tmp/changed-files.txt; then
-            echo "CloudflareWorker/ files changed — leaving the real Cloudflare status alone."
+          MATCHES=$(grep -E '^CloudflareWorker/' /tmp/changed-files.txt || true)
+          if [ -n "$MATCHES" ]; then
+            echo "DECISION: leaving the real Cloudflare status alone. Blocking file(s):"
+            echo "$MATCHES"
           else
-            gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+            echo "DECISION: no CloudflareWorker/ files changed — posting a shimmed success."
+            RESPONSE=$(gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
               -f state=success \
               -f context="Workers Builds: sftransitwatch" \
-              -f description="No CloudflareWorker/ changes — shimmed by shim-required-checks.yml"
+              -f description="No CloudflareWorker/ changes — shimmed by shim-required-checks.yml")
+            echo "gh api response: $RESPONSE"
           fi
 
       - name: Shim Xcode Cloud test statuses if no app files changed
@@ -75,17 +79,21 @@ jobs:
           # .github/, and top-level repo-meta files. Everything else (SFTransitWatch*/,
           # TestSupport/, *.xcodeproj, ci_scripts/, bin/, Config.xcconfig, etc.) is treated as
           # potentially relevant and will NOT be skipped, even if this list is incomplete.
-          IRRELEVANT_PATTERN='^(AwsLambda/|CloudflareWorker/|docs/|\.github/|CLAUDE\.md$|LICENSE$|README\.md$|TODO\.md$|build\.log$)'
-          if grep -vE "$IRRELEVANT_PATTERN" /tmp/changed-files.txt | grep -q .; then
-            echo "App-relevant files changed — leaving the real Xcode Cloud statuses alone."
+          IRRELEVANT_PATTERN='^(AwsLambda/|CloudflareWorker/|docs/|\.github/|CLAUDE\.md$|LICENSE$|LICENSE\..*$|README\.md$|TODO\.md$|build\.log$|\.gitignore$|\.gitattributes$|\.editorconfig$)'
+          NON_MATCHES=$(grep -vE "$IRRELEVANT_PATTERN" /tmp/changed-files.txt || true)
+          if [ -n "$NON_MATCHES" ]; then
+            echo "DECISION: leaving the real Xcode Cloud statuses alone. Blocking file(s) (didn't match IRRELEVANT_PATTERN):"
+            echo "$NON_MATCHES"
           else
+            echo "DECISION: every changed file matched IRRELEVANT_PATTERN — posting shimmed successes."
             for CTX in \
               "SFTransitWatch | Test Run" \
               "SFTransitWatch | Test Run | Test - iOS" \
               "SFTransitWatch | Test Run | Test - watchOS"; do
-              gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+              RESPONSE=$(gh api "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
                 -f state=success \
                 -f context="$CTX" \
-                -f description="No app-relevant changes — shimmed by shim-required-checks.yml"
+                -f description="No app-relevant changes — shimmed by shim-required-checks.yml")
+              echo "gh api response for '$CTX': $RESPONSE"
             done
           fi
