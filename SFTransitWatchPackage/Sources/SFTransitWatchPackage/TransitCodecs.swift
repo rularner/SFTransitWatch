@@ -34,6 +34,23 @@ public enum TransitJSON {
         }
         return s.replacingOccurrences(of: "_", with: " ")
     }
+
+    /// Maps this worker's GTFS-RT direction codes to a legible label. "IB"/"OB"
+    /// come from CloudflareWorker/src/gtfsrt/indexBuilder.ts's directionRef(),
+    /// which has no headsign to work with — it only knows GTFS-RT direction_id
+    /// (0/1). Anything else (511.org's native SIRI DirectionRef values, e.g.
+    /// "N") is already a real value from the source feed and passes through
+    /// unchanged. An empty ref (direction_id absent) gets a non-blank label so
+    /// the UI never renders empty text where a destination is expected.
+    public static func directionLabel(_ directionRef: String) -> String {
+        switch directionRef {
+        case "IB": return "Inbound"
+        case "OB": return "Outbound"
+        case "":   return "Unknown direction"
+        default:   return directionRef
+        }
+    }
+
     /// Decodes a `/Stops` JSON payload into BusStops. Returns nil if the
     /// payload doesn't decode (caller can fall back to XML parsing). The
     /// `agency` arg tags every returned stop, since stop codes are scoped.
@@ -71,7 +88,7 @@ public enum TransitJSON {
             guard let rawTime, let arrivalTime = formatter.date(from: rawTime) else { return nil }
             let destination = journey.targetedCall.destinationDisplay
                 ?? journey.vehicleJourneyName
-                ?? journey.directionRef
+                ?? Self.directionLabel(journey.directionRef)
             return BusArrival(
                 route: cleanLineRef(journey.lineRef),
                 destination: destination,
@@ -188,7 +205,7 @@ public enum TransitJSON {
 
             return BusArrival(
                 route: Self.cleanLineRef(journey.lineRef),
-                destination: journey.directionRef,
+                destination: Self.directionLabel(journey.directionRef),
                 arrivalTime: arrivalTime,
                 isRealTime: true,
                 alerts: alerts,

@@ -57,10 +57,7 @@ final class WatchSession: NSObject, WCSessionDelegate {
         // user set directly on the watch. Only non-empty values are applied (mirrors the
         // enabledAgencies/favoriteStops handling that was already guarded this way).
         if let key = context["transitKey"] as? String, !key.isEmpty {
-            // Write to both stores: App Group (for SettingsView) and standard (for
-            // TransitAPI's @AppStorage reactive updates).
             ConfigurationManager.shared.apiKey = key
-            UserDefaults.standard.set(key, forKey: "511_API_KEY_FROM_PHONE")
         }
 
         let token = (context["workerToken"] as? String) ?? ""
