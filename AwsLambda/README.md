@@ -95,6 +95,7 @@ cat > /tmp/sftransitwatch-gha-deploy-policy.json <<'EOF'
   "Version": "2012-10-17",
   "Statement": [
     { "Effect": "Allow", "Action": "cloudformation:*", "Resource": "arn:aws:cloudformation:*:ACCOUNT_ID:stack/sftransitwatch-gtfsrt/*" },
+    { "Effect": "Allow", "Action": "cloudformation:*", "Resource": "arn:aws:cloudformation:*:ACCOUNT_ID:stack/aws-sam-cli-managed-default/*" },
     { "Effect": "Allow", "Action": ["s3:*"], "Resource": ["arn:aws:s3:::aws-sam-cli-managed-*", "arn:aws:s3:::aws-sam-cli-managed-*/*"] },
     { "Effect": "Allow", "Action": ["lambda:*"], "Resource": "arn:aws:lambda:*:ACCOUNT_ID:function:sftransitwatch-gtfsrt-*" },
     { "Effect": "Allow", "Action": ["iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PassRole", "iam:TagRole"], "Resource": "arn:aws:iam::ACCOUNT_ID:role/sftransitwatch-gtfsrt-*" },
