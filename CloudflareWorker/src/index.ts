@@ -418,17 +418,26 @@ function selectClosestStops(url: URL, active: CachedStops): CachedStop[] {
 	const lat = parseFloat(url.searchParams.get("lat") ?? url.searchParams.get("latitude") ?? "");
 	const lon = parseFloat(url.searchParams.get("lon") ?? url.searchParams.get("longitude") ?? "");
 	const rawCount = parseInt(url.searchParams.get("count") ?? "", 10);
-	const count = Number.isFinite(rawCount) && rawCount > 0
-		? Math.min(rawCount, MAX_STOPS_COUNT)
-		: DEFAULT_STOPS_COUNT;
+	// parseInt yields a finite number or NaN, and `NaN > 0` is false, so a non-positive or
+	// unparseable count (e.g. "count=-5", "count=notanumber") intentionally falls back to
+	// DEFAULT_STOPS_COUNT rather than being clamped to a minimum of 1 — this is deliberate,
+	// tested behavior, not something to "simplify" into a strict clamp.
+	const hasExplicitCount = rawCount > 0;
+	const count = hasExplicitCount ? Math.min(rawCount, MAX_STOPS_COUNT) : DEFAULT_STOPS_COUNT;
 
 	if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-		return active.stops.slice(0, count);
+		// No location to rank by: stop search (fetchAllStops -> searchStops in the apps) relies
+		// on getting the full agency stop list back. Only cap this path if the caller explicitly
+		// asked for a count — otherwise capping to `count` would silently break client-side search
+		// for the ~99% of stops beyond the first `count` in whatever order the cache holds.
+		return hasExplicitCount ? active.stops.slice(0, count) : active.stops;
 	}
 
-	return [...active.stops]
-		.sort((a, b) => distanceMeters(a.lat, a.lon, lat, lon) - distanceMeters(b.lat, b.lon, lat, lon))
-		.slice(0, count);
+	return active.stops
+		.map((s) => ({ s, d: distanceMeters(s.lat, s.lon, lat, lon) }))
+		.sort((a, b) => a.d - b.d)
+		.slice(0, count)
+		.map((x) => x.s);
 }
 
 function isValidCachedStops(raw: unknown): raw is CachedStops {

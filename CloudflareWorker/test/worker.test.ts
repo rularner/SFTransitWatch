@@ -483,6 +483,19 @@ describe("GET /Stops count param (closest-N selection)", () => {
         const body = (await res.json()) as StopsBody;
         expect(body.Contents.dataObjects.ScheduledStopPoint).toHaveLength(5);
     });
+
+    it("returns the full stop list when no lat/lon and no count are provided", async () => {
+        // fetchAllStops(agency:) on both the iOS and watchOS apps calls /Stops with only
+        // operator_id — no lat/lon, no count — and feeds the result into client-side stop
+        // search. That path must never be silently truncated to DEFAULT_STOPS_COUNT (30);
+        // this fixture has 150 stops specifically so a cap-to-30 regression is visible.
+        const res = await SELF.fetch("https://example.com/Stops?agency=CX", {
+            headers: { "X-App-Token": VALID_TOKEN },
+        });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as StopsBody;
+        expect(body.Contents.dataObjects.ScheduledStopPoint).toHaveLength(150);
+    });
 });
 
 // ---------------------------------------------------------------------------
