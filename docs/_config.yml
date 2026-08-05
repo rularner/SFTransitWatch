@@ -6,4 +6,4 @@ show_downloads: false
 header_pages:
   - index.md
   - support.md
-  - privacy.md
+  - privacy_policy.md

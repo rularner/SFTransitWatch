@@ -7,19 +7,27 @@ title: Support
 
 ## Getting started
 
-### Option A — Connect to the SF Transit Watch server (recommended)
+### Option A — Subscribe to the SF Transit Watch server (recommended)
 
-On first launch, the app will ask if you want to connect to the SF Transit
-Watch proxy server. Tap **Connect** and the app configures itself
-automatically — no API key required.
+On first launch, the app offers to connect to the SF Transit Watch proxy
+server. This requires an auto-renewing subscription, purchased through the
+App Store; the current price and billing period are shown on the subscribe
+screen in the app before you buy. Subscriptions renew automatically unless
+cancelled at least 24 hours before the end of the period, and you can manage
+or cancel yours any time in **Settings → Apple Account → Subscriptions** on
+iPhone.
 
-The proxy is optional and free. It caches 511.org requests so your watch
-gets faster responses. See the privacy policy for what data is exchanged
-during the one-time setup.
+In exchange you get transit data without registering for or managing an API
+key of your own, plus server-side caching so your watch gets faster
+responses.
+
+In this mode your requests go through our server, which means it receives
+your location and the stops you look up. See the
+[privacy policy](privacy_policy.html) for exactly what is sent and kept.
 
 ### Option B — Use a 511.org API key directly
 
-SF Transit Watch also works with a free [511.org Open Data API](https://511.org/open-data) key. This mode sends requests directly from the app to 511.org, bypassing the proxy entirely.
+SF Transit Watch also works with a free [511.org Open Data API](https://511.org/open-data) key, with no subscription. This mode sends requests directly from the app to 511.org, bypassing our proxy entirely — we receive nothing at all, including no diagnostics. This is the option to choose if you would rather no server of ours ever see your location.
 
 **Getting a key:**
 
@@ -34,6 +42,13 @@ SF Transit Watch also works with a free [511.org Open Data API](https://511.org/
 3. The watch app picks up the key automatically the next time it connects to the phone.
 
 You can also enter the key directly on the watch under **Settings → API Key**, but setting it on the phone is easier.
+
+**If you previously subscribed to the proxy server**, entering an API key is
+not on its own enough to stop using it — the app keeps routing through the
+server while it still holds a credential for it. To switch fully to direct
+mode, also tap **Clear** under **Settings → Worker proxy**. Once cleared, the
+app talks only to 511.org. (Clearing the credential does not cancel your
+subscription; cancel that in **Settings → Apple Account → Subscriptions**.)
 
 ## Loading your API key via text or email
 
