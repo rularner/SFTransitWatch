@@ -21,9 +21,9 @@ public final class SubscriptionManager {
 
     public init() {}
 
-    /// Returns the `originalTransactionId` of an active, non-revoked worker-proxy
-    /// subscription entitlement (any tier in the group), or `nil` if there isn't one.
-    public func activeOriginalTransactionId() async -> String? {
+    /// Returns the entitlement JWS (`VerificationResult.jwsRepresentation`) of an active, non-revoked worker-proxy
+    /// subscription (any tier in the group), or `nil` if there isn't one.
+    public func activeEntitlementJWS() async -> String? {
         let ids = Set(Self.workerProxyProductIDs)
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
@@ -32,7 +32,7 @@ public final class SubscriptionManager {
                   let expirationDate = transaction.expirationDate,
                   expirationDate > Date()
             else { continue }
-            return String(transaction.originalID)
+            return result.jwsRepresentation
         }
         return nil
     }
@@ -64,7 +64,7 @@ public final class SubscriptionManager {
     }
 
     /// Presents the StoreKit purchase flow for the given product. Returns the
-    /// `originalTransactionId` on success.
+    /// `jwsRepresentation` on success.
     public func purchase(productID: String) async throws -> String {
         let products = try await Product.products(for: [productID])
         guard let product = products.first else {
@@ -78,7 +78,7 @@ public final class SubscriptionManager {
                 throw SubscriptionManagerError.verificationFailed
             }
             await transaction.finish()
-            return String(transaction.originalID)
+            return verification.jwsRepresentation
         case .userCancelled:
             throw SubscriptionManagerError.purchaseCancelled
         case .pending:
@@ -90,13 +90,13 @@ public final class SubscriptionManager {
 
     /// Force-refreshes entitlements from Apple's servers (may prompt for Apple ID
     /// sign-in), then returns the active worker-proxy subscription's
-    /// `originalTransactionId`. Throws `.noActiveSubscription` if none is found.
+    /// `jwsRepresentation`. Throws `.noActiveSubscription` if none is found.
     public func restore() async throws -> String {
         try await AppStore.sync()
-        guard let id = await activeOriginalTransactionId() else {
+        guard let jws = await activeEntitlementJWS() else {
             throw SubscriptionManagerError.noActiveSubscription
         }
-        return id
+        return jws
     }
 
     // MARK: - StoreKit → value-type mapping

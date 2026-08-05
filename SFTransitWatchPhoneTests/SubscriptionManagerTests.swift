@@ -22,9 +22,9 @@ final class SubscriptionManagerTests: XCTestCase {
         XCTAssertTrue(SubscriptionManager.workerProxyProductIDs.contains(SubscriptionManager.workerProxyProductID))
     }
 
-    func testActiveOriginalTransactionIdReturnsNilWithNoSubscription() async {
+    func testActiveEntitlementJWSReturnsNilWithNoSubscription() async {
         let manager = SubscriptionManager()
-        let result = await manager.activeOriginalTransactionId()
+        let result = await manager.activeEntitlementJWS()
         XCTAssertNil(result)
     }
 
@@ -65,14 +65,14 @@ final class SubscriptionManagerTests: XCTestCase {
         XCTAssertNil(tiers.last?.introOffer)
     }
 
-    func testPurchaseReturnsOriginalTransactionId() async throws {
+    func testPurchaseReturnsEntitlementJWS() async throws {
         try XCTSkipIf(true, "Product.products(for:) returns productNotFound — needs the scheme's Test action StoreKit Configuration set to WorkerProxySubscription.storekit.")
 
         let manager = SubscriptionManager()
-        let originalTransactionId = try await manager.purchase(productID: SubscriptionManager.workerProxyProductID)
-        XCTAssertFalse(originalTransactionId.isEmpty)
+        let jws = try await manager.purchase(productID: SubscriptionManager.workerProxyProductID)
+        XCTAssertFalse(jws.isEmpty)
 
-        let active = await manager.activeOriginalTransactionId()
-        XCTAssertEqual(active, originalTransactionId)
+        let active = await manager.activeEntitlementJWS()
+        XCTAssertEqual(active, jws)
     }
 }
