@@ -220,7 +220,7 @@ struct SettingsView: View {
             APIKeyEntryView(apiKey: $apiKey)
         }
         .task {
-            hasActiveSubscription = await subscriptionManager.activeOriginalTransactionId() != nil
+            hasActiveSubscription = await subscriptionManager.activeEntitlementJWS() != nil
         }
     }
 

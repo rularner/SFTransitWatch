@@ -55,7 +55,7 @@ struct SFTransitWatchApp: App {
                     }
                 }) {
                     SetupView(
-                        canSubscribe: provisionService != nil,
+                        canSubscribe: true,
                         tiers: subscriptionTiers,
                         isPurchasing: isPurchasing,
                         onSubscribe: { productID in Task { await handleSubscribeAndProvision(productID: productID) } },
@@ -132,18 +132,18 @@ struct SFTransitWatchApp: App {
     }
 
     private func handleSubscribeAndProvision(productID: String) async {
-        guard let service = provisionService else { return }
+        let service = provisionService
         isPurchasing = true
         defer { isPurchasing = false }
         do {
-            let originalTransactionId: String
-            if let existing = await subscriptionManager.activeOriginalTransactionId() {
-                originalTransactionId = existing
+            let signedTransactionInfo: String
+            if let existing = await subscriptionManager.activeEntitlementJWS() {
+                signedTransactionInfo = existing
             } else {
-                originalTransactionId = try await subscriptionManager.purchase(productID: productID)
+                signedTransactionInfo = try await subscriptionManager.purchase(productID: productID)
             }
 
-            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, signedTransactionInfo: signedTransactionInfo)
             switch result {
             case .success:
                 showingSetup = false
@@ -160,12 +160,12 @@ struct SFTransitWatchApp: App {
     }
 
     private func handleRestore() async {
-        guard let service = provisionService else { return }
+        let service = provisionService
         isRestoring = true
         defer { isRestoring = false }
         do {
-            let originalTransactionId = try await subscriptionManager.restore()
-            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            let signedTransactionInfo = try await subscriptionManager.restore()
+            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, signedTransactionInfo: signedTransactionInfo)
             switch result {
             case .success:
                 showingSetup = false
@@ -180,12 +180,12 @@ struct SFTransitWatchApp: App {
     }
 
     private func refreshSubscriptionIfNeeded() async {
-        guard let service = provisionService, ConfigurationManager.shared.isWorkerConfigured else { return }
+        guard ConfigurationManager.shared.isWorkerConfigured else { return }
         let now = Date()
         guard ProvisionRefreshGate.shouldRefresh(lastRefreshAt: ConfigurationManager.shared.lastProvisionRefreshAt, now: now) else { return }
         ConfigurationManager.shared.lastProvisionRefreshAt = now
-        guard let originalTransactionId = await subscriptionManager.activeOriginalTransactionId() else { return }
-        _ = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+        guard let signedTransactionInfo = await subscriptionManager.activeEntitlementJWS() else { return }
+        _ = await provisionService.provision(workerURL: ConfigurationManager.shared.workerBaseURL, signedTransactionInfo: signedTransactionInfo)
     }
 
     private func handleWorkerBootstrap(_ bootstrap: PendingBootstrap) async {
