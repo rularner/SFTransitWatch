@@ -4,21 +4,5 @@
 
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
 
-// EC P-256 private key for worker self-provisioning (Base64-encoded SEC1 or PKCS8 DER).
-// Generate with:
-//   openssl ecparam -name prime256v1 -genkey -noout -out /tmp/provision.pem
-//   openssl ec -in /tmp/provision.pem -outform DER | base64 | tr -d '\n'
-//   rm /tmp/provision.pem
-// The corresponding public key (SPKI DER base64) goes into the Cloudflare Worker
-// secret SELF_PROVISION_PUBLIC_KEY:
-//   openssl ec -in /tmp/provision.pem -pubout -outform DER | base64 | tr -d '\n'
-// To build without the key (simulator-only, no store flow — makeFromBundle()
-// returns nil and the Connect button is hidden), leave it blank AND set
-// ALLOW_MISSING_SELF_PROVISION_KEY = YES below. Otherwise the build fails, so a
-// missing key can't silently ship a dead store flow. See bin/check-self-provision-key.sh.
-
-SELF_PROVISION_PRIVATE_KEY =
-// ALLOW_MISSING_SELF_PROVISION_KEY = YES
-
 // Worker proxy base URL (already set in Config.xcconfig; override here only if needed).
 // WORKER_BASE_URL = https://your-worker.your-account.workers.dev

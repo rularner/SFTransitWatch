@@ -43,24 +43,6 @@ fi
 
 sed -i '' "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = ${CI_BUILD_NUMBER}/" "$XCCONFIG"
 
-# Inject the self-provision signing key into the xcconfig from the Xcode Cloud
-# environment variable. This is REQUIRED, not optional: Info.plist substitutes
-# $(SELF_PROVISION_PRIVATE_KEY) from *build settings*, and Xcode Cloud
-# environment variables are NOT promoted to build settings (same reason
-# CI_BUILD_NUMBER is sed'd in above). Setting the env var alone would let the
-# build-phase guard (bin/check-self-provision-key.sh) pass — it reads the
-# inherited shell env — while the shipped app still got an empty key. Append
-# (don't sed) because the value is base64 and contains '/' and '+'; appended
-# after the #include? line it's the only definition in CI (Developer.xcconfig
-# is gitignored and absent). If the env var is unset, leave it empty and let
-# the build-phase guard fail the build with its explanatory message.
-if [ -n "${SELF_PROVISION_PRIVATE_KEY:-}" ]; then
-  printf '\nSELF_PROVISION_PRIVATE_KEY = %s\n' "$SELF_PROVISION_PRIVATE_KEY" >> "$XCCONFIG"
-  echo "Injected SELF_PROVISION_PRIVATE_KEY from Xcode Cloud environment"
-else
-  echo "SELF_PROVISION_PRIVATE_KEY not set in environment; build-phase guard will decide whether to fail"
-fi
-
 # Keep CFBundleShortVersionString aligned with release tags in CI.
 # If tags are available, use the latest semver tag (vX.Y.Z) as MARKETING_VERSION.
 # Instead of a simple fetch, get all history and tags

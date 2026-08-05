@@ -474,7 +474,6 @@
 				CAFE000000000000000017A0 /* Frameworks */,
 				CAFE000000000000000001AD /* Resources */,
 				CAFE0000000000000000CT04 /* Embed Foundation Extensions */,
-				CAFE0000000000000000SP01 /* Check self-provision key */,
 			);
 			buildRules = (
 			);
@@ -497,7 +496,6 @@
 				CAFE000000000000000020D2 /* Frameworks */,
 				CAFE000000000000000020D1 /* Resources */,
 				CAFE000000000000000020D3 /* Embed Watch Content */,
-				CAFE0000000000000000SP02 /* Check self-provision key */,
 			);
 			buildRules = (
 			);
@@ -655,43 +653,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		CAFE0000000000000000SP01 /* Check self-provision key */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/bin/check-self-provision-key.sh",
-				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
-			);
-			name = "Check self-provision key";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/bin/check-self-provision-key.sh\"\n";
-		};
-		CAFE0000000000000000SP02 /* Check self-provision key */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/bin/check-self-provision-key.sh",
-				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
-			);
-			name = "Check self-provision key";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/bin/check-self-provision-key.sh\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		8477FCC02FB16F9000C98E73 /* Sources */ = {
