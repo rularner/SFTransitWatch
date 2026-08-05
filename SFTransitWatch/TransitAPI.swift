@@ -372,13 +372,14 @@ class TransitAPI: ObservableObject {
             if let routeRange = Range(match.range(at: 1), in: xmlString),
                let destinationRange = Range(match.range(at: 2), in: xmlString),
                let timeRange = Range(match.range(at: 3), in: xmlString) {
-                let route = TransitJSON.cleanLineRef(String(xmlString[routeRange]))
+                let rawLineRef = String(xmlString[routeRange])
+                let route = TransitJSON.cleanLineRef(rawLineRef)
                 let destination = String(xmlString[destinationRange])
                 let timeString = String(xmlString[timeRange])
                 if let arrivalTime = formatter.date(from: timeString) {
                     arrivals.append(BusArrival(
                         route: route,
-                        destination: TransitJSON.directionLabel(destination),
+                        destination: TransitJSON.directionLabel(destination, lineRef: rawLineRef),
                         arrivalTime: arrivalTime,
                         isRealTime: true,
                         alerts: alerts

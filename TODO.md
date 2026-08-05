@@ -1,6 +1,7 @@
 Bugs:
   - Initial screen shows "No nearby stops" message before data is loaded instead of a loading message
   - Re-enable skipped StoreKit purchase-flow tests (testActiveOriginalTransactionIdReturnsIdAfterPurchase, testPurchaseReturnsOriginalTransactionId) once the SFTransitWatch scheme's Test action StoreKit Configuration is set to WorkerProxySubscription.storekit. Currently XCTSkipIf(true, ...).
+  - We should set up continuous scroll to retrieve further away stations
 
 Code review 2026-07-12 (full app + worker; verified findings):
   Correctness / user-visible — remaining:
