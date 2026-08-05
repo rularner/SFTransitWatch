@@ -403,6 +403,56 @@ final class BusArrivalTests: XCTestCase {
         XCTAssertEqual(arrivals?.first?.destination, "N")
     }
 
+    /// Caltrain is a linear SF↔San Jose/Gilroy corridor, not a downtown loop,
+    /// so the generic Inbound/Outbound labeling doesn't mean anything for it.
+    /// direction_id 1 ("IB") is Southbound and 0 ("OB") is Northbound for
+    /// Caltrain specifically (confirmed against real service).
+    func testDecodeArrivalsMapsCaltrainIBToSouthbound() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "CT:Local",
+                  "DirectionRef": "IB",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Southbound")
+    }
+
+    func testDecodeArrivalsMapsCaltrainOBToNorthbound() {
+        let json = """
+        {
+          "ServiceDelivery": {
+            "StopMonitoringDelivery": {
+              "MonitoredStopVisit": [{
+                "MonitoredVehicleJourney": {
+                  "LineRef": "CT:Local",
+                  "DirectionRef": "OB",
+                  "MonitoredCall": {
+                    "ExpectedArrivalTime": "2026-01-01T10:25:00+00:00"
+                  }
+                }
+              }]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let arrivals = TransitJSON.decodeArrivals(json)
+        XCTAssertEqual(arrivals?.first?.destination, "Northbound")
+    }
+
     /// Regression: decodeScheduledDepartures's destination fallback chain
     /// (DestinationDisplay ?? VehicleJourneyName ?? DirectionRef) must map
     /// its raw-DirectionRef fallback through directionLabel, same as
