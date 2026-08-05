@@ -7,7 +7,9 @@ export interface AppStoreEnv {
 	APPSTORE_BUNDLE_ID: string;
 }
 
-export type SubscriptionStatus = { active: true; expiresAtMs: number } | { active: false };
+export type SubscriptionStatus =
+	| { active: true; expiresAtMs: number; environment: "Production" | "Sandbox" }
+	| { active: false };
 
 interface AppStoreSubscriptionResponse {
 	data?: Array<{
@@ -18,6 +20,7 @@ interface AppStoreSubscriptionResponse {
 export async function verifySubscription(
 	env: AppStoreEnv,
 	originalTransactionId: string,
+	expectedEnvironment: "Production" | "Sandbox",
 ): Promise<SubscriptionStatus> {
 	const jwt = await signAppStoreJWT(env);
 
@@ -49,8 +52,15 @@ export async function verifySubscription(
 	const payload = decodeJwsPayload(last.signedTransactionInfo);
 	const expiresAtMs = typeof payload.expiresDate === "number" ? payload.expiresDate : 0;
 
+	// environment is the LOWER of what the client's JWS claimed and which host
+	// actually confirmed the transaction: a claim of Production that only sandbox
+	// could verify is downgraded, never upgraded.
+	const confirmedEnvironment: "Production" | "Sandbox" = usedSandbox ? "Sandbox" : "Production";
+	const environment: "Production" | "Sandbox" =
+		expectedEnvironment === "Sandbox" || confirmedEnvironment === "Sandbox" ? "Sandbox" : "Production";
+
 	if (ACTIVE_STATUSES.has(last.status) && expiresAtMs > Date.now()) {
-		return { active: true, expiresAtMs };
+		return { active: true, expiresAtMs, environment };
 	}
 	console.warn(JSON.stringify({ source: "verify-sub", reason: "inactive", usedSandbox, txStatus: last.status, expiresAtMs, now: Date.now() }));
 	return { active: false };
