@@ -57,10 +57,10 @@ If you'd rather not type or paste the key into the watch, you can send yourself 
 1. Send yourself a Messages or email message containing a link in this exact form:
 
    ```
-   https://rularner.github.io/sftransitwatch/key?k=YOUR_API_KEY
+   sftransitwatch://key/YOUR_API_KEY
    ```
 
-   Replace `YOUR_API_KEY` with the token 511.org sent you. Messages and Mail will render it as a normal tappable link.
+   Replace `YOUR_API_KEY` with the token 511.org sent you. Note the key goes **after a slash**, not as a `?k=` parameter.
 
 2. Open that message **on your Apple Watch**:
    - **Messages:** open the conversation in the Messages app on the watch.
@@ -68,17 +68,9 @@ If you'd rather not type or paste the key into the watch, you can send yourself 
 
 3. Tap the link. The watch will launch SF Transit Watch, save the key, and you'll be ready to go.
 
-Tapping the link on the iPhone or a computer won't open the app — the link is only wired into the watch app. Anyone who lands on that URL in a browser just sees a short "open this on your watch" page; the key is never sent anywhere except the watch.
+The key is never sent anywhere except your own watch — the link is handled entirely on-device and never resolves against any web server.
 
-### Fallback: custom URL scheme
-
-If for some reason the https link isn't working (e.g., your watch hasn't picked up the universal link yet), the app also accepts its own URL scheme:
-
-```
-sftransitwatch://key/YOUR_API_KEY
-```
-
-Note that many email and message clients won't auto-linkify non-`https` URLs, so the link may render as plain text. Prefer the https form above.
+**If the link isn't tappable:** many Mail and Messages clients only auto-linkify `http`/`https` URLs, so an `sftransitwatch://` link may render as plain text you can't tap. If that happens, type the key in directly on the watch under **Settings → API Key**, or set it on the iPhone and let it sync over.
 
 ## Troubleshooting
 
