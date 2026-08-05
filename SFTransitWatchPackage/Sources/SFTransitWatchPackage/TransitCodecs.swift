@@ -36,16 +36,22 @@ public enum TransitJSON {
     }
 
     /// Maps this worker's GTFS-RT direction codes to a legible label. "IB"/"OB"
-    /// come from CloudflareWorker/src/gtfsrt/indexBuilder.ts's directionRef(),
-    /// which has no headsign to work with — it only knows GTFS-RT direction_id
+    /// come from AwsLambda/src/gtfsrt/indexBuilder.ts's directionRef(), which
+    /// has no headsign to work with — it only knows GTFS-RT direction_id
     /// (0/1). Anything else (511.org's native SIRI DirectionRef values, e.g.
     /// "N") is already a real value from the source feed and passes through
     /// unchanged. An empty ref (direction_id absent) gets a non-blank label so
     /// the UI never renders empty text where a destination is expected.
-    public static func directionLabel(_ directionRef: String) -> String {
+    ///
+    /// Caltrain is a linear SF↔San Jose/Gilroy corridor, not a downtown loop,
+    /// so "Inbound"/"Outbound" doesn't mean anything there — it gets
+    /// Northbound/Southbound instead. `lineRef` is the raw (un-cleaned)
+    /// LineRef, e.g. "CT:Local", so the agency prefix is still intact.
+    public static func directionLabel(_ directionRef: String, lineRef: String) -> String {
+        let isCaltrain = lineRef.hasPrefix("CT:")
         switch directionRef {
-        case "IB": return "Inbound"
-        case "OB": return "Outbound"
+        case "IB": return isCaltrain ? "Southbound" : "Inbound"
+        case "OB": return isCaltrain ? "Northbound" : "Outbound"
         case "":   return "Unknown direction"
         default:   return directionRef
         }
@@ -88,7 +94,7 @@ public enum TransitJSON {
             guard let rawTime, let arrivalTime = formatter.date(from: rawTime) else { return nil }
             let destination = journey.targetedCall.destinationDisplay
                 ?? journey.vehicleJourneyName
-                ?? Self.directionLabel(journey.directionRef)
+                ?? Self.directionLabel(journey.directionRef, lineRef: journey.lineRef)
             return BusArrival(
                 route: cleanLineRef(journey.lineRef),
                 destination: destination,
@@ -205,7 +211,7 @@ public enum TransitJSON {
 
             return BusArrival(
                 route: Self.cleanLineRef(journey.lineRef),
-                destination: Self.directionLabel(journey.directionRef),
+                destination: Self.directionLabel(journey.directionRef, lineRef: journey.lineRef),
                 arrivalTime: arrivalTime,
                 isRealTime: true,
                 alerts: alerts,
