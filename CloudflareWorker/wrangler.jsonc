@@ -5,7 +5,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "sftransitwatch",
-	"main": "src/index.ts",
+	"main": "src/worker-entry.ts",
 	"compatibility_date": "2026-04-20",
 	"observability": {
 		"enabled": true,

@@ -1,4 +1,3 @@
-import { SignedDataVerifier, VerificationException, VerificationStatus, Environment } from "@apple/app-store-server-library";
 import { APPLE_ROOT_CA_G3_DER_BASE64 } from "./appleRootCertificate";
 
 export const WORKER_PROXY_PRODUCT_IDS = ["org.larner.SFTransitWatch.proxy.monthly"];
@@ -14,9 +13,24 @@ export interface VerifiedTransaction {
 
 export type VerifyResult = { ok: true; payload: VerifiedTransaction } | { ok: false; reason: string };
 
+// @apple/app-store-server-library pulls in jsrsasign, which seeds an internal PRNG pool
+// via crypto.getRandomValues() as a side effect of merely loading the module — not of
+// calling any of its functions. Workers forbids randomness/async I/O outside of
+// request-handling context ("global scope"), so a static top-level import here crashes
+// the Worker at startup, before it ever serves a request (confirmed via `wrangler dev`,
+// which runs the real workerd engine locally: "Disallowed operation called within global
+// scope"). A dynamic import, first triggered from inside a request handler and never at
+// module load time, defers that side effect into request context, where it's allowed.
+type AppleLib = typeof import("@apple/app-store-server-library");
+let applePromise: Promise<AppleLib> | undefined;
+function loadAppleLib(): Promise<AppleLib> {
+    if (!applePromise) applePromise = import("@apple/app-store-server-library");
+    return applePromise;
+}
+
 interface VerifierPair {
-    production: SignedDataVerifier;
-    sandbox: SignedDataVerifier;
+    production: InstanceType<AppleLib["SignedDataVerifier"]>;
+    sandbox: InstanceType<AppleLib["SignedDataVerifier"]>;
 }
 
 // Keyed by "bundleId:appAppleId" rather than a single module-level singleton so that
@@ -24,10 +38,11 @@ interface VerifierPair {
 // in production this key is constant for the life of the isolate, so it's a no-op cost.
 const verifierCache = new Map<string, VerifierPair>();
 
-function getVerifiers(bundleId: string, appAppleId: number): VerifierPair {
+async function getVerifiers(bundleId: string, appAppleId: number): Promise<VerifierPair> {
     const cacheKey = `${bundleId}:${appAppleId}`;
     let pair = verifierCache.get(cacheKey);
     if (!pair) {
+        const { SignedDataVerifier, Environment } = await loadAppleLib();
         const root = [Buffer.from(APPLE_ROOT_CA_G3_DER_BASE64, "base64")];
         pair = {
             production: new SignedDataVerifier(root, false, Environment.PRODUCTION, bundleId, appAppleId),
@@ -44,10 +59,12 @@ export async function verifyAppleTransactionJWS(
 ): Promise<VerifyResult> {
     let production: VerifierPair["production"], sandbox: VerifierPair["sandbox"];
     try {
-        ({ production, sandbox } = getVerifiers(opts.bundleId, opts.appAppleId));
+        ({ production, sandbox } = await getVerifiers(opts.bundleId, opts.appAppleId));
     } catch (err) {
         return { ok: false, reason: `verifier construction failed: ${String(err)}` };
     }
+
+    const { VerificationException, VerificationStatus } = await loadAppleLib();
 
     let decoded;
     try {
@@ -94,13 +111,13 @@ export async function verifyAppleTransactionJWS(
     };
 }
 
-export function healthCheckAppleJws(bundleId: string, rawAppAppleId: string): { ok: boolean; error?: string } {
+export async function healthCheckAppleJws(bundleId: string, rawAppAppleId: string): Promise<{ ok: boolean; error?: string }> {
     const appAppleId = Number.parseInt(rawAppAppleId, 10);
     if (!Number.isInteger(appAppleId) || appAppleId <= 0) {
         return { ok: false, error: "APPSTORE_APP_APPLE_ID is not configured or not a positive integer" };
     }
     try {
-        getVerifiers(bundleId, appAppleId);
+        await getVerifiers(bundleId, appAppleId);
         return { ok: true };
     } catch (err) {
         return { ok: false, error: String(err) };

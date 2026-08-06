@@ -585,7 +585,7 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 	const checks: Record<string, { ok: boolean; status?: number; error?: string }> = {};
 
 	try {
-		const result = healthCheckAppleJws(env.APPSTORE_BUNDLE_ID, env.APPSTORE_APP_APPLE_ID);
+		const result = await healthCheckAppleJws(env.APPSTORE_BUNDLE_ID, env.APPSTORE_APP_APPLE_ID);
 		checks.appleJwsVerifier = result.ok ? { ok: true } : { ok: false, error: result.error };
 	} catch (err) {
 		console.error("Healthcheck appleJwsVerifier check failed", err);
