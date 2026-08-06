@@ -91,6 +91,17 @@ Each subscription (`originalTransactionId`) is capped at 5 simultaneously live
 tokens — enough for a phone, a watch, and reinstall headroom — with the oldest
 evicted once a 6th is issued.
 
+**Migration note (one-time, post-deploy):** this Worker hard-rejects the
+legacy `{jwt, originalTransactionId}` self-provision body shape with 400 —
+only the new `signedTransactionInfo` shape works. Deploy this Worker version
+**only after** existing TestFlight testers have updated to a client build
+that sends `signedTransactionInfo`, or every tester still on the old build
+will have their self-provision flow break. Once you've confirmed testers are
+on the new build, delete the now-unused secret:
+```bash
+npx wrangler secret delete SELF_PROVISION_PUBLIC_KEY
+```
+
 ## Issuing client tokens (manual, for specific devices)
 
 For devices you want to provision without the first-launch prompt — e.g.,

@@ -42,7 +42,12 @@ export async function verifyAppleTransactionJWS(
     jws: string,
     opts: { bundleId: string; appAppleId: number; productIds: string[] },
 ): Promise<VerifyResult> {
-    const { production, sandbox } = getVerifiers(opts.bundleId, opts.appAppleId);
+    let production: VerifierPair["production"], sandbox: VerifierPair["sandbox"];
+    try {
+        ({ production, sandbox } = getVerifiers(opts.bundleId, opts.appAppleId));
+    } catch (err) {
+        return { ok: false, reason: `verifier construction failed: ${String(err)}` };
+    }
 
     let decoded;
     try {

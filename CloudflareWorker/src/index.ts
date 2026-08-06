@@ -624,7 +624,7 @@ async function recordTokenForSubscription(
     const indexKey = `subtok:${originalTransactionId}`;
     const now = Date.now();
     const raw = (await env.CLIENT_TOKENS.get(indexKey, "json")) as SubscriptionTokenIndexEntry[] | null;
-    const live = (raw ?? []).filter((e) => e.expiresAtMs > now);
+    const live = (Array.isArray(raw) ? raw : []).filter((e) => e.expiresAtMs > now);
     live.push(entry);
     live.sort((a, b) => a.createdAtMs - b.createdAtMs);
     while (live.length > MAX_TOKENS_PER_SUBSCRIPTION) {
