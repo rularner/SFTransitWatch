@@ -1,6 +1,6 @@
 import { verifySubscription, checkAppStoreAuth } from "./appstore";
 import { handleStopMonitoring } from "./gtfsrt/proxy";
-import { verifyAppleTransactionJWS, WORKER_PROXY_PRODUCT_IDS } from "./applejws";
+import { verifyAppleTransactionJWS, WORKER_PROXY_PRODUCT_IDS, healthCheckAppleJws } from "./applejws";
 
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
 const FRESH_TTL_SECONDS = 60;
@@ -585,15 +585,11 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 	const checks: Record<string, { ok: boolean; status?: number; error?: string }> = {};
 
 	try {
-		if (!env.SELF_PROVISION_PUBLIC_KEY) {
-			throw new Error("SELF_PROVISION_PUBLIC_KEY not configured");
-		}
-		const spkiBytes = Uint8Array.from(atob(env.SELF_PROVISION_PUBLIC_KEY), (c) => c.charCodeAt(0));
-		await crypto.subtle.importKey("spki", spkiBytes, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
-		checks.selfProvisionKey = { ok: true };
+		const result = healthCheckAppleJws(env.APPSTORE_BUNDLE_ID, env.APPSTORE_APP_APPLE_ID);
+		checks.appleJwsVerifier = result.ok ? { ok: true } : { ok: false, error: result.error };
 	} catch (err) {
-		console.error("Healthcheck selfProvisionKey check failed", err);
-		checks.selfProvisionKey = { ok: false, error: "Self-provision key check failed" };
+		console.error("Healthcheck appleJwsVerifier check failed", err);
+		checks.appleJwsVerifier = { ok: false, error: "Apple JWS verifier check failed" };
 	}
 
 	try {
@@ -603,7 +599,7 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 		checks.appStoreAuth = { ok: false, error: "App Store auth check failed" };
 	}
 
-	const ok = checks.selfProvisionKey.ok && checks.appStoreAuth.ok;
+	const ok = checks.appleJwsVerifier.ok && checks.appStoreAuth.ok;
 	return new Response(JSON.stringify({ ok, checks }), {
 		status: ok ? 200 : 503,
 		headers: {

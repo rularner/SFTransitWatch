@@ -933,7 +933,7 @@ describe("GET /healthz/appstore", () => {
         expect(res.status).toBe(200);
         const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean }> };
         expect(body.ok).toBe(true);
-        expect(body.checks.selfProvisionKey.ok).toBe(true);
+        expect(body.checks.appleJwsVerifier.ok).toBe(true);
         expect(body.checks.appStoreAuth.ok).toBe(true);
     });
 
@@ -950,12 +950,12 @@ describe("GET /healthz/appstore", () => {
         expect(body.checks.appStoreAuth.ok).toBe(false);
     });
 
-    it("returns 503 with ok:false when SELF_PROVISION_PUBLIC_KEY is not configured", async () => {
+    it("returns 503 with ok:false when APPSTORE_APP_APPLE_ID is not configured", async () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
 
-        const testEnv = env as unknown as { SELF_PROVISION_PUBLIC_KEY: string };
-        const original = testEnv.SELF_PROVISION_PUBLIC_KEY;
-        testEnv.SELF_PROVISION_PUBLIC_KEY = "";
+        const testEnv = env as unknown as { APPSTORE_APP_APPLE_ID: string };
+        const original = testEnv.APPSTORE_APP_APPLE_ID;
+        testEnv.APPSTORE_APP_APPLE_ID = "";
         try {
             const res = await SELF.fetch("https://example.com/healthz/appstore", {
                 headers: { Authorization: "Bearer test-healthcheck-token" },
@@ -964,9 +964,9 @@ describe("GET /healthz/appstore", () => {
             expect(res.status).toBe(503);
             const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean }> };
             expect(body.ok).toBe(false);
-            expect(body.checks.selfProvisionKey.ok).toBe(false);
+            expect(body.checks.appleJwsVerifier.ok).toBe(false);
         } finally {
-            testEnv.SELF_PROVISION_PUBLIC_KEY = original;
+            testEnv.APPSTORE_APP_APPLE_ID = original;
         }
     });
 
