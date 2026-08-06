@@ -156,13 +156,12 @@ The app intelligently learns your route preferences:
 3. **(Optional) Override signing locally**:
    ```bash
    cp Developer.xcconfig.sample Developer.xcconfig
-   # Edit Developer.xcconfig and fill in YOUR_TEAM_ID and SELF_PROVISION_PRIVATE_KEY
+   # Edit Developer.xcconfig and fill in YOUR_TEAM_ID
    ```
    `Developer.xcconfig` is gitignored and optional — `Config.xcconfig` pulls it
    in with an optional `#include?` directive, so the project builds fine
    without it. Create it only if you want to override signing settings like
-   `DEVELOPMENT_TEAM` or provide the self-provision private key for device
-   builds. See `Developer.xcconfig.sample` for key-generation instructions.
+   `DEVELOPMENT_TEAM`. See `Developer.xcconfig.sample` for details.
 
    **Worker proxy (optional):** by default the app prompts on first launch to
    connect to the SF Transit Watch proxy server (auto-provisioned, no operator
