@@ -588,6 +588,26 @@ describe("per-token rate limiting on proxy routes", () => {
         expect(res.status).not.toBe(429);
         expect(res.status).not.toBe(401);
     });
+
+    it("applies the tighter sandbox limit (15/min) to a sandbox-tier token", async () => {
+        const sandboxToken = "sandbox-rate-limit-token";
+        const sandboxHash = await sha256Hex(sandboxToken);
+        await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+            sandboxHash,
+            JSON.stringify({ label: "sandbox-test", tier: "sandbox", createdAt: "2026-05-03T00:00:00Z" }),
+        );
+
+        for (let i = 0; i < 15; i++) {
+            const res = await SELF.fetch("https://example.com/StopMonitoring?stopCode=12345", {
+                headers: { "X-App-Token": sandboxToken },
+            });
+            expect(res.status).not.toBe(429);
+        }
+        const res = await SELF.fetch("https://example.com/StopMonitoring?stopCode=12345", {
+            headers: { "X-App-Token": sandboxToken },
+        });
+        expect(res.status).toBe(429);
+    });
 });
 
 describe("timetable endpoint routing", () => {

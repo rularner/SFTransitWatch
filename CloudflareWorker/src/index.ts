@@ -16,6 +16,11 @@ const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
 export const PROXY_RATE_LIMIT = { maxRequests: 60, windowSeconds: 60 };
+const SANDBOX_PROXY_RATE_LIMIT = { maxRequests: 15, windowSeconds: 60 };
+
+function proxyRateLimitFor(tier: "paid" | "sandbox"): { maxRequests: number; windowSeconds: number } {
+    return tier === "sandbox" ? SANDBOX_PROXY_RATE_LIMIT : PROXY_RATE_LIMIT;
+}
 const SUBSCRIPTION_GRACE_SECONDS = 3 * 24 * 60 * 60;
 const MAX_TOKENS_PER_SUBSCRIPTION = 5;
 const SANDBOX_MIN_TTL_SECONDS = 24 * 60 * 60;
@@ -107,15 +112,16 @@ export default {
 			if (endpoint === "Stops") {
 				// Budget is enforced inside handleStopsRequest so a fresh cache HIT stays
 				// free (matching the XML proxy path below) instead of 429ing needlessly.
-				return await handleStopsRequest(url, env, auth.client.tokenHash);
+				return await handleStopsRequest(url, env, auth.client.tokenHash, auth.client.tier);
 			}
 
 			if (endpoint === "StopMonitoring") {
 				// Bound this endpoint per token — it was previously ungated and could be
 				// polled without limit, contending for the shared upstream refresh lock.
-				const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+				const limit = proxyRateLimitFor(auth.client.tier);
+				const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, limit.maxRequests, limit.windowSeconds);
 				if (!allowed) {
-					return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+					return jsonError("Too many requests.", 429, { "Retry-After": String(limit.windowSeconds) });
 				}
 				return await handleStopMonitoring(url, env);
 			}
@@ -135,13 +141,14 @@ export default {
 			}
 
 			// Work is required — now gate on the per-token budget.
-			const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+			const limit = proxyRateLimitFor(auth.client.tier);
+			const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, limit.maxRequests, limit.windowSeconds);
 			if (!allowed) {
 				if (cached) {
 					return xmlResponse(cached, "STALE", ttl);
 				}
 				console.warn(JSON.stringify({ source: "proxy-rate-limit", outcome: "rate_limited", label: auth.client.label }));
-				return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+				return jsonError("Too many requests.", 429, { "Retry-After": String(limit.windowSeconds) });
 			}
 
 			const canRefreshNow = await canMakeUpstreamRequest(env, now);
@@ -376,7 +383,7 @@ async function handleLog(request: Request, env: Env, tokenHash: string): Promise
 	return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
-async function handleStopsRequest(url: URL, env: Env, tokenHash: string): Promise<Response> {
+async function handleStopsRequest(url: URL, env: Env, tokenHash: string, tier: "paid" | "sandbox"): Promise<Response> {
 	const agency = url.searchParams.get("agency") ?? url.searchParams.get("operator_id");
 	if (!agency) {
 		return jsonError("agency parameter required.", 400);
@@ -396,13 +403,14 @@ async function handleStopsRequest(url: URL, env: Env, tokenHash: string): Promis
 	} else {
 		// Work (an upstream fetch) is required — now gate on the per-token budget. On limit,
 		// serve stale cache if we have it rather than failing the client outright.
-		const allowed = await checkRateLimit(env, "proxy-token", tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+		const limit = proxyRateLimitFor(tier);
+		const allowed = await checkRateLimit(env, "proxy-token", tokenHash, limit.maxRequests, limit.windowSeconds);
 		if (!allowed) {
 			if (cached) {
 				active = cached;
 				return stopsJsonResponse(selectClosestStops(url, active), active.fetchedAtMs);
 			}
-			return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+			return jsonError("Too many requests.", 429, { "Retry-After": String(limit.windowSeconds) });
 		}
 		const result = await fetchAndCacheAllStops(env, agency, now);
 		if (result.ok) {
