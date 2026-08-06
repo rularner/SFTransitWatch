@@ -25,7 +25,13 @@ SF Transit Watch covers every transit stop served by the 511.org feed — all ni
 ## Getting started
 
 1. Install SF Transit Watch from the App Store.
-2. Open the iPhone app and enter your free 511.org API key (see the [support page](support.html) for how to get one).
+2. Open the iPhone app and choose how you want transit data:
+   - **Subscribe to the SF Transit Watch server** — no API key to register or
+     manage. Requires an auto-renewing App Store subscription; the price and
+     billing period are shown in the app before you buy.
+   - **Bring your own 511.org API key** — free, no subscription, and requests
+     go straight from the app to 511.org without touching our server. See the
+     [support page](support.html) for how to get a key.
 3. Open the watch app — your nearby stops will appear automatically.
 
 ## Privacy

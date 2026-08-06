@@ -7,19 +7,27 @@ title: Support
 
 ## Getting started
 
-### Option A — Connect to the SF Transit Watch server (recommended)
+### Option A — Subscribe to the SF Transit Watch server (recommended)
 
-On first launch, the app will ask if you want to connect to the SF Transit
-Watch proxy server. Tap **Connect** and the app configures itself
-automatically — no API key required.
+On first launch, the app offers to connect to the SF Transit Watch proxy
+server. This requires an auto-renewing subscription, purchased through the
+App Store; the current price and billing period are shown on the subscribe
+screen in the app before you buy. Subscriptions renew automatically unless
+cancelled at least 24 hours before the end of the period, and you can manage
+or cancel yours any time in **Settings → Apple Account → Subscriptions** on
+iPhone.
 
-The proxy is optional and free. It caches 511.org requests so your watch
-gets faster responses. See the privacy policy for what data is exchanged
-during the one-time setup.
+In exchange you get transit data without registering for or managing an API
+key of your own, plus server-side caching so your watch gets faster
+responses.
+
+In this mode your requests go through our server, which means it receives
+your location and the stops you look up. See the
+[privacy policy](privacy_policy.html) for exactly what is sent and kept.
 
 ### Option B — Use a 511.org API key directly
 
-SF Transit Watch also works with a free [511.org Open Data API](https://511.org/open-data) key. This mode sends requests directly from the app to 511.org, bypassing the proxy entirely.
+SF Transit Watch also works with a free [511.org Open Data API](https://511.org/open-data) key, with no subscription. This mode sends requests directly from the app to 511.org, bypassing our proxy entirely — we receive nothing at all, including no diagnostics. This is the option to choose if you would rather no server of ours ever see your location.
 
 **Getting a key:**
 
@@ -35,6 +43,13 @@ SF Transit Watch also works with a free [511.org Open Data API](https://511.org/
 
 You can also enter the key directly on the watch under **Settings → API Key**, but setting it on the phone is easier.
 
+**If you previously subscribed to the proxy server**, entering an API key is
+not on its own enough to stop using it — the app keeps routing through the
+server while it still holds a credential for it. To switch fully to direct
+mode, also tap **Clear** under **Settings → Worker proxy**. Once cleared, the
+app talks only to 511.org. (Clearing the credential does not cancel your
+subscription; cancel that in **Settings → Apple Account → Subscriptions**.)
+
 ## Loading your API key via text or email
 
 If you'd rather not type or paste the key into the watch, you can send yourself a link and tap it on your wrist.
@@ -42,10 +57,10 @@ If you'd rather not type or paste the key into the watch, you can send yourself 
 1. Send yourself a Messages or email message containing a link in this exact form:
 
    ```
-   https://rularner.github.io/sftransitwatch/key?k=YOUR_API_KEY
+   sftransitwatch://key/YOUR_API_KEY
    ```
 
-   Replace `YOUR_API_KEY` with the token 511.org sent you. Messages and Mail will render it as a normal tappable link.
+   Replace `YOUR_API_KEY` with the token 511.org sent you. Note the key goes **after a slash**, not as a `?k=` parameter.
 
 2. Open that message **on your Apple Watch**:
    - **Messages:** open the conversation in the Messages app on the watch.
@@ -53,17 +68,9 @@ If you'd rather not type or paste the key into the watch, you can send yourself 
 
 3. Tap the link. The watch will launch SF Transit Watch, save the key, and you'll be ready to go.
 
-Tapping the link on the iPhone or a computer won't open the app — the link is only wired into the watch app. Anyone who lands on that URL in a browser just sees a short "open this on your watch" page; the key is never sent anywhere except the watch.
+The key is never sent anywhere except your own watch — the link is handled entirely on-device and never resolves against any web server.
 
-### Fallback: custom URL scheme
-
-If for some reason the https link isn't working (e.g., your watch hasn't picked up the universal link yet), the app also accepts its own URL scheme:
-
-```
-sftransitwatch://key/YOUR_API_KEY
-```
-
-Note that many email and message clients won't auto-linkify non-`https` URLs, so the link may render as plain text. Prefer the https form above.
+**If the link isn't tappable:** many Mail and Messages clients only auto-linkify `http`/`https` URLs, so an `sftransitwatch://` link may render as plain text you can't tap. If that happens, type the key in directly on the watch under **Settings → API Key**, or set it on the iPhone and let it sync over.
 
 ## Troubleshooting
 

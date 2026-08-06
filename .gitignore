@@ -172,6 +172,13 @@ fastlane/test_output/
 # linked worktrees get via .git/hooks/post-checkout.
 docs/superpowers
 
+# Planning/roadmap notes stay local, same rationale as docs/superpowers above.
+# TODO.md in particular records unfixed gaps in the live service (quota
+# headroom, rate-limit behavior, revocation gaps) and which shipped features
+# are currently broken — that's an abuse roadmap in a public repo. Anything
+# genuinely meant for the public belongs in SECURITY.md or docs/ instead.
+TODO.md
+
 # Subagent-driven-development scratch workspace (ledgers, briefs, review packages)
 .superpowers/
 

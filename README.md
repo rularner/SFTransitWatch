@@ -175,11 +175,15 @@ The app intelligently learns your route preferences:
       WORKER_URL=https://your-worker.workers.dev ./scripts/issue-token.sh <your-device-label>
       ```
       The script prints a link of the form
-      `https://rularner.github.io/sftransitwatch/wt?u=<worker-url>&t=<token>`.
-   2. They share the link via Messages or Mail. **On iOS**: paste it into
-      Settings → Worker proxy and tap Save. **On the watch**: open the
-      message and tap the link — the watch app handles it directly.
-      Settings will then show the worker host instead of "Not set".
+      `sftransitwatch://wt?u=<encoded-worker-url>&c=<one-time-code>`
+      (see `WorkerConfigLink.workerBootstrap`; the worker URL must be
+      `https`, and the parameter is `c`, a one-time code — not the token
+      itself, which is exchanged for on first use).
+   2. They share the link via Messages or Mail, then open it on the device.
+      The app handles the link directly on both iOS and watchOS. Settings
+      will then show the worker host instead of "Not set". Note that some
+      mail and message clients won't auto-linkify a non-`https` URL, so it
+      may arrive as plain, untappable text.
    3. To revoke later (lost device, leaked token), the operator runs
       `npx wrangler kv key delete --binding CLIENT_TOKENS <hash>`.
 
@@ -202,16 +206,16 @@ The app intelligently learns your route preferences:
 
    On first launch the app will prompt you. Pick whichever is easiest:
 
-   - **Connect to the proxy server** (recommended): tap **Connect** on the
-     first-launch prompt. The app self-provisions a token automatically —
-     no API key needed.
+   - **Subscribe to the proxy server** (recommended): tap **Subscribe** on
+     the first-launch prompt. The app self-provisions a token automatically
+     once the subscription is active — no API key needed.
    - **Direct 511.org**: on the first-launch prompt, tap
      **Use 511.org key instead**, then paste your API key in the Settings
      sheet that opens.
    - **Via text or email (watch/phone)**: send yourself a link
-     `https://rularner.github.io/sftransitwatch/key?k=YOUR_API_KEY`
-     and open it on your Apple Watch to load the key directly. The app
-     also accepts `sftransitwatch://key/YOUR_API_KEY` as a fallback.
+     `sftransitwatch://key/YOUR_API_KEY` and open it on your Apple Watch to
+     load the key directly. The key goes after a slash, not as a `?k=`
+     parameter.
 
    See [docs/support.md](docs/support.md) for more detail.
 
