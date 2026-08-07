@@ -120,6 +120,9 @@ struct BusStopListView: View {
                 await loadNearbyStops()
             }
         }
+        .onDisappear {
+            locationManager.stopLocationUpdates()
+        }
         .onChange(of: locationManager.currentLocation) {
             Task {
                 await loadNearbyStops()

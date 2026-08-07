@@ -129,6 +129,43 @@ final class FavoritesManagerTests: XCTestCase {
                       "Routes should not be persisted — they come from live API data")
     }
 
+    // MARK: - Static lookup (used by BackgroundRefreshController, no manager instance needed)
+
+    func testStaticFavoriteStopWithIdReturnsMatch() {
+        let suite = "FavoritesManagerTests-static-lookup-\(UUID().uuidString)"
+        let ud = UserDefaults(suiteName: suite)!
+        let stop = makeStops()[1]
+        FavoritesManager(userDefaultsSuiteName: suite).toggleFavorite(stop)
+
+        let found = FavoritesManager.favoriteStop(withId: stop.id, in: ud)
+        XCTAssertEqual(found?.id, stop.id)
+        XCTAssertEqual(found?.agency, stop.agency)
+    }
+
+    func testStaticFavoriteStopWithIdReturnsNilWhenNotFavorited() {
+        let suite = "FavoritesManagerTests-static-lookup-miss-\(UUID().uuidString)"
+        let ud = UserDefaults(suiteName: suite)!
+        XCTAssertNil(FavoritesManager.favoriteStop(withId: "does-not-exist", in: ud))
+    }
+
+    func testStaticAllFavoritesReturnsEveryPersistedStop() {
+        let suite = "FavoritesManagerTests-static-all-\(UUID().uuidString)"
+        let ud = UserDefaults(suiteName: suite)!
+        let stops = makeStops()
+        let mgr = FavoritesManager(userDefaultsSuiteName: suite)
+        mgr.toggleFavorite(stops[0])
+        mgr.toggleFavorite(stops[2])
+
+        let all = FavoritesManager.allFavorites(in: ud)
+        XCTAssertEqual(Set(all.map(\.id)), Set([stops[0].id, stops[2].id]))
+    }
+
+    func testStaticAllFavoritesReturnsEmptyWhenNoneStored() {
+        let suite = "FavoritesManagerTests-static-empty-\(UUID().uuidString)"
+        let ud = UserDefaults(suiteName: suite)!
+        XCTAssertTrue(FavoritesManager.allFavorites(in: ud).isEmpty)
+    }
+
     private func makeStops() -> [BusStop] {
         return [
             BusStop(id: "1", name: "Test Stop One", code: "1",

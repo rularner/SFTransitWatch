@@ -211,6 +211,9 @@ struct BusArrivalView: View {
             locationManager.startLocationUpdates()
             Task { await loadArrivals() }
         }
+        .onDisappear {
+            locationManager.stopLocationUpdates()
+        }
         .onReceive(ticker) { _ in
             guard !transitAPI.isLoading else { return }
             if countdown.tick() {

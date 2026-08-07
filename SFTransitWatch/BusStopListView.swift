@@ -81,6 +81,9 @@ struct BusStopListView: View {
             locationManager.startLocationUpdates()
             scheduleLoadNearbyStops()
         }
+        .onDisappear {
+            locationManager.stopLocationUpdates()
+        }
         .onChange(of: locationManager.currentLocation) {
             scheduleLoadNearbyStops()
         }
