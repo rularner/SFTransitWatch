@@ -37,6 +37,13 @@ class TransitAPI: ObservableObject {
     private var arrivalsCache: [String: CachedArrivals] = [:]
     private var inFlight: [String: Task<[BusArrival], Never>] = [:]
 
+    private struct CachedSchedule { let arrivals: [BusArrival]; let timestamp: Date }
+    // StopTimetable is a mostly-static schedule (valid ~24h) — caching it client-side means
+    // repeated empty/failed StopMonitoring polls during a GTFS-RT gap fall back to this cache
+    // instead of re-hitting the network every poll.
+    private var scheduleCache: [String: CachedSchedule] = [:]
+    private let scheduleCacheTTL: TimeInterval = 24 * 60 * 60
+
     private func arrivalsCacheKey(_ stopId: String, _ agency: String) -> String { "\(agency):\(stopId)" }
 
     private var resolvedKey: String {
@@ -186,21 +193,7 @@ class TransitAPI: ObservableObject {
                 if httpResponse.statusCode == 429 {
                     applyBackoff(retryAfter: httpResponse.value(forHTTPHeaderField: "Retry-After"))
                 }
-                let key = arrivalsCacheKey(stopId, agency)
-                if let cached = arrivalsCache[key], now().timeIntervalSince(cached.timestamp) < keepLastMaxAge, !cached.arrivals.isEmpty {
-                    errorMessage = nil
-                    softBanner = "Live updates paused"
-                    return cached.arrivals
-                }
-                let scheduled = await fetchScheduledDepartures(for: stopId, agency: agency)
-                if !scheduled.isEmpty {
-                    arrivalsCache[key] = CachedArrivals(arrivals: scheduled, timestamp: now())
-                    errorMessage = nil
-                    softBanner = "Showing scheduled times"
-                    return scheduled
-                }
-                errorMessage = "511.org returned HTTP \(httpResponse.statusCode)"
-                return []
+                return await recentOrScheduledFallback(stopId: stopId, agency: agency, errorDescription: "511.org returned HTTP \(httpResponse.statusCode)")
             }
 
             let cacheStatus = httpResponse.value(forHTTPHeaderField: "X-Cache-Status")
@@ -218,12 +211,36 @@ class TransitAPI: ObservableObject {
         } catch {
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: errorKind(for: error, status: nil), httpStatus: nil, latencyMs: latencyMs)
-            errorMessage = "Failed to load arrivals: \(error.localizedDescription)"
-            return []
+            return await recentOrScheduledFallback(stopId: stopId, agency: agency, errorDescription: "Failed to load arrivals: \(error.localizedDescription)")
         }
     }
-    
+
+    /// Shared by the non-200 and thrown-error paths above: prefer recent kept-last real-time
+    /// data, then the (cached) schedule, before giving up and surfacing `errorDescription`.
+    private func recentOrScheduledFallback(stopId: String, agency: String, errorDescription: String) async -> [BusArrival] {
+        let key = arrivalsCacheKey(stopId, agency)
+        if let cached = arrivalsCache[key], now().timeIntervalSince(cached.timestamp) < keepLastMaxAge, !cached.arrivals.isEmpty {
+            errorMessage = nil
+            softBanner = "Live updates paused"
+            return cached.arrivals
+        }
+        let scheduled = await fetchScheduledDepartures(for: stopId, agency: agency)
+        if !scheduled.isEmpty {
+            arrivalsCache[key] = CachedArrivals(arrivals: scheduled, timestamp: now())
+            errorMessage = nil
+            softBanner = "Showing scheduled times"
+            return scheduled
+        }
+        errorMessage = errorDescription
+        return []
+    }
+
     func fetchScheduledDepartures(for stopId: String, agency: String) async -> [BusArrival] {
+        let key = arrivalsCacheKey(stopId, agency)
+        if let cached = scheduleCache[key], now().timeIntervalSince(cached.timestamp) < scheduleCacheTTL {
+            return refreshScheduledTimestamps(cached.arrivals)
+        }
+
         let endpoint = "StopTimetable"
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
         var queryItems = [
@@ -244,9 +261,32 @@ class TransitAPI: ObservableObject {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
             let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            return TransitJSON.decodeScheduledDepartures(data) ?? []
+            let decoded = TransitJSON.decodeScheduledDepartures(data) ?? []
+            if !decoded.isEmpty {
+                scheduleCache[key] = CachedSchedule(arrivals: decoded, timestamp: now())
+            }
+            return decoded
         } catch {
             return []
+        }
+    }
+
+    /// Cached schedule entries carry `minutesAway`/`timeString`-relevant state baked in from
+    /// when they were first decoded (see `BusArrival.init`) — recompute it against the current
+    /// time on every cache hit so a long-lived cache entry doesn't show a frozen countdown.
+    private func refreshScheduledTimestamps(_ arrivals: [BusArrival]) -> [BusArrival] {
+        let current = now()
+        return arrivals.map {
+            BusArrival(
+                route: $0.route,
+                destination: $0.destination,
+                arrivalTime: $0.arrivalTime,
+                isRealTime: $0.isRealTime,
+                alerts: $0.alerts,
+                vehicleRef: $0.vehicleRef,
+                onwardStops: $0.onwardStops,
+                now: current
+            )
         }
     }
 

@@ -152,4 +152,121 @@ final class TransitAPIFallbackTests: XCTestCase {
         XCTAssertTrue(arrivals[0].isRealTime)
         XCTAssertEqual(mockSession.requestCount(), 1, "Must NOT call StopTimetable when real-time data is present")
     }
+
+    /// A non-200 StopMonitoring response must fall back to the schedule, same as an empty
+    /// real-time result — previously the watch just surfaced an error here.
+    @MainActor
+    func testHTTPErrorFallsBackToScheduleWhenAvailable() async {
+        let monitoringURL = URL(string: "https://api.511.org/transit/StopMonitoring")!
+        mockSession.responses[monitoringURL] = (Data(), HTTPURLResponse(url: monitoringURL, statusCode: 503, httpVersion: nil, headerFields: nil)!)
+
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetableData = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"Local Weekday","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"SF"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopTimetable")!, data: timetableData)
+
+        let arrivals = await api.fetchArrivals(for: "70021", agency: "CT")
+
+        XCTAssertEqual(arrivals.count, 1)
+        XCTAssertFalse(arrivals[0].isRealTime)
+        XCTAssertNil(api.errorMessage, "should clear the error once the schedule fallback succeeds")
+    }
+
+    /// A thrown network error on StopMonitoring must also fall back to the (cached) schedule.
+    /// Warms the cache first: MockURLSession's error matching is host-wide (not path-specific),
+    /// so once StopMonitoring is made to throw, a live StopTimetable fetch would throw too —
+    /// exactly the scenario the schedule cache exists to avoid hitting.
+    @MainActor
+    func testNetworkErrorFallsBackToCachedScheduleWithoutRefetching() async {
+        let emptyMonitoring = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[]}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: emptyMonitoring)
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetableData = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"Local Weekday","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"SF"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopTimetable")!, data: timetableData)
+
+        let warm = await api.fetchArrivals(for: "70021", agency: "CT")   // warms the schedule cache
+        XCTAssertEqual(warm.count, 1)
+        XCTAssertEqual(mockSession.requestCount(), 2)
+
+        api.now = { Date().addingTimeInterval(60) }   // still well within the 24h schedule TTL
+        mockSession.setMockError(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, error: URLError(.networkConnectionLost))
+
+        let arrivals = await api.fetchArrivals(for: "70021", agency: "CT")
+
+        XCTAssertEqual(arrivals.count, 1)
+        XCTAssertFalse(arrivals[0].isRealTime)
+        XCTAssertNil(api.errorMessage, "should clear the error once the cached-schedule fallback succeeds")
+        XCTAssertEqual(mockSession.requestCount(), 3, "StopMonitoring retry only — schedule served from cache, no new StopTimetable call")
+    }
+
+    // MARK: - Scheduled-departures client-side cache
+
+    @MainActor
+    func testFetchScheduledDeparturesCachesAcrossRepeatedCalls() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetable = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"Local Weekday","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"SF"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopTimetable")!, data: timetable)
+
+        let first = await api.fetchScheduledDepartures(for: "70021", agency: "CT")
+        XCTAssertEqual(first.count, 1)
+        XCTAssertEqual(mockSession.requestCount(), 1)
+
+        let second = await api.fetchScheduledDepartures(for: "70021", agency: "CT")
+        XCTAssertEqual(second.count, 1)
+        XCTAssertEqual(mockSession.requestCount(), 1, "second call within the 24h TTL should be served from cache")
+    }
+
+    @MainActor
+    func testFetchScheduledDeparturesCacheExpiresAfter24Hours() async {
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetable = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"Local Weekday","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"SF"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopTimetable")!, data: timetable)
+
+        _ = await api.fetchScheduledDepartures(for: "70021", agency: "CT")
+        XCTAssertEqual(mockSession.requestCount(), 1)
+
+        api.now = { Date().addingTimeInterval(24 * 60 * 60 + 1) }
+        _ = await api.fetchScheduledDepartures(for: "70021", agency: "CT")
+        XCTAssertEqual(mockSession.requestCount(), 2, "cache should have expired after 24h")
+    }
+
+    @MainActor
+    func testFetchScheduledDeparturesRecomputesMinutesAwayOnCacheHit() async throws {
+        let isoIn10 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
+        let timetable = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"SF:38","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn10)","DestinationDisplay":"Downtown"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopTimetable")!, data: timetable)
+
+        let first = await api.fetchScheduledDepartures(for: "70021", agency: "SF")
+        let arrivalTime = try XCTUnwrap(first.first?.arrivalTime)
+
+        let laterNow = Date().addingTimeInterval(240)   // 4 minutes later, still within the 24h TTL
+        api.now = { laterNow }
+        let second = await api.fetchScheduledDepartures(for: "70021", agency: "SF")
+
+        let expectedMinutesAway = max(0, Int(arrivalTime.timeIntervalSince(laterNow) / 60))
+        XCTAssertEqual(second.first?.minutesAway, expectedMinutesAway, "cache hit must recompute minutesAway against the current time")
+        XCTAssertNotEqual(second.first?.minutesAway, first.first?.minutesAway, "must not reuse the frozen minutesAway from the first decode")
+        XCTAssertEqual(mockSession.requestCount(), 1, "still served from cache")
+    }
 }
