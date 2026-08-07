@@ -29,8 +29,8 @@ class MockURLSession: URLSessionProtocol {
         return (Data(), response)
     }
 
-    func setMockResponse(for url: URL, data: Data, statusCode: Int = 200) {
-        let resp = HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: nil, headerFields: nil)!
+    func setMockResponse(for url: URL, data: Data, statusCode: Int = 200, headers: [String: String]? = nil) {
+        let resp = HTTPURLResponse(url: url, statusCode: statusCode, httpVersion: nil, headerFields: headers)!
         responses[url] = (data: data, response: resp)
     }
 

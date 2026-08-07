@@ -210,6 +210,9 @@ class TransitAPI: ObservableObject {
                 let scheduled = await fetchScheduledDepartures(for: stopId, agency: agency)
                 arrivalsCache[arrivalsCacheKey(stopId, agency)] = CachedArrivals(arrivals: scheduled, timestamp: now())
                 resetBackoff()
+                if cacheStatus == "ERROR" {
+                    softBanner = "Live updates unavailable — showing scheduled times"
+                }
                 return scheduled
             }
             arrivalsCache[arrivalsCacheKey(stopId, agency)] = CachedArrivals(arrivals: realTimeArrivals, timestamp: now())
