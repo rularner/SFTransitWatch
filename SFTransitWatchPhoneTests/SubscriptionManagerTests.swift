@@ -49,11 +49,13 @@ final class SubscriptionManagerTests: XCTestCase {
         }
     }
 
-    // Known issue: Product.products(for:) returns productNotFound unless the SFTransitWatch
-    // scheme's Test action StoreKit Configuration is set to WorkerProxySubscription.storekit.
-    // These stay skipped until that scheme setting is applied (see CLAUDE.md / README).
+    // Known issue: SubscriptionManager.workerProxyProductIDs only lists the monthly
+    // product ID — the yearly product doesn't exist in App Store Connect yet (see
+    // the comment on workerProxyProductIDs). This test's expectations assume both
+    // tiers are requested, so it fails regardless of environment. Re-enable once
+    // yearly is registered and added to workerProxyProductIDs.
     func testLoadDisplayInfoReturnsTiersSortedByPeriod() async throws {
-        try XCTSkipIf(true, "Product.products(for:) returns productNotFound — needs the scheme's Test action StoreKit Configuration set to WorkerProxySubscription.storekit.")
+        try XCTSkipIf(true, "workerProxyProductIDs only contains the monthly product ID — yearly isn't registered in App Store Connect yet.")
 
         let manager = SubscriptionManager()
         let tiers = await manager.loadDisplayInfo()
@@ -65,8 +67,16 @@ final class SubscriptionManagerTests: XCTestCase {
         XCTAssertNil(tiers.last?.introOffer)
     }
 
+    // Known issue: product.purchase() hangs under StoreKitTest until Xcode Cloud's
+    // 10-minute per-test allowance kills it ("Test exceeded execution time
+    // allowance of 10 minutes"), rather than returning or throwing. This is a
+    // different symptom of the same StoreKitTest purchase-flow flakiness as the
+    // SKInternalErrorDomain Code=3 issue noted in CLAUDE.md, not an app bug — the
+    // scheme's StoreKit Configuration fix (needed for loadDisplayInfo()) resolved
+    // productNotFound but exposed this separate hang. Re-enable once Apple's
+    // StoreKitTest purchase flow stops hanging in this environment.
     func testPurchaseReturnsEntitlementJWS() async throws {
-        try XCTSkipIf(true, "Product.products(for:) returns productNotFound — needs the scheme's Test action StoreKit Configuration set to WorkerProxySubscription.storekit.")
+        try XCTSkipIf(true, "product.purchase() hangs under StoreKitTest in this environment until the CI test-time allowance kills it.")
 
         let manager = SubscriptionManager()
         let jws = try await manager.purchase(productID: SubscriptionManager.workerProxyProductID)

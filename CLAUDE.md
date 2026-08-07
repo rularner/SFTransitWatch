@@ -139,10 +139,30 @@ us repeatedly here:
   (same as `SFTransitWatchPhoneUITests`) — otherwise it runs under the
   watchOS destination and crashes with SIGILL ("Early unexpected exit").
 
-Two of the purchase-flow tests are currently marked `XCTSkipIf(true, ...)`
-because of the `productNotFound` issue above — see the "Known issue" note in
-the root README for how to re-enable them once the scheme's StoreKit
-Configuration is set.
+Two tests are currently marked `XCTSkipIf(true, ...)` again, for two
+*different* reasons — don't re-enable either without re-checking the
+underlying condition:
+
+- `testLoadDisplayInfoReturnsTiersSortedByPeriod` expects both the monthly
+  and yearly tiers, but `SubscriptionManager.workerProxyProductIDs`
+  (`SubscriptionManager.swift`) only lists the monthly product ID because
+  the yearly product **does not exist in App Store Connect yet**. This
+  fails in any environment, not just CI — it's not a scheme/config issue.
+  Re-enable only after yearly is registered and added to
+  `workerProxyProductIDs`.
+- `testPurchaseReturnsEntitlementJWS` hangs on `product.purchase()` until
+  Xcode Cloud's 10-minute per-test allowance kills it. This surfaced only
+  after the scheme's StoreKit Configuration was set (which correctly fixed
+  `productNotFound` for `loadDisplayInfo()`) — it's a separate StoreKitTest
+  purchase-flow bug, same family as the `SKInternalErrorDomain Code=3` issue
+  above, just a different symptom.
+
+If a future attempt to re-enable these produces failures on
+`testProductIDsIncludeMonthly` or `testActiveEntitlementJWSReturnsNilWithNoSubscription`
+too — both trivially true given the current code and unrelated to StoreKit
+catalog contents — suspect that the whole Xcode Cloud test action got killed
+once `testPurchaseReturnsEntitlementJWS` blew its 10-minute budget, and those
+were reported as collateral failures rather than real ones.
 
 **Xcode Cloud's simulator SDK can be ahead of the local one** (e.g. CI ran
 `iPhoneSimulator26.5.sdk` while the local sandbox only has 26.4.1 installed).
