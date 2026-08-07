@@ -34,8 +34,8 @@ describe("verifySubscription", () => {
         const jws = fakeSignedTransactionInfo({ expiresDate: expiresAtMs });
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(appStoreResponse([{ status: 1, signedTransactionInfo: jws }])));
 
-        const result = await verifySubscription(TEST_ENV, "1000000000000001");
-        expect(result).toEqual({ active: true, expiresAtMs });
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
+        expect(result).toEqual({ active: true, expiresAtMs, environment: "Production" });
     });
 
     it("returns active for status 4 (billing grace period) with a future expiresDate", async () => {
@@ -43,15 +43,15 @@ describe("verifySubscription", () => {
         const jws = fakeSignedTransactionInfo({ expiresDate: expiresAtMs });
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(appStoreResponse([{ status: 4, signedTransactionInfo: jws }])));
 
-        const result = await verifySubscription(TEST_ENV, "1000000000000001");
-        expect(result).toEqual({ active: true, expiresAtMs });
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
+        expect(result).toEqual({ active: true, expiresAtMs, environment: "Production" });
     });
 
     it("returns inactive for status 2 (expired)", async () => {
         const jws = fakeSignedTransactionInfo({ expiresDate: Date.now() - 1000 });
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(appStoreResponse([{ status: 2, signedTransactionInfo: jws }])));
 
-        const result = await verifySubscription(TEST_ENV, "1000000000000001");
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
         expect(result).toEqual({ active: false });
     });
 
@@ -59,7 +59,7 @@ describe("verifySubscription", () => {
         const jws = fakeSignedTransactionInfo({ expiresDate: Date.now() + 1000 });
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(appStoreResponse([{ status: 5, signedTransactionInfo: jws }])));
 
-        const result = await verifySubscription(TEST_ENV, "1000000000000001");
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
         expect(result).toEqual({ active: false });
     });
 
@@ -72,8 +72,8 @@ describe("verifySubscription", () => {
             .mockResolvedValueOnce(appStoreResponse([{ status: 1, signedTransactionInfo: jws }]));
         vi.stubGlobal("fetch", fetchMock);
 
-        const result = await verifySubscription(TEST_ENV, "1000000000000001");
-        expect(result).toEqual({ active: true, expiresAtMs });
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
+        expect(result).toEqual({ active: true, expiresAtMs, environment: "Sandbox" });
         expect(fetchMock).toHaveBeenCalledTimes(2);
         expect(String(fetchMock.mock.calls[1][0])).toContain("storekit-sandbox.itunes.apple.com");
     });
@@ -87,8 +87,8 @@ describe("verifySubscription", () => {
             .mockResolvedValueOnce(appStoreResponse([{ status: 1, signedTransactionInfo: jws }]));
         vi.stubGlobal("fetch", fetchMock);
 
-        const result = await verifySubscription(TEST_ENV, "1000000000000001");
-        expect(result).toEqual({ active: true, expiresAtMs });
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
+        expect(result).toEqual({ active: true, expiresAtMs, environment: "Sandbox" });
         expect(fetchMock).toHaveBeenCalledTimes(2);
         expect(String(fetchMock.mock.calls[1][0])).toContain("storekit-sandbox.itunes.apple.com");
     });
@@ -96,8 +96,17 @@ describe("verifySubscription", () => {
     it("returns inactive when Apple returns no transactions", async () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 })));
 
-        const result = await verifySubscription(TEST_ENV, "1000000000000001");
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
         expect(result).toEqual({ active: false });
+    });
+
+    it("does not upgrade environment when the client claims Sandbox but production host answers", async () => {
+        const expiresAtMs = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        const jws = fakeSignedTransactionInfo({ expiresDate: expiresAtMs });
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(appStoreResponse([{ status: 1, signedTransactionInfo: jws }])));
+
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Sandbox");
+        expect(result).toEqual({ active: true, expiresAtMs, environment: "Sandbox" });
     });
 });
 

@@ -48,6 +48,7 @@ The `[skip ci]` in the commit message prevents the bump workflow from running on
 - **Bump ran on a docs-only PR:** it shouldn't — `docs:` is in the "none" bucket. If it did, check whether the PR title actually started with `feat`/`fix`/`perf` or whether a body line contained `BREAKING CHANGE:`.
 - **Xcode Cloud build number didn't increment:** check Xcode Cloud's build log for the `ci_pre_xcodebuild.sh` output. Confirm `CI_BUILD_NUMBER` was set.
 - **Workflow pushed the commit and tag but `gh release create` failed:** the release step runs last; a failure here leaves the tag on the remote without a matching GitHub Release. Recover with `gh release create vX.Y.Z --title "vX.Y.Z" --generate-notes` from a local clone.
+- **`Validate PR title follows Conventional Commits` or `check-main-health` stuck on "Expected — Waiting for status to be reported":** neither workflow has a `workflow_dispatch` trigger, so if their `pull_request` event gets dropped (seen once alongside a run of duplicate/delayed CodeQL dispatches right when the PR was opened), there's nothing to manually re-run — the check name never got attached to a run at all. Confirm by checking the Action's run list (Actions tab → workflow) for the PR number; if it's simply absent (not failed), push a new commit or close/reopen the PR to fire `synchronize`/`reopened` and get both checks queued again.
 
 ## What's explicitly out of scope
 

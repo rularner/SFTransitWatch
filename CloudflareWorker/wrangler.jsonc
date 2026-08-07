@@ -5,7 +5,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "sftransitwatch",
-	"main": "src/index.ts",
+	"main": "src/worker-entry.ts",
 	"compatibility_date": "2026-04-20",
 	"observability": {
 		"enabled": true,
@@ -28,6 +28,9 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"vars": {
+		"APPSTORE_APP_APPLE_ID": "__APPSTORE_APP_APPLE_ID__"
+	},
 	"custom_domains": [
 		"__WORKER_HOSTNAME__"
 	],

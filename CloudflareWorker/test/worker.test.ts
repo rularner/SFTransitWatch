@@ -2,6 +2,14 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { SELF, env } from "cloudflare:test";
 import { sha256Hex, parseStopsFromApi, distanceMeters, PROXY_RATE_LIMIT } from "../src/index";
+import { verifyAppleTransactionJWS, type VerifiedTransaction } from "../src/applejws";
+
+vi.mock("../src/applejws", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../src/applejws")>();
+    return { ...actual, verifyAppleTransactionJWS: vi.fn() };
+});
+
+const mockVerifyJWS = vi.mocked(verifyAppleTransactionJWS);
 
 const VALID_TOKEN = "test-token";
 let VALID_HASH = "";
@@ -580,6 +588,26 @@ describe("per-token rate limiting on proxy routes", () => {
         expect(res.status).not.toBe(429);
         expect(res.status).not.toBe(401);
     });
+
+    it("applies the tighter sandbox limit (15/min) to a sandbox-tier token", async () => {
+        const sandboxToken = "sandbox-rate-limit-token";
+        const sandboxHash = await sha256Hex(sandboxToken);
+        await (env as unknown as { CLIENT_TOKENS: KVNamespace }).CLIENT_TOKENS.put(
+            sandboxHash,
+            JSON.stringify({ label: "sandbox-test", tier: "sandbox", createdAt: "2026-05-03T00:00:00Z" }),
+        );
+
+        for (let i = 0; i < 15; i++) {
+            const res = await SELF.fetch("https://example.com/StopMonitoring?stopCode=12345", {
+                headers: { "X-App-Token": sandboxToken },
+            });
+            expect(res.status).not.toBe(429);
+        }
+        const res = await SELF.fetch("https://example.com/StopMonitoring?stopCode=12345", {
+            headers: { "X-App-Token": sandboxToken },
+        });
+        expect(res.status).toBe(429);
+    });
 });
 
 describe("timetable endpoint routing", () => {
@@ -616,19 +644,16 @@ describe("timetable endpoint routing", () => {
 
 
 describe("POST /self-provision", () => {
-    const TEST_ENV = env as unknown as {
-        CLIENT_TOKENS: KVNamespace;
-        TEST_PROVISION_PRIVATE_KEY: string;
-        TRANSIT_CACHE: KVNamespace;
-    };
+    const TEST_ENV = env as unknown as { CLIENT_TOKENS: KVNamespace; TRANSIT_CACHE: KVNamespace };
 
-    const VALID_ORIGINAL_TRANSACTION_ID = "1000000000000001";
-
-    let testPrivateKey: CryptoKey;
-
-    beforeEach(async () => {
+    async function clearRateLimitKeys(): Promise<void> {
         const { keys } = await TEST_ENV.TRANSIT_CACHE.list({ prefix: "ratelimit:" });
         await Promise.all(keys.map((k) => TEST_ENV.TRANSIT_CACHE.delete(k.name)));
+    }
+
+    beforeEach(async () => {
+        mockVerifyJWS.mockReset();
+        await clearRateLimitKeys();
     });
 
     afterEach(() => {
@@ -636,43 +661,25 @@ describe("POST /self-provision", () => {
     });
 
     function b64url(data: ArrayBuffer | string): string {
-        const bytes =
-            typeof data === "string"
-                ? new TextEncoder().encode(data)
-                : new Uint8Array(data);
+        const bytes = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
         let str = "";
         for (const b of bytes) str += String.fromCharCode(b);
         return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
     }
 
-    async function signJWT(
-        payload: Record<string, unknown>,
-        overrideKey?: CryptoKey,
-    ): Promise<string> {
-        const key = overrideKey ?? testPrivateKey;
-        const header = { alg: "ES256", typ: "JWT" };
-        const encodedHeader = b64url(JSON.stringify(header));
-        const encodedPayload = b64url(JSON.stringify(payload));
-        const signingInput = `${encodedHeader}.${encodedPayload}`;
-        const sig = await crypto.subtle.sign(
-            { name: "ECDSA", hash: "SHA-256" },
-            key,
-            new TextEncoder().encode(signingInput),
-        );
-        return `${signingInput}.${b64url(sig)}`;
-    }
-
-    function validPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-        const now = Math.floor(Date.now() / 1000);
-        return {
-            iss: "org.larner.SFTransitWatch",
-            install_id: "aabbccdd-1234-5678-abcd-ef0123456789",
-            platform: "ios",
-            app_version: "1.0.0",
-            iat: now,
-            exp: now + 60,
-            ...overrides,
-        };
+    function stubVerifiedJWS(overrides: Partial<VerifiedTransaction> = {}): void {
+        mockVerifyJWS.mockResolvedValue({
+            ok: true,
+            payload: {
+                originalTransactionId: "1000000000000001",
+                transactionId: "2000000000000001",
+                bundleId: "org.larner.SFTransitWatch",
+                productId: "org.larner.SFTransitWatch.proxy.monthly",
+                environment: "Production",
+                expiresDateMs: Date.now() + 30 * 24 * 60 * 60 * 1000,
+                ...overrides,
+            },
+        });
     }
 
     function activeSubscriptionResponse(expiresAtMs = Date.now() + 30 * 24 * 60 * 60 * 1000): Response {
@@ -695,25 +702,16 @@ describe("POST /self-provision", () => {
         vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => activeSubscriptionResponse(expiresAtMs)));
     }
 
-    beforeAll(async () => {
-        const pkcs8 = Uint8Array.from(
-            atob(TEST_ENV.TEST_PROVISION_PRIVATE_KEY),
-            (c) => c.charCodeAt(0),
-        );
-        testPrivateKey = await crypto.subtle.importKey(
-            "pkcs8",
-            pkcs8,
-            { name: "ECDSA", namedCurve: "P-256" },
-            false,
-            ["sign"],
-        );
-    });
-
-    it("returns 400 when body is missing", async () => {
-        const res = await SELF.fetch("https://example.com/self-provision", {
+    function postSelfProvision(body: Record<string, unknown>) {
+        return SELF.fetch("https://example.com/self-provision", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
         });
+    }
+
+    it("returns 400 when body is missing", async () => {
+        const res = await SELF.fetch("https://example.com/self-provision", { method: "POST", headers: { "Content-Type": "application/json" } });
         expect(res.status).toBe(400);
     });
 
@@ -726,134 +724,111 @@ describe("POST /self-provision", () => {
         expect(res.status).toBe(400);
     });
 
-    it("returns 400 when jwt field is absent", async () => {
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
+    it("returns 400 when signedTransactionInfo is absent", async () => {
+        const res = await postSelfProvision({});
         expect(res.status).toBe(400);
     });
 
-    it("returns 400 when originalTransactionId field is absent", async () => {
-        const jwt = await signJWT(validPayload());
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt }),
-        });
+    it("returns 400 when the legacy jwt field is present", async () => {
+        const res = await postSelfProvision({ jwt: "x", originalTransactionId: "1" });
         expect(res.status).toBe(400);
     });
 
-    it("returns 401 when JWT signature is invalid", async () => {
-        const wrongKeyPair = await crypto.subtle.generateKey(
-            { name: "ECDSA", namedCurve: "P-256" },
-            true,
-            ["sign", "verify"],
-        );
-        const jwt = await signJWT(validPayload(), wrongKeyPair.privateKey);
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
-        expect(res.status).toBe(401);
+    it("returns 400 when the legacy originalTransactionId field is present", async () => {
+        const res = await postSelfProvision({ signedTransactionInfo: "x", originalTransactionId: "1" });
+        expect(res.status).toBe(400);
     });
 
-    it("returns 401 when exp is in the past", async () => {
-        const now = Math.floor(Date.now() / 1000);
-        const jwt = await signJWT(validPayload({ iat: now - 120, exp: now - 60 }));
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
-        expect(res.status).toBe(401);
-    });
-
-    it("returns 401 when iss does not match the expected bundle ID", async () => {
-        const jwt = await signJWT(validPayload({ iss: "com.evil.app" }));
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
+    it("returns 401 when JWS verification fails", async () => {
+        mockVerifyJWS.mockResolvedValue({ ok: false, reason: "bad signature" });
+        const res = await postSelfProvision({ signedTransactionInfo: "x" });
         expect(res.status).toBe(401);
     });
 
     it("returns 403 when there is no active subscription", async () => {
+        stubVerifiedJWS();
         vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => expiredSubscriptionResponse()));
-        const jwt = await signJWT(validPayload());
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
+        const res = await postSelfProvision({ signedTransactionInfo: "x" });
         expect(res.status).toBe(403);
     });
 
-    it("returns 200 with a token for a valid JWT and active subscription", async () => {
+    it("returns 200 with a token for a valid transaction and active subscription", async () => {
+        stubVerifiedJWS();
         stubActiveSubscription();
-        const jwt = await signJWT(validPayload());
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
+        const res = await postSelfProvision({ signedTransactionInfo: "x", install_id: "abc", platform: "ios", app_version: "1.0.0" });
         expect(res.status).toBe(200);
         const body = (await res.json()) as { token: string };
         expect(typeof body.token).toBe("string");
         expect(body.token.length).toBeGreaterThan(8);
     });
 
-    it("stores the token in CLIENT_TOKENS under sha256(token) with tier 'paid'", async () => {
+    it("stores the token with tier 'paid' and environment 'Production' for a Production transaction", async () => {
+        stubVerifiedJWS({ environment: "Production" });
         stubActiveSubscription();
-        const jwt = await signJWT(validPayload({ install_id: "store-test-id", platform: "ios", app_version: "1.0.0" }));
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
+        const res = await postSelfProvision({ signedTransactionInfo: "x" });
         const { token } = (await res.json()) as { token: string };
         const hash = await sha256Hex(token);
-        const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { label: string; tier: string; subExpiresAt: string } | null;
-        expect(stored).not.toBeNull();
-        expect(stored!.label).toContain("self-prov");
-        expect(stored!.label).toContain("ios");
-        expect(stored!.tier).toBe("paid");
-        expect(new Date(stored!.subExpiresAt).getTime()).toBeGreaterThan(Date.now());
+        const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { tier: string; environment: string } | null;
+        expect(stored?.tier).toBe("paid");
+        expect(stored?.environment).toBe("Production");
     });
 
-    it("label contains the platform and first 8 chars of install_id", async () => {
+    it("stores the token with tier 'sandbox' for a Sandbox transaction, TTL clamped to a 24h floor", async () => {
+        stubVerifiedJWS({ environment: "Sandbox" });
+        // Sandbox subscription expiring in 5 minutes — the floor should still grant 24h.
+        stubActiveSubscription(Date.now() + 5 * 60 * 1000);
+        const res = await postSelfProvision({ signedTransactionInfo: "x" });
+        const { token } = (await res.json()) as { token: string };
+        const hash = await sha256Hex(token);
+        const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { tier: string } | null;
+        expect(stored?.tier).toBe("sandbox");
+        const { keys } = await TEST_ENV.CLIENT_TOKENS.list({ prefix: hash });
+        const meta = keys.find((k) => k.name === hash);
+        const ttlSeconds = (meta?.expiration ?? 0) - Math.floor(Date.now() / 1000);
+        expect(ttlSeconds).toBeGreaterThanOrEqual(24 * 60 * 60 - 5);
+        expect(ttlSeconds).toBeLessThanOrEqual(24 * 60 * 60 + 5);
+    });
+
+    it("label contains the platform and first 8 chars of install_id from the request body", async () => {
+        stubVerifiedJWS();
         stubActiveSubscription();
-        const installId = "12345678-abcd-ef01-2345-678901234567";
-        const jwt = await signJWT(validPayload({ install_id: installId, platform: "watchos", app_version: "2.0.0" }));
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
+        const res = await postSelfProvision({
+            signedTransactionInfo: "x",
+            install_id: "12345678-abcd-ef01-2345-678901234567",
+            platform: "watchos",
+            app_version: "2.0.0",
         });
         const { token } = (await res.json()) as { token: string };
         const hash = await sha256Hex(token);
         const stored = (await TEST_ENV.CLIENT_TOKENS.get(hash, "json")) as { label: string } | null;
-        expect(stored!.label).toBe("self-prov:watchos:12345678:2.0.0");
+        expect(stored?.label).toBe("self-prov:watchos:12345678:2.0.0");
+    });
+
+    it("evicts the oldest token once a subscription has more than 5 live tokens", async () => {
+        stubVerifiedJWS({ originalTransactionId: "9999999999999999" });
+        stubActiveSubscription();
+        const tokens: string[] = [];
+        for (let i = 0; i < 6; i++) {
+            await clearRateLimitKeys();
+            const res = await postSelfProvision({ signedTransactionInfo: "x", install_id: `device-${i}` });
+            const { token } = (await res.json()) as { token: string };
+            tokens.push(token);
+        }
+        const firstHash = await sha256Hex(tokens[0]);
+        const lastHash = await sha256Hex(tokens[5]);
+        expect(await TEST_ENV.CLIENT_TOKENS.get(firstHash)).toBeNull();
+        expect(await TEST_ENV.CLIENT_TOKENS.get(lastHash)).not.toBeNull();
     });
 
     it("is accessible without an X-App-Token header", async () => {
+        stubVerifiedJWS();
         stubActiveSubscription();
-        const jwt = await signJWT(validPayload({ install_id: "no-token-test-id" }));
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jwt, originalTransactionId: VALID_ORIGINAL_TRANSACTION_ID }),
-        });
+        const res = await postSelfProvision({ signedTransactionInfo: "x" });
         expect(res.status).not.toBe(401);
     });
 
     it("returns 405 for non-POST methods", async () => {
-        const res = await SELF.fetch("https://example.com/self-provision", {
-            method: "GET",
-        });
+        const res = await SELF.fetch("https://example.com/self-provision", { method: "GET" });
         expect(res.status).toBe(405);
     });
 });
@@ -958,7 +933,7 @@ describe("GET /healthz/appstore", () => {
         expect(res.status).toBe(200);
         const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean }> };
         expect(body.ok).toBe(true);
-        expect(body.checks.selfProvisionKey.ok).toBe(true);
+        expect(body.checks.appleJwsVerifier.ok).toBe(true);
         expect(body.checks.appStoreAuth.ok).toBe(true);
     });
 
@@ -975,12 +950,12 @@ describe("GET /healthz/appstore", () => {
         expect(body.checks.appStoreAuth.ok).toBe(false);
     });
 
-    it("returns 503 with ok:false when SELF_PROVISION_PUBLIC_KEY is not configured", async () => {
+    it("returns 503 with ok:false when APPSTORE_APP_APPLE_ID is not configured", async () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
 
-        const testEnv = env as unknown as { SELF_PROVISION_PUBLIC_KEY: string };
-        const original = testEnv.SELF_PROVISION_PUBLIC_KEY;
-        testEnv.SELF_PROVISION_PUBLIC_KEY = "";
+        const testEnv = env as unknown as { APPSTORE_APP_APPLE_ID: string };
+        const original = testEnv.APPSTORE_APP_APPLE_ID;
+        testEnv.APPSTORE_APP_APPLE_ID = "";
         try {
             const res = await SELF.fetch("https://example.com/healthz/appstore", {
                 headers: { Authorization: "Bearer test-healthcheck-token" },
@@ -989,9 +964,9 @@ describe("GET /healthz/appstore", () => {
             expect(res.status).toBe(503);
             const body = (await res.json()) as { ok: boolean; checks: Record<string, { ok: boolean }> };
             expect(body.ok).toBe(false);
-            expect(body.checks.selfProvisionKey.ok).toBe(false);
+            expect(body.checks.appleJwsVerifier.ok).toBe(false);
         } finally {
-            testEnv.SELF_PROVISION_PUBLIC_KEY = original;
+            testEnv.APPSTORE_APP_APPLE_ID = original;
         }
     });
 

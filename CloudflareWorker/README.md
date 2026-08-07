@@ -61,33 +61,46 @@ Type generation also needs both:
 ## Self-provision (automatic token issuance)
 
 The worker exposes a `POST /self-provision` endpoint that the app calls on
-first launch to obtain a token automatically. No operator action is required
-per device. The app signs a short-lived ES256 JWT with a private key baked
-into the app binary at build time; the worker verifies the signature using a
-corresponding public key stored as a Cloudflare Worker secret.
+first launch, subscribe, and restore to obtain a token automatically. No
+operator action is required per device. The app sends Apple's own signed
+transaction (`VerificationResult.jwsRepresentation`, from `Transaction.currentEntitlements`);
+the worker verifies its certificate chain against Apple's pinned Root CA G3
+using `@apple/app-store-server-library`, then confirms liveness against the
+App Store Server API exactly as before. There is no app-embedded signing key —
+the entitlement's authenticity comes entirely from Apple's signature.
 
 **One-time operator setup:**
 
-1. Generate the key pair:
-   ```bash
-   openssl ecparam -name prime256v1 -genkey -noout -out /tmp/provision.pem
-   # Private key → Developer.xcconfig (local) and Xcode Cloud secret
-   openssl ec -in /tmp/provision.pem -outform DER | base64 | tr -d '\n'
-   # Public key → SELF_PROVISION_PUBLIC_KEY worker secret
-   openssl ec -in /tmp/provision.pem -pubout -outform DER | base64 | tr -d '\n'
-   rm /tmp/provision.pem
-   ```
-2. Set the worker secret:
-   ```bash
-   npx wrangler secret put SELF_PROVISION_PUBLIC_KEY
-   # Paste the Base64 SPKI public key when prompted
-   ```
-3. Set `SELF_PROVISION_PRIVATE_KEY` in `Developer.xcconfig` (local builds)
-   and as an Xcode Cloud environment variable (CI builds).
+1. Look up the app's numeric App Store ID in App Store Connect → the app →
+   General → App Information.
+2. Set it as the `APPSTORE_APP_APPLE_ID` build environment variable wherever
+   `npm run deploy` / `npm run dev` runs (same mechanism as `WORKER_HOSTNAME`,
+   `TRANSIT_CACHE_KV_ID`, `CLIENT_TOKENS_KV_ID` — see `scripts/prepare-wrangler.mjs`).
+   It is not sensitive and does not need to be a Wrangler secret.
 
 Self-provisioned tokens are stored in `CLIENT_TOKENS` with a label of the
 form `self-prov:<platform>:<first8-of-install-id>:<app-version>`, which is
-visible in Cloudflare worker logs for abuse detection.
+visible in Cloudflare worker logs for abuse detection. Tokens also carry a
+`tier` (`"paid"` or `"sandbox"`) and `environment` field: sandbox-verified
+entitlements get a reduced token TTL (24h–7d, vs. the paid tier's subscription
+length plus a 3-day grace) and a tighter proxy rate limit (15/min vs. 60/min),
+since sandbox subscriptions are free and self-service and must not carry full
+paid access indefinitely.
+
+Each subscription (`originalTransactionId`) is capped at 5 simultaneously live
+tokens — enough for a phone, a watch, and reinstall headroom — with the oldest
+evicted once a 6th is issued.
+
+**Migration note (one-time, post-deploy):** this Worker hard-rejects the
+legacy `{jwt, originalTransactionId}` self-provision body shape with 400 —
+only the new `signedTransactionInfo` shape works. Deploy this Worker version
+**only after** existing TestFlight testers have updated to a client build
+that sends `signedTransactionInfo`, or every tester still on the old build
+will have their self-provision flow break. Once you've confirmed testers are
+on the new build, delete the now-unused secret:
+```bash
+npx wrangler secret delete SELF_PROVISION_PUBLIC_KEY
+```
 
 ## Issuing client tokens (manual, for specific devices)
 
@@ -114,7 +127,7 @@ npx wrangler kv key delete --binding CLIENT_TOKENS <hash>
 After every deploy, `npm run postdeploy` calls `GET /healthz/appstore` on
 the worker that was just deployed. This verifies:
 
-- `SELF_PROVISION_PUBLIC_KEY` is configured and is a valid P-256 SPKI key.
+- `APPSTORE_APP_APPLE_ID` is configured and the Apple JWS verifier can be constructed.
 - The `APPSTORE_KEY_ID`/`APPSTORE_ISSUER_ID`/`APPSTORE_PRIVATE_KEY`/`APPSTORE_BUNDLE_ID`
   secrets can successfully authenticate to Apple's App Store Server API.
 
@@ -144,7 +157,7 @@ it.
 ## Notes
 
 - `TRANSIT_CACHE_KV_ID` and `CLIENT_TOKENS_KV_ID` are required for `npm run deploy`, `npm run dev`, and `npm run cf-typegen`.
-- `SELF_PROVISION_PUBLIC_KEY` is required for the `/self-provision` endpoint to work. Without it, all self-provision attempts will fail with 401.
+- `APPSTORE_APP_APPLE_ID` is required for the `/self-provision` endpoint to work. Without it, all self-provision attempts fail with 500 (server misconfiguration).
 - `.wrangler.generated.jsonc` is generated at runtime and is gitignored.
 - `HEALTHCHECK_TOKEN` and `WORKERS_DEV_URL` are required for `npm run postdeploy` to work, in addition to the `WORKER_HOSTNAME` already required by `npm run deploy`. See "Apple communication health check" above.
 - `GTFSRT_READER_URL` and `GTFSRT_INTERNAL_KEY` are required for `/StopMonitoring` to return live data. `GTFSRT_READER_URL` is the AWS Lambda reader's Function URL (the `AwsLambda` SAM stack's `ReaderFunctionUrl` output); `GTFSRT_INTERNAL_KEY` is the shared secret the Worker sends as `X-Internal-Key` and must match the SAM stack's `InternalSharedKey` parameter. Both are set via `wrangler secret put`. See "GTFS-RT Lambda dependency" above for rollout ordering. Without them, `/StopMonitoring` degrades to an empty `MonitoredStopVisit[]` rather than erroring.

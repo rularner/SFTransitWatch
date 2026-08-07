@@ -1,8 +1,8 @@
 import { verifySubscription, checkAppStoreAuth } from "./appstore";
 import { handleStopMonitoring } from "./gtfsrt/proxy";
+import { verifyAppleTransactionJWS, WORKER_PROXY_PRODUCT_IDS, healthCheckAppleJws } from "./applejws";
 
 const UPSTREAM_BASE_URL = "https://api.511.org/transit";
-const EXPECTED_ISS = "org.larner.SFTransitWatch";
 const FRESH_TTL_SECONDS = 60;
 export const STALE_TTL_SECONDS = 6 * 60 * 60;
 const MIN_UPSTREAM_INTERVAL_MS = 60_000;
@@ -16,7 +16,15 @@ const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
 export const PROXY_RATE_LIMIT = { maxRequests: 60, windowSeconds: 60 };
+const SANDBOX_PROXY_RATE_LIMIT = { maxRequests: 15, windowSeconds: 60 };
+
+function proxyRateLimitFor(tier: "paid" | "sandbox"): { maxRequests: number; windowSeconds: number } {
+    return tier === "sandbox" ? SANDBOX_PROXY_RATE_LIMIT : PROXY_RATE_LIMIT;
+}
 const SUBSCRIPTION_GRACE_SECONDS = 3 * 24 * 60 * 60;
+const MAX_TOKENS_PER_SUBSCRIPTION = 5;
+const SANDBOX_MIN_TTL_SECONDS = 24 * 60 * 60;
+const SANDBOX_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 type TtlPair = { fresh: number; stale: number };
 
@@ -33,11 +41,11 @@ export interface Env {
 	API_511_KEY: string;
 	TRANSIT_CACHE: KVNamespace;
 	CLIENT_TOKENS: KVNamespace;
-	SELF_PROVISION_PUBLIC_KEY: string;
 	APPSTORE_KEY_ID: string;
 	APPSTORE_ISSUER_ID: string;
 	APPSTORE_PRIVATE_KEY: string;
 	APPSTORE_BUNDLE_ID: string;
+	APPSTORE_APP_APPLE_ID: string;
 	HEALTHCHECK_TOKEN: string;
 	GTFSRT_READER_URL: string;
 	GTFSRT_INTERNAL_KEY: string;
@@ -104,15 +112,16 @@ export default {
 			if (endpoint === "Stops") {
 				// Budget is enforced inside handleStopsRequest so a fresh cache HIT stays
 				// free (matching the XML proxy path below) instead of 429ing needlessly.
-				return await handleStopsRequest(url, env, auth.client.tokenHash);
+				return await handleStopsRequest(url, env, auth.client.tokenHash, auth.client.tier);
 			}
 
 			if (endpoint === "StopMonitoring") {
 				// Bound this endpoint per token — it was previously ungated and could be
 				// polled without limit, contending for the shared upstream refresh lock.
-				const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+				const limit = proxyRateLimitFor(auth.client.tier);
+				const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, limit.maxRequests, limit.windowSeconds);
 				if (!allowed) {
-					return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+					return jsonError("Too many requests.", 429, { "Retry-After": String(limit.windowSeconds) });
 				}
 				return await handleStopMonitoring(url, env);
 			}
@@ -132,13 +141,14 @@ export default {
 			}
 
 			// Work is required — now gate on the per-token budget.
-			const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+			const limit = proxyRateLimitFor(auth.client.tier);
+			const allowed = await checkRateLimit(env, "proxy-token", auth.client.tokenHash, limit.maxRequests, limit.windowSeconds);
 			if (!allowed) {
 				if (cached) {
 					return xmlResponse(cached, "STALE", ttl);
 				}
 				console.warn(JSON.stringify({ source: "proxy-rate-limit", outcome: "rate_limited", label: auth.client.label }));
-				return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+				return jsonError("Too many requests.", 429, { "Retry-After": String(limit.windowSeconds) });
 			}
 
 			const canRefreshNow = await canMakeUpstreamRequest(env, now);
@@ -373,7 +383,7 @@ async function handleLog(request: Request, env: Env, tokenHash: string): Promise
 	return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
-async function handleStopsRequest(url: URL, env: Env, tokenHash: string): Promise<Response> {
+async function handleStopsRequest(url: URL, env: Env, tokenHash: string, tier: "paid" | "sandbox"): Promise<Response> {
 	const agency = url.searchParams.get("agency") ?? url.searchParams.get("operator_id");
 	if (!agency) {
 		return jsonError("agency parameter required.", 400);
@@ -393,13 +403,14 @@ async function handleStopsRequest(url: URL, env: Env, tokenHash: string): Promis
 	} else {
 		// Work (an upstream fetch) is required — now gate on the per-token budget. On limit,
 		// serve stale cache if we have it rather than failing the client outright.
-		const allowed = await checkRateLimit(env, "proxy-token", tokenHash, PROXY_RATE_LIMIT.maxRequests, PROXY_RATE_LIMIT.windowSeconds);
+		const limit = proxyRateLimitFor(tier);
+		const allowed = await checkRateLimit(env, "proxy-token", tokenHash, limit.maxRequests, limit.windowSeconds);
 		if (!allowed) {
 			if (cached) {
 				active = cached;
 				return stopsJsonResponse(selectClosestStops(url, active), active.fetchedAtMs);
 			}
-			return jsonError("Too many requests.", 429, { "Retry-After": String(PROXY_RATE_LIMIT.windowSeconds) });
+			return jsonError("Too many requests.", 429, { "Retry-After": String(limit.windowSeconds) });
 		}
 		const result = await fetchAndCacheAllStops(env, agency, now);
 		if (result.ok) {
@@ -574,15 +585,11 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 	const checks: Record<string, { ok: boolean; status?: number; error?: string }> = {};
 
 	try {
-		if (!env.SELF_PROVISION_PUBLIC_KEY) {
-			throw new Error("SELF_PROVISION_PUBLIC_KEY not configured");
-		}
-		const spkiBytes = Uint8Array.from(atob(env.SELF_PROVISION_PUBLIC_KEY), (c) => c.charCodeAt(0));
-		await crypto.subtle.importKey("spki", spkiBytes, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
-		checks.selfProvisionKey = { ok: true };
+		const result = await healthCheckAppleJws(env.APPSTORE_BUNDLE_ID, env.APPSTORE_APP_APPLE_ID);
+		checks.appleJwsVerifier = result.ok ? { ok: true } : { ok: false, error: result.error };
 	} catch (err) {
-		console.error("Healthcheck selfProvisionKey check failed", err);
-		checks.selfProvisionKey = { ok: false, error: "Self-provision key check failed" };
+		console.error("Healthcheck appleJwsVerifier check failed", err);
+		checks.appleJwsVerifier = { ok: false, error: "Apple JWS verifier check failed" };
 	}
 
 	try {
@@ -592,7 +599,7 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 		checks.appStoreAuth = { ok: false, error: "App Store auth check failed" };
 	}
 
-	const ok = checks.selfProvisionKey.ok && checks.appStoreAuth.ok;
+	const ok = checks.appleJwsVerifier.ok && checks.appStoreAuth.ok;
 	return new Response(JSON.stringify({ ok, checks }), {
 		status: ok ? 200 : 503,
 		headers: {
@@ -601,6 +608,43 @@ async function handleHealthzAppStore(request: Request, env: Env): Promise<Respon
 			"Cache-Control": "no-store",
 		},
 	});
+}
+
+interface SubscriptionTokenIndexEntry {
+    hash: string;
+    createdAtMs: number;
+    expiresAtMs: number;
+}
+
+async function recordTokenForSubscription(
+    env: Env,
+    originalTransactionId: string,
+    entry: SubscriptionTokenIndexEntry,
+): Promise<void> {
+    const indexKey = `subtok:${originalTransactionId}`;
+    const now = Date.now();
+    const raw = (await env.CLIENT_TOKENS.get(indexKey, "json")) as SubscriptionTokenIndexEntry[] | null;
+    const live = (Array.isArray(raw) ? raw : []).filter((e) => e.expiresAtMs > now);
+    live.push(entry);
+    live.sort((a, b) => a.createdAtMs - b.createdAtMs);
+    while (live.length > MAX_TOKENS_PER_SUBSCRIPTION) {
+        const evicted = live.shift();
+        if (evicted) await env.CLIENT_TOKENS.delete(evicted.hash);
+    }
+    const maxExpiresAtMs = Math.max(...live.map((e) => e.expiresAtMs));
+    const ttlSeconds = Math.max(60, Math.ceil((maxExpiresAtMs - now) / 1000));
+    await env.CLIENT_TOKENS.put(indexKey, JSON.stringify(live), { expirationTtl: ttlSeconds });
+}
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max);
+}
+
+function tokenTtlSeconds(tier: "paid" | "sandbox", remainingSeconds: number): number {
+    if (tier === "paid") {
+        return remainingSeconds + SUBSCRIPTION_GRACE_SECONDS;
+    }
+    return clamp(remainingSeconds, SANDBOX_MIN_TTL_SECONDS, SANDBOX_MAX_TTL_SECONDS);
 }
 
 async function handleSelfProvision(request: Request, env: Env): Promise<Response> {
@@ -623,130 +667,74 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         return jsonError("Body must be valid JSON.", 400);
     }
 
-    if (
-        !parsed ||
-        typeof parsed !== "object" ||
-        typeof (parsed as Record<string, unknown>).jwt !== "string" ||
-        typeof (parsed as Record<string, unknown>).originalTransactionId !== "string"
-    ) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_required_field" }));
-        return jsonError('Body must be {"jwt": "<compact-jwt>", "originalTransactionId": "<string>"}', 400);
+    if (!parsed || typeof parsed !== "object") {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_body" }));
+        return jsonError('Body must be {"signedTransactionInfo": "<jws>"}', 400);
+    }
+    const body = parsed as Record<string, unknown>;
+
+    if ("jwt" in body || "originalTransactionId" in body) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "legacy_client" }));
+        return jsonError("This app version is no longer supported. Please update.", 400);
+    }
+    if (typeof body.signedTransactionInfo !== "string" || body.signedTransactionInfo.length === 0) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_signed_transaction_info" }));
+        return jsonError('Body must be {"signedTransactionInfo": "<jws>"}', 400);
     }
 
-    const jwt = (parsed as { jwt: string }).jwt;
-    const originalTransactionId = (parsed as { originalTransactionId: string }).originalTransactionId;
-    // App Store originalTransactionId is a numeric string. Enforce that so it cannot be
-    // used to inject path segments / query params into the authenticated App Store Server
-    // API request (see fetchSubscriptionStatus).
-    if (!/^[0-9]+$/.test(originalTransactionId)) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "bad_transaction_id" }));
-        return jsonError("originalTransactionId must be a numeric string.", 400);
-    }
-    const parts = jwt.split(".");
-    if (parts.length !== 3) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "malformed_jwt" }));
-        return jsonError("Malformed JWT.", 400);
+    const appAppleId = Number.parseInt(env.APPSTORE_APP_APPLE_ID ?? "", 10);
+    if (!Number.isInteger(appAppleId) || appAppleId <= 0) {
+        console.error(JSON.stringify({ source: "self-provision", outcome: "error", reason: "app_apple_id_not_configured" }));
+        return jsonError("Server misconfiguration.", 500);
     }
 
-    const [encodedHeader, encodedPayload, encodedSig] = parts;
-
-    let payload: Record<string, unknown>;
-    try {
-        const payloadBytes = fromBase64Url(encodedPayload);
-        payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as Record<string, unknown>;
-    } catch {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "payload_decode_failed" }));
-        return jsonError("JWT payload is not valid Base64url JSON.", 400);
+    const verified = await verifyAppleTransactionJWS(body.signedTransactionInfo, {
+        bundleId: env.APPSTORE_BUNDLE_ID,
+        appAppleId,
+        productIds: WORKER_PROXY_PRODUCT_IDS,
+    });
+    if (!verified.ok) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jws_verification_failed", detail: verified.reason }));
+        return jsonError("Could not verify the Apple transaction signature.", 401);
     }
 
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (typeof payload.exp !== "number" || payload.exp <= nowSec) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_expired", exp: payload.exp, now: nowSec }));
-        return jsonError("JWT has expired.", 401);
-    }
-    if (typeof payload.iat !== "number" || payload.iat > nowSec + 5) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_iat_future", iat: payload.iat, now: nowSec }));
-        return jsonError("JWT iat is in the future.", 401);
-    }
-    if (payload.exp - (payload.iat as number) > 300) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_lifetime_too_long" }));
-        return jsonError("JWT lifetime too long.", 401);
-    }
-
-    if (payload.iss !== EXPECTED_ISS) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "iss_mismatch" }));
-        return jsonError("JWT issuer mismatch.", 401);
-    }
-
-    let sigValid: boolean;
-    try {
-        if (!env.SELF_PROVISION_PUBLIC_KEY) {
-            console.error(JSON.stringify({ source: "self-provision", outcome: "error", reason: "public_key_not_configured" }));
-            return jsonError("Server misconfiguration.", 500);
-        }
-        const spkiBytes = Uint8Array.from(atob(env.SELF_PROVISION_PUBLIC_KEY), (c) => c.charCodeAt(0));
-        const publicKey = await crypto.subtle.importKey(
-            "spki",
-            spkiBytes,
-            { name: "ECDSA", namedCurve: "P-256" },
-            false,
-            ["verify"],
-        );
-        const sigBytes = fromBase64Url(encodedSig);
-        const signingInputBytes = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
-        sigValid = await crypto.subtle.verify(
-            { name: "ECDSA", hash: "SHA-256" },
-            publicKey,
-            sigBytes,
-            signingInputBytes,
-        );
-    } catch (err) {
-        console.error(JSON.stringify({ source: "self-provision", outcome: "error", reason: "sig_verify_threw", detail: String(err) }));
-        return jsonError("JWT signature verification failed.", 401);
-    }
-
-    if (!sigValid) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "sig_invalid" }));
-        return jsonError("JWT signature is invalid.", 401);
-    }
-
-    // Replay defense: the JWT is otherwise reusable until exp, so an intercepted request
-    // body could be replayed within its (<=5 min) window to mint extra tokens. Record a
-    // one-time marker keyed by the signature; legitimate retries rebuild a fresh JWT (new
-    // iat -> new signature), so this only blocks true replays.
-    const replayKey = `selfprov-jti:${(await sha256Hex(encodedSig)).slice(0, 32)}`;
-    if (await env.TRANSIT_CACHE.get(replayKey)) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "jwt_replayed" }));
-        return jsonError("JWT has already been used.", 401);
-    }
-    await env.TRANSIT_CACHE.put(replayKey, "1", { expirationTtl: Math.max(1, (payload.exp as number) - nowSec) });
-
-    const subscription = await verifySubscription(env, originalTransactionId);
+    const subscription = await verifySubscription(env, verified.payload.originalTransactionId, verified.payload.environment);
     if (!subscription.active) {
         console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "no_active_subscription" }));
         return jsonError("No active subscription.", 403);
     }
 
+    const tier: "paid" | "sandbox" = subscription.environment === "Sandbox" ? "sandbox" : "paid";
+    const remainingSeconds = Math.floor((subscription.expiresAtMs - Date.now()) / 1000);
+    const ttlSeconds = Math.max(60, tokenTtlSeconds(tier, remainingSeconds));
+
     const rawToken = crypto.randomUUID();
     const hash = await sha256Hex(rawToken);
-    const platform = typeof payload.platform === "string" ? payload.platform : "unknown";
-    const installId = typeof payload.install_id === "string" ? payload.install_id : "unknown";
-    const appVersion = typeof payload.app_version === "string" ? payload.app_version : "unknown";
+    const platform = typeof body.platform === "string" ? body.platform : "unknown";
+    const installId = typeof body.install_id === "string" ? body.install_id : "unknown";
+    const appVersion = typeof body.app_version === "string" ? body.app_version : "unknown";
     const label = `self-prov:${platform}:${installId.slice(0, 8)}:${appVersion}`;
-    const ttlSeconds = Math.floor((subscription.expiresAtMs - Date.now()) / 1000) + SUBSCRIPTION_GRACE_SECONDS;
 
     await env.CLIENT_TOKENS.put(
         hash,
         JSON.stringify({
             label,
-            tier: "paid",
+            tier,
+            environment: subscription.environment,
+            originalTransactionId: verified.payload.originalTransactionId,
             createdAt: new Date().toISOString(),
             subExpiresAt: new Date(subscription.expiresAtMs).toISOString(),
         }),
         { expirationTtl: ttlSeconds },
     );
 
-    console.log(JSON.stringify({ source: "self-provision", outcome: "ok", label }));
+    await recordTokenForSubscription(env, verified.payload.originalTransactionId, {
+        hash,
+        createdAtMs: Date.now(),
+        expiresAtMs: Date.now() + ttlSeconds * 1000,
+    });
+
+    console.log(JSON.stringify({ source: "self-provision", outcome: "ok", label, tier }));
 
     return new Response(JSON.stringify({ token: rawToken }), {
         status: 200,
@@ -756,12 +744,6 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
             "Cache-Control": "no-store",
         },
     });
-}
-
-function fromBase64Url(s: string): Uint8Array {
-	const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
-	const str = atob(b64);
-	return Uint8Array.from(str, c => c.charCodeAt(0));
 }
 
 export async function sha256Hex(input: string): Promise<string> {
@@ -774,7 +756,7 @@ export async function sha256Hex(input: string): Promise<string> {
 	return out;
 }
 
-type ClientInfo = { label: string; tokenHash: string };
+type ClientInfo = { label: string; tokenHash: string; tier: "paid" | "sandbox" };
 
 export async function authorizeClient(
 	request: Request,
@@ -787,5 +769,9 @@ export async function authorizeClient(
 	if (!value || typeof (value as { label: string }).label !== "string") {
 		return { ok: false };
 	}
-	return { ok: true, client: { label: (value as { label: string }).label, tokenHash: hash } };
+	// Tokens issued before tiering existed (or via the manual issue-token.sh flow)
+	// have no `tier` field — default them to "paid" to preserve existing behavior.
+	const stored = value as { label: string; tier?: string };
+	const tier: "paid" | "sandbox" = stored.tier === "sandbox" ? "sandbox" : "paid";
+	return { ok: true, client: { label: stored.label, tokenHash: hash, tier } };
 }

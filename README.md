@@ -1,139 +1,78 @@
 # SF Transit Watch
 
-An Apple Watch app that shows nearby bus stops and real-time arrival times for San Francisco transit using the 511.org API.
+An Apple Watch + iPhone app that shows nearby transit stops and real-time arrival
+times across the Bay Area, backed by the 511.org Open Data API.
 
 ## Features
 
-- **Real-time 511.org Integration**: Uses the official 511.org Transit API for live data
-- **Location-based Bus Stop Discovery**: Automatically finds nearby bus stops using GPS
-- **Real-time Arrival Times**: Shows upcoming bus arrivals with live updates from 511.org
-- **Distance Information**: Displays how far each stop is from your current location
-- **Route Information**: Shows which bus routes serve each stop
-- **Favorite Stops**: Mark frequently used stops as favorites for quick access
-- **Favorites First**: Favorite stops appear at the top of the list
-- **Siri Integration**: Use voice commands to check bus times hands-free
-- **Route-Specific Voice Commands**: Ask for specific bus/train routes by name
-- **Pull-to-Refresh**: Manually refresh arrival times by pulling down
-- **Auto-refresh**: Automatically updates arrival times every 30 seconds
-- **Watch-optimized UI**: Designed specifically for Apple Watch with large touch targets
-- **API Key Management**: Built-in settings to configure your 511.org API key
+- **Real-time arrivals**: Live predictions from 511.org's `StopMonitoring` API,
+  with a scheduled-timetable fallback when real-time data isn't available
+- **Seven Bay Area agencies**: Muni, BART, AC Transit, Caltrain, Golden Gate
+  Transit, SamTrans, and VTA — filterable in Settings
+- **Location-based stop discovery**: Finds nearby stops using GPS, with a
+  per-agency search radius (e.g. wider for sparser Caltrain/Golden Gate stops)
+- **Favorites**: Star stops for quick access; favorites sort to the top of the list
+- **Commute slots + alerts**: Pin a morning and afternoon stop and get a local
+  notification when your bus is approaching, with configurable lead time and
+  time-of-day window, and automatic suppression once you're already at the stop
+- **Watch complications**: Home-screen widgets showing the next arrival for a
+  commute slot or for your nearby favorite stops, refreshed in the background
+- **iPhone ↔ Watch sync**: API key/token, enabled agencies, commute slots, and
+  favorites sync automatically over Watch Connectivity
+- **Siri / Shortcuts**: Built on the `AppIntents` framework — "find nearby
+  stops" and "check bus times" work out of the box, no shortcut recording needed
+- **Two ways to get data**: subscribe to the SF Transit Watch proxy server (no
+  API key to manage), or bring your own free 511.org API key and skip our
+  servers entirely
+- **Watch-optimized UI**: Large touch targets, pull-to-refresh, auto-refresh
 
-## Screenshots
+## Architecture
 
-The app has four main screens:
+This is a single Xcode project with four targets sharing one local Swift package:
 
-1. **Nearby Stops**: Shows a list of bus stops near your current location, sorted by distance with favorites first
-2. **Arrival Times**: Shows upcoming bus arrivals for a selected stop with route information
-3. **Settings**: Configure your 511.org API key and manage favorite stops
-4. **Siri Shortcuts**: Set up voice commands for hands-free transit information
+- **`SFTransitWatch/`** — iOS companion app. Onboarding, purchases, deep-link
+  handling, and hosts the Watch Connectivity session that pushes config to the watch.
+- **`SFTransitWatch Watch App/`** — the watchOS app. Same onboarding/purchase
+  flow, plus background refresh and the logic that drives complication updates.
+- **`SFTransitWatch Complication/`** — WidgetKit extension with two widgets
+  (commute-slot arrival, nearby-favorites arrival). Reads snapshots the watch
+  app writes to the shared App Group; makes no network calls of its own.
+- **`SFTransitWatchPackage/`** — local Swift package holding almost all shared
+  model, view, and service code (agencies, favorites, alerts, subscriptions,
+  Siri intents, API codecs, etc.) used by both the iOS and watch targets.
 
-## Siri Integration
+Two backend components live in this repo but deploy independently:
 
-### Voice Commands
+- **`CloudflareWorker/`** — proxies and caches 511.org requests at
+  `api.sftransitwatch.com`; issues/exchanges worker access tokens for
+  subscribers. See `CloudflareWorker/README.md`.
+- **`AwsLambda/`** — a two-function pipeline (scheduled feed refresher + an
+  on-demand reader behind a Function URL) that decodes 511's GTFS-realtime
+  feed for Muni and serves it to the Worker, offloading work the Worker's
+  free-tier CPU budget can't cover. See `AwsLambda/README.md`.
 
-You can use Siri to quickly access transit information:
+## Getting Data: Subscribe or Bring Your Own Key
 
-#### General Commands
-- **"Hey Siri, find nearby bus stops"** - Opens the app and shows nearby stops
-- **"Hey Siri, check bus times"** - Opens the app to view arrival times
-- **"Hey Siri, show me transit times"** - Opens the app for current times
-- **"Hey Siri, open SF Transit Watch"** - Launches the app
+On first launch the app asks you to pick one:
 
-#### Route-Specific Commands
-- **"Hey Siri, when is the next 38 bus"** - Check times for the 38 bus route
-- **"Hey Siri, when is the next F train"** - Check times for the F streetcar
-- **"Hey Siri, next 14 bus"** - Quick check for the 14 bus
-- **"Hey Siri, bus 22 times"** - Get arrival times for the 22 bus
-- **"Hey Siri, when is the next N train"** - Check N-Judah train times
-- **"Hey Siri, next L bus"** - Get L-Taraval bus times
+- **Subscribe to the SF Transit Watch server** (recommended) — an
+  auto-renewing App Store subscription. No API key to register or manage,
+  plus server-side caching for faster responses. Your requests (location,
+  stops you look up) pass through our server.
+- **Use a 511.org API key directly** — free, no subscription. Requests go
+  straight from the app to 511.org; our servers see nothing.
 
-### Supported Routes
-
-The app recognizes these common San Francisco routes:
-- **Bus Routes**: 38, 38R, 14, 14R, 22
-- **Streetcar Routes**: F, N, L, K, M, T
-- **Express Routes**: Any route with "R" suffix
-
-### Setting Up Siri Shortcuts
-
-1. **Open Settings**: Tap the gear icon in the app
-2. **Go to Siri Integration**: Tap "Voice Commands" in the settings
-3. **Add Shortcuts**: Tap the "+" button next to any shortcut
-4. **Record Your Phrase**: Follow the prompts to record your custom voice command
-5. **Test It**: Say "Hey Siri" followed by your custom phrase
-
-### Available Shortcuts
-
-- **Find Nearby Stops**: Locate bus stops near your current location
-- **Route-Specific Times**: Check times for specific bus/train routes
-- **Check Bus Times**: Get arrival times for specific stops
-- **Custom Commands**: Create your own voice phrases for any function
-
-### How Siri Learning Works
-
-The app automatically teaches Siri your preferences:
-- When you view arrival times, Siri learns which stops you check
-- When you favorite stops, Siri remembers your frequently used locations
-- When you view specific routes, Siri learns which routes you use most
-- Siri suggests shortcuts based on your usage patterns
-
-### Route-Specific Learning
-
-The app intelligently learns your route preferences:
-- **Automatic Route Detection**: Siri recognizes when you ask about specific routes
-- **Route Suggestions**: Based on your location and usage, Siri suggests relevant routes
-- **Voice Pattern Learning**: Siri adapts to how you naturally ask for route information
-
-## Favorites Feature
-
-### How to Use Favorites
-
-1. **Add to Favorites**: 
-   - Tap the star icon next to any bus stop in the list
-   - The star will turn yellow to indicate it's favorited
-
-2. **View Favorites**:
-   - Favorite stops appear in a separate "Favorites" section at the top
-   - They're also marked with a yellow star icon
-
-3. **Remove from Favorites**:
-   - Tap the yellow star icon to unfavorite a stop
-   - Or use the "Clear All Favorites" option in Settings
-
-4. **Manage Favorites**:
-   - Go to Settings to see how many favorites you have
-   - Clear all favorites at once if needed
-
-### Favorites Benefits
-
-- **Quick Access**: Favorite stops always appear first
-- **Persistent**: Favorites are saved between app launches
-- **Visual Indicators**: Yellow stars make favorites easy to spot
-- **Easy Management**: Toggle favorites with a single tap
+Full walkthrough, including loading a key via a `sftransitwatch://key/…` link
+sent to your watch, is in [docs/support.md](docs/support.md).
 
 ## Setup Instructions
 
 ### Prerequisites
 
-- Xcode 15.0 or later
-- iOS 17.0+ / watchOS 10.0+
+- Xcode 26 (targets build against the iOS 26.4 / watchOS 26.4 SDKs)
 - Apple Developer Account (for device testing)
-- Apple Watch (for testing)
-- 511.org API key (free)
-
-### Getting Your 511.org API Key
-
-1. **Visit the 511.org Developer Portal**:
-   - Go to https://511.org/developers/
-   - Click "Get API Key"
-   - Fill out the registration form
-   - You'll receive your API key via email
-
-2. **API Key Features**:
-   - Free for personal use
-   - Rate limited (check 511.org documentation)
-   - Covers San Francisco Bay Area transit agencies
-   - Real-time data for Muni, BART, AC Transit, and more
+- iPhone + Apple Watch paired together (recommended; simulators work for most development)
+- Optional: a 511.org API key ([free](https://511.org/open-data/token)) if you don't want to use the proxy server
 
 ### Installation
 
@@ -188,22 +127,22 @@ The app intelligently learns your route preferences:
    3. To revoke later (lost device, leaked token), the operator runs
       `npx wrangler kv key delete --binding CLIENT_TOKENS <hash>`.
 
-3. **Open in Xcode**:
+4. **Open in Xcode**:
    ```bash
    open SFTransitWatch.xcodeproj
    ```
 
-3. **Configure your team**:
+5. **Configure your team**:
    - Select the project in Xcode
    - Go to "Signing & Capabilities"
    - Select your development team
    - Update the bundle identifier if needed
 
-4. **Build and Run**:
-   - Select your Apple Watch as the target device
+6. **Build and Run**:
+   - Select the `SFTransitWatch` (iPhone) or `SFTransitWatch Watch App` scheme
    - Press Cmd+R to build and run
 
-5. **Configure data source**:
+7. **Configure data source**:
 
    On first launch the app will prompt you. Pick whichever is easiest:
 
@@ -220,154 +159,143 @@ The app intelligently learns your route preferences:
 
    See [docs/support.md](docs/support.md) for more detail.
 
-6. **Set Up Siri**:
-   - Go to Settings > Siri Integration
-   - Add voice shortcuts for your most common actions
-   - Test the voice commands
-
 ### Location Permissions
 
-The app requires location access to find nearby bus stops. When prompted:
-
-1. Tap "Allow While Using App"
-2. The app will automatically start finding nearby stops
-
-## 511.org API Integration
-
-### Supported Transit Agencies
-
-- **San Francisco Muni**: Buses, streetcars, and cable cars
-- **BART**: Bay Area Rapid Transit
-- **AC Transit**: Alameda-Contra Costa Transit
-- **Caltrain**: Peninsula commuter rail
-- **VTA**: Santa Clara Valley Transportation Authority
-
-### API Endpoints Used
-
-- **StopMonitoring**: Real-time arrival predictions
-- **StopPlace**: Nearby transit stops
-- **VehicleMonitoring**: Live vehicle locations (future)
-
-### Data Format
-
-The app parses 511.org's XML responses:
-```xml
-<MonitoredVehicleJourney>
-  <LineRef>38</LineRef>
-  <DirectionRef>Downtown</DirectionRef>
-  <MonitoredCall>
-    <ExpectedDepartureTime>2024-01-15T14:30:00Z</ExpectedDepartureTime>
-  </MonitoredCall>
-</MonitoredVehicleJourney>
-```
+The app requires location access to find nearby stops. When prompted, tap
+"Allow While Using App" and it will automatically start finding nearby stops.
 
 ## Project Structure
 
 ```
 SFTransitWatch/
-├── SFTransitWatchApp.swift          # Main app entry point
-├── ContentView.swift                # Root view with navigation
-├── BusStopListView.swift            # List of nearby stops with favorites
-├── BusArrivalView.swift             # Arrival times for selected stop
-├── SettingsView.swift               # API key and favorites management
-├── SiriShortcutsView.swift          # Siri shortcuts configuration
-├── SiriManager.swift                # Siri integration and intent handling
-├── FavoritesManager.swift           # Favorites storage and management
-├── LocationManager.swift            # GPS location handling
-├── TransitAPI.swift                 # 511.org API integration
-├── BusStop.swift                    # Data model for bus stops
-├── BusArrival.swift                 # Data model for arrivals
-└── Assets.xcassets/                 # App icons and resources
+├── SFTransitWatch/                        # iOS companion app target
+│   ├── SFTransitWatchApp.swift            # App entry point, onboarding, deep links
+│   ├── ContentView.swift                  # Root navigation
+│   ├── BusStopListView.swift              # Nearby/favorite stops list
+│   ├── BusArrivalView.swift               # Arrival times for a selected stop
+│   ├── BusJourneyView.swift               # Onward-stop journey view
+│   ├── SettingsView.swift                 # API key, agencies, favorites management
+│   ├── SiriManager.swift                  # Siri/AppIntents wiring
+│   ├── TransitAPI.swift                   # 511.org / worker-proxy API client
+│   └── PhoneSession.swift                 # Watch Connectivity session (phone side)
+├── SFTransitWatch Watch App/              # watchOS app target
+│   ├── SFTransitWatchApp.swift            # App entry point, onboarding, deep links
+│   ├── AppDelegate.swift
+│   ├── ContentView.swift
+│   ├── BusStopListView.swift
+│   ├── BusArrivalView.swift
+│   ├── SettingsView.swift
+│   ├── TransitAPI.swift                   # 511.org / worker-proxy API client (watch)
+│   ├── WatchSiriManager.swift
+│   ├── WatchSession.swift                 # Watch Connectivity session (watch side)
+│   ├── BackgroundRefreshController.swift  # Background refresh + alert notifications
+│   └── ComplicationUpdater.swift          # Writes snapshots for the widget extension
+├── SFTransitWatch Complication/           # WidgetKit extension target
+│   ├── ComplicationWidget.swift           # Commute-slot arrival widget
+│   └── NearbyFavoritesWidget.swift        # Nearby-favorites arrival widget
+├── SFTransitWatchPackage/                 # shared Swift package (most of the logic)
+│   └── Sources/SFTransitWatchPackage/
+│       ├── Agency.swift                   # Bay Area transit agency definitions
+│       ├── BusStop.swift / BusArrival.swift / OnwardStop.swift
+│       ├── TransitCodecs.swift            # JSON decoding of 511's SIRI-shaped responses
+│       ├── SIRIXMLParser.swift            # XML parsing for service-alert text
+│       ├── FavoritesManager.swift / SharedAgenciesManager.swift
+│       ├── CommuteSlotsManager.swift / CommuteSlotPickerView.swift
+│       ├── AlertSettingsManager.swift / AlertSlotSettingsView.swift
+│       ├── SubscriptionManager.swift / PaywallView.swift / SubscriptionDisplayInfo.swift
+│       ├── SelfProvisionService.swift / WorkerConfigLink.swift / WorkerTokenExchange.swift
+│       ├── ConfigurationManager.swift / ProvisionRefreshGate.swift
+│       ├── SiriIntents.swift / SiriShortcutsView.swift
+│       ├── StopRoutesCache.swift / Telemetry.swift
+│       └── LocationManager.swift / LocationProvider.swift
+├── CloudflareWorker/                      # 511.org proxy + token issuance (deploys to api.sftransitwatch.com)
+├── AwsLambda/                             # GTFS-RT feed refresher + reader behind the Worker
+└── docs/                                  # GitHub Pages site (www.sftransitwatch.com)
 ```
 
-## Data Models
+## Backend Components
 
-### BusStop
-- `id`: Unique identifier from 511.org
-- `name`: Stop name (e.g., "Market St & 4th St")
-- `code`: Stop code (e.g., "M4")
-- `latitude/longitude`: GPS coordinates from 511.org
-- `routes`: Array of bus routes serving this stop
-- `isFavorite`: Whether this stop is marked as favorite
+### Cloudflare Worker
 
-### BusArrival
-- `route`: Bus route number from 511.org
-- `destination`: Final destination
-- `arrivalTime`: Scheduled arrival time from 511.org
-- `minutesAway`: Minutes until arrival
-- `isRealTime`: Whether this is live data from 511.org
+Proxies and caches 511.org requests at `api.sftransitwatch.com`. Handles
+`/self-provision` (issues a worker token after verifying an App Store
+subscription), `/worker-token` (exchanges a one-time bootstrap code for a
+token), telemetry ingestion, and the proxied transit endpoints. `/StopMonitoring`
+for Muni is served by the AWS Lambda pipeline rather than calling 511.org
+directly. See `CloudflareWorker/README.md`.
 
-## API Error Handling
+### AWS Lambda GTFS-RT pipeline
 
-The app includes robust error handling:
+Two Lambda functions, deployed via GitHub Actions OIDC: a scheduled refresher
+that decodes 511's regional GTFS-realtime feed every 2 minutes and writes a
+snapshot to S3, and a reader behind a Function URL (gated by a shared-secret
+header) that the Worker calls to serve real-time Muni arrivals. This exists
+because decoding GTFS-RT inline exceeded the Worker's free-tier CPU budget.
+See `AwsLambda/README.md`.
 
-- **Network Errors**: Falls back to sample data
-- **Invalid API Key**: Shows configuration prompt
-- **No Data**: Displays appropriate empty states
-- **Location Errors**: Graceful degradation
+## 511.org API Integration
 
-## Customization
+### Supported Transit Agencies
 
-### Adding New Transit Agencies
+- **Muni** — San Francisco Municipal Transportation Agency
+- **BART** — Bay Area Rapid Transit
+- **AC Transit** — Alameda-Contra Costa Transit
+- **Caltrain** — Peninsula commuter rail
+- **Golden Gate Transit** — Marin/Sonoma buses and ferries
+- **SamTrans** — San Mateo County Transit District
+- **VTA** — Santa Clara Valley Transportation Authority
 
-1. Update `TransitAPI.swift` with new agency codes
-2. Add new API endpoints if needed
-3. Update XML parsing for agency-specific formats
+### API Endpoints Used
 
-### UI Customization
+- **StopMonitoring**: real-time arrival predictions
+- **Stops**: nearby stop search
+- **StopTimetable**: scheduled-arrival fallback and per-stop route discovery
+- **Timetable**: onward-stop journey lookup
 
-- Colors: Modify `AccentColor.colorset`
-- Icons: Replace app icon in `AppIcon.appiconset`
-- Fonts: Update text styles in SwiftUI views
+### Data Format
+
+The primary path decodes 511.org's SIRI-shaped **JSON** responses directly
+(`TransitCodecs.swift`). A regex-based XML parser exists as a last-resort
+fallback if a JSON response fails to decode or comes back empty, and a small
+XML parser (`SIRIXMLParser.swift`) is used separately for service-alert text.
+In worker-proxy mode, requests go to `{workerBaseURL}/{endpoint}` with an
+`X-App-Token` header; in direct mode they go to
+`https://api.511.org/transit/{endpoint}` with an `api_key` query param. The
+app falls back from worker to direct mode automatically on a 401.
+
+## Rate Limits
+
+511.org's API is rate limited (see their documentation for current limits).
+Requests are cached on-device (with a short throttle and "keep last on error"
+behavior) to minimize calls; subscribers additionally benefit from the
+Worker's edge cache.
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **API Key Issues**:
-   - Verify your 511.org API key is correct
-   - Check if you've exceeded rate limits
-   - Ensure the key is saved in Settings
+1. **"A 511.org API key or registered server is required"**: the app hasn't
+   been configured yet. Tap **Connect** to subscribe, or paste a 511.org key
+   into Settings. If the watch shows this but the iPhone app is installed,
+   configure it there first — the watch picks it up automatically.
 
-2. **Location not working**:
-   - Check location permissions in Watch Settings
-   - Ensure GPS is enabled on the paired iPhone
-
-3. **No stops found**:
-   - Verify you're in the San Francisco Bay Area
-   - Check internet connection
+2. **No stops found**:
+   - Confirm you're inside 511.org's coverage area (the nine Bay Area counties)
+   - Check location permissions
+   - Check your API key/subscription is configured
    - Try pulling to refresh
 
-4. **Favorites not saving**:
-   - Check if the app has proper permissions
-   - Try restarting the app
-   - Verify UserDefaults is working
+3. **Complication isn't updating**: complications refresh on a schedule set
+   by watchOS; opening the watch app forces a refresh. If it's still stale
+   after a minute, remove and re-add it to the watch face.
 
-5. **Siri not working**:
-   - Ensure Siri is enabled on your Apple Watch
-   - Check that shortcuts are properly added
-   - Try re-recording your voice commands
-   - Verify the app has microphone permissions
-   - For route-specific commands, make sure to say the route number clearly
+4. **Arrivals look stale**: real-time data comes from 511.org's upstream
+   feed — if it's delayed, pull to refresh and try again in a minute.
 
-6. **Route commands not recognized**:
-   - Speak clearly when saying route numbers
-   - Try different phrasings (e.g., "38 bus" vs "route 38")
-   - Check that the route exists in the system
-   - Ensure you're in an area served by that route
+5. **Build errors**: clean the build folder (Cmd+Shift+K), make sure Xcode
+   matches the SDKs referenced above, and check the deployment target.
 
-7. **Build errors**:
-   - Clean build folder (Cmd+Shift+K)
-   - Update Xcode to latest version
-   - Check deployment target compatibility
-
-### Debug Mode
-
-For development, the app includes:
-- Sample bus stop data as fallback
-- Simulated API responses
-- Debug logging in console
-- Graceful error handling
+See [docs/support.md](docs/support.md) for the full troubleshooting guide.
 
 ## Snapshot tests for App Store screenshots
 
@@ -452,40 +380,26 @@ catalog. Fixing this requires setting the `SFTransitWatch` scheme's Test
 action "StoreKit Configuration" to `WorkerProxySubscription.storekit`, then
 removing the `XCTSkipIf` lines.
 
-## Rate Limits
-
-511.org API has rate limits:
-- **Free Tier**: 1,000 requests per day
-- **Paid Tier**: Higher limits available
-- **Caching**: App caches data to minimize requests
-
-## Future Enhancements
-
-The planned-work backlog lives in [TODO.md](TODO.md), grouped by effort
-(quick wins, medium features, bigger bets) plus bug and privacy items.
-Complications, multiple transit agencies, and favorite-stop widgets that
-were once listed here are already shipped.
-
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test on actual Apple Watch
-5. Submit a pull request
+4. Run the relevant test suites (see `CLAUDE.md` for scheme/destination details)
+5. Submit a pull request with a [Conventional Commits](https://www.conventionalcommits.org/) title — `.github/workflows/validate-pr-title.yml` enforces this
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For issues and questions:
-- Create an issue on GitHub
-- Check the troubleshooting section
-- Review 511.org API documentation
-- Contact 511.org for API support
+- **Using the app**: see [docs/support.md](docs/support.md) for setup and troubleshooting
+- **Bugs, feature requests, or anything else**: email sftransitwatch@larner.org
+- **Security vulnerabilities**: see [SECURITY.md](SECURITY.md) — please don't open a public issue for these
+- **511.org API issues**: those are upstream of this project; contact 511.org directly
 
 ---
 
-**Note**: This app uses the official 511.org Transit API. Please respect their terms of service and rate limits. For production use, consider implementing proper caching and error handling. 
+**Note**: This app uses the 511.org Open Data API. Please respect their terms
+of service and rate limits.

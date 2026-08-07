@@ -95,7 +95,7 @@ struct SettingsView: View {
                     Button("Manage Subscription") {
                         showingManageSubscriptions = true
                     }
-                } else if provisionService != nil {
+                } else {
                     PaywallView(
                         tiers: subscriptionTiers,
                         isPurchasing: isSubscribing,
@@ -308,7 +308,7 @@ struct SettingsView: View {
             Text("This will remove all your favorite stops. This action cannot be undone.")
         }
         .task {
-            hasActiveSubscription = await subscriptionManager.activeOriginalTransactionId() != nil
+            hasActiveSubscription = await subscriptionManager.activeEntitlementJWS() != nil
             if subscriptionTiers.isEmpty {
                 subscriptionTiers = await subscriptionManager.loadDisplayInfo()
             }
@@ -370,25 +370,25 @@ struct SettingsView: View {
     }
 
     private func handleSubscribeAndProvision(productID: String) async {
-        guard let service = provisionService else { return }
+        let service = provisionService
         isSubscribing = true
         defer { isSubscribing = false }
         do {
-            var originalTransactionId: String
+            var signedTransactionInfo: String
             var usedExistingEntitlement = false
-            if let existing = await subscriptionManager.activeOriginalTransactionId() {
-                originalTransactionId = existing
+            if let existing = await subscriptionManager.activeEntitlementJWS() {
+                signedTransactionInfo = existing
                 usedExistingEntitlement = true
             } else {
-                originalTransactionId = try await subscriptionManager.purchase(productID: productID)
+                signedTransactionInfo = try await subscriptionManager.purchase(productID: productID)
             }
-            var result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            var result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, signedTransactionInfo: signedTransactionInfo)
             if case .failure = result, usedExistingEntitlement {
                 // The cached entitlement didn't hold up server-side (e.g. it actually
                 // expired since the local check ran) — fall back to a real purchase
                 // instead of leaving the user stuck with no way to subscribe.
-                originalTransactionId = try await subscriptionManager.purchase(productID: productID)
-                result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+                signedTransactionInfo = try await subscriptionManager.purchase(productID: productID)
+                result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, signedTransactionInfo: signedTransactionInfo)
             }
             switch result {
             case .success:
@@ -404,12 +404,12 @@ struct SettingsView: View {
     }
 
     private func handleRestore() async {
-        guard let service = provisionService else { return }
+        let service = provisionService
         isRestoring = true
         defer { isRestoring = false }
         do {
-            let originalTransactionId = try await subscriptionManager.restore()
-            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, originalTransactionId: originalTransactionId)
+            let signedTransactionInfo = try await subscriptionManager.restore()
+            let result = await service.provision(workerURL: ConfigurationManager.shared.workerBaseURL, signedTransactionInfo: signedTransactionInfo)
             switch result {
             case .success:
                 hasActiveSubscription = true
