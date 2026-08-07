@@ -20,14 +20,14 @@ final class SelfProvisionServiceTests: XCTestCase {
 
     func testProvisionSendsPOSTToSelfProvisionEndpoint() async {
         let (service, mock) = makeService()
-        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws")
+        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws", purpose: .purchase)
         XCTAssertEqual(mock.lastRequest?.url?.path, "/self-provision")
         XCTAssertEqual(mock.lastRequest?.httpMethod, "POST")
     }
 
     func testProvisionBodyIncludesSignedTransactionInfo() async throws {
         let (service, mock) = makeService()
-        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "abc.def.ghi")
+        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "abc.def.ghi", purpose: .purchase)
 
         let body = try XCTUnwrap(mock.lastRequest?.httpBody)
         let json = try JSONDecoder().decode([String: String].self, from: body)
@@ -36,13 +36,27 @@ final class SelfProvisionServiceTests: XCTestCase {
 
     func testProvisionBodyIncludesInstallIdPlatformAndAppVersion() async throws {
         let (service, mock) = makeService()
-        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws")
+        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws", purpose: .purchase)
 
         let body = try XCTUnwrap(mock.lastRequest?.httpBody)
         let json = try JSONDecoder().decode([String: String].self, from: body)
         XCTAssertNotNil(json["install_id"])
         XCTAssertNotNil(json["platform"])
         XCTAssertNotNil(json["app_version"])
+    }
+
+    func testProvisionBodyIncludesPurpose() async throws {
+        let (service, mock) = makeService()
+
+        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws", purpose: .purchase)
+        var body = try XCTUnwrap(mock.lastRequest?.httpBody)
+        var json = try JSONDecoder().decode([String: String].self, from: body)
+        XCTAssertEqual(json["purpose"], "purchase")
+
+        _ = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws", purpose: .refresh)
+        body = try XCTUnwrap(mock.lastRequest?.httpBody)
+        json = try JSONDecoder().decode([String: String].self, from: body)
+        XCTAssertEqual(json["purpose"], "refresh")
     }
 
     // MARK: - Success path
@@ -56,7 +70,7 @@ final class SelfProvisionServiceTests: XCTestCase {
         {"token":"stored-token-xyz"}
         """.data(using: .utf8))
 
-        let result = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws")
+        let result = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws", purpose: .purchase)
 
         if case .success = result { } else { XCTFail("Expected .success, got \(result)") }
         XCTAssertEqual(ConfigurationManager.shared.workerToken, "stored-token-xyz")
@@ -72,7 +86,7 @@ final class SelfProvisionServiceTests: XCTestCase {
         let (service, _) = makeService(statusCode: 401, responseBody: """
         {"error":"Unauthorized"}
         """.data(using: .utf8))
-        let result = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws")
+        let result = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws", purpose: .purchase)
         if case .failure(let e) = result { XCTAssertEqual(e, .serverRejected) } else { XCTFail("Expected .failure(.serverRejected), got \(result)") }
     }
 
@@ -80,7 +94,7 @@ final class SelfProvisionServiceTests: XCTestCase {
         let mock = SelfProvisionMockSession()
         mock.mockError = URLError(.notConnectedToInternet)
         let service = SelfProvisionService(session: mock)
-        let result = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws")
+        let result = await service.provision(workerURL: "https://worker.example.com", signedTransactionInfo: "test-jws", purpose: .purchase)
         if case .failure(let e) = result { XCTAssertEqual(e, .networkError) } else { XCTFail("Expected .failure(.networkError), got \(result)") }
     }
 }

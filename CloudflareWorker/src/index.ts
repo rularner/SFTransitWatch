@@ -12,7 +12,14 @@ const DEFAULT_STOPS_COUNT = 30;
 const MAX_STOPS_COUNT = 100;
 const TIMETABLE_FRESH_TTL_SECONDS = 24 * 60 * 60;
 const TIMETABLE_STALE_TTL_SECONDS = 7 * 24 * 60 * 60;
-const PROVISION_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
+// Split from a single shared budget so a drained passive-refresh bucket (ProvisionRefreshGate,
+// hourly, harmless if it misses — the existing token stays valid) can't block a purchase-path
+// request sharing the same carrier-CGNAT IP as other users. Both are still keyed by IP for
+// abuse protection; see handleSelfProvision's `purpose` handling below. A client that omits
+// `purpose` (old app versions predating this split) falls into the refresh bucket, matching
+// this endpoint's pre-split behavior exactly — see TODO.md.
+const PROVISION_REFRESH_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
+const PROVISION_PURCHASE_RATE_LIMIT = { maxRequests: 5, windowSeconds: 10 * 60 };
 const TOKEN_EXCHANGE_RATE_LIMIT = { maxRequests: 10, windowSeconds: 10 * 60 };
 const LOG_RATE_LIMIT = { maxRequests: 60, windowSeconds: 15 * 60 };
 export const PROXY_RATE_LIMIT = { maxRequests: 60, windowSeconds: 60 };
@@ -652,13 +659,6 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
         return jsonError("Only POST requests are supported.", 405);
     }
 
-    const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    const allowed = await checkRateLimit(env, "provision", clientIp, PROVISION_RATE_LIMIT.maxRequests, PROVISION_RATE_LIMIT.windowSeconds);
-    if (!allowed) {
-        console.warn(JSON.stringify({ source: "self-provision", outcome: "rate_limited" }));
-        return jsonError("Too many requests.", 429, { "Retry-After": String(PROVISION_RATE_LIMIT.windowSeconds) });
-    }
-
     let parsed: unknown;
     try {
         parsed = await request.json();
@@ -680,6 +680,18 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
     if (typeof body.signedTransactionInfo !== "string" || body.signedTransactionInfo.length === 0) {
         console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "missing_signed_transaction_info" }));
         return jsonError('Body must be {"signedTransactionInfo": "<jws>"}', 400);
+    }
+
+    // Purchase and refresh calls get separate IP-keyed budgets (see the constants above) —
+    // clients that don't send `purpose` (not yet updated) default to the refresh bucket,
+    // identical to this endpoint's behavior before the split.
+    const purpose = body.purpose === "purchase" ? "purchase" : "refresh";
+    const rateLimit = purpose === "purchase" ? PROVISION_PURCHASE_RATE_LIMIT : PROVISION_REFRESH_RATE_LIMIT;
+    const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const allowed = await checkRateLimit(env, `provision-${purpose}`, clientIp, rateLimit.maxRequests, rateLimit.windowSeconds);
+    if (!allowed) {
+        console.warn(JSON.stringify({ source: "self-provision", outcome: "rate_limited", purpose }));
+        return jsonError("Too many requests.", 429, { "Retry-After": String(rateLimit.windowSeconds) });
     }
 
     const appAppleId = Number.parseInt(env.APPSTORE_APP_APPLE_ID ?? "", 10);

@@ -57,17 +57,33 @@ Resources:
         Variables:
           SNAPSHOT_BUCKET: !Ref SnapshotBucket
           API_511_KEY: !Ref Api511Key
+          ALERT_TOPIC_ARN: !Ref AlertTopic
       Policies:
         - Statement:
             - Effect: Allow
-              Action: s3:PutObject
+              Action:
+                - s3:GetObject
+                - s3:PutObject
               Resource: !Sub "${SnapshotBucket.Arn}/snapshots/RG.json"
+            - Effect: Allow
+              # Throttle marker for the 429-quota SNS alert (see QUOTA_ALERT_STATE_KEY in refresh.ts).
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub "${SnapshotBucket.Arn}/state/last-quota-alert-ms.txt"
+            - Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref AlertTopic
       Events:
         Schedule:
           Type: Schedule
           Properties:
             Schedule: rate(2 minutes)
-            Description: Refresh the RG GTFS-RT snapshot every 2 minutes.
+            Description: >
+              Runs every 2 minutes; no-ops against 511 (still writes nothing new to S3) between
+              1am-5am Pacific if the cached snapshot is under 15 minutes old — see
+              QUIET_HOUR_START_PACIFIC in refresh.ts. Reduces the ~720 calls/day baseline against
+              the 511 free tier's 1,000/day cap.
     # NOTE: this esbuild config has NOT been verified with a real `sam build` —
     # no aws/sam CLI is available in the sandbox this was authored in. Run
     # `sam build` (and ideally `sam validate --lint`) before the first real
