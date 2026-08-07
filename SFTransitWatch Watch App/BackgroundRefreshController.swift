@@ -41,6 +41,11 @@ final class BackgroundRefreshController {
             task.setTaskCompletedWithSnapshot(false)
         }
 
+        await refreshCommuteSlotComplication()
+        await refreshNearbyFavoritesComplication()
+    }
+
+    private func refreshCommuteSlotComplication() async {
         let slotsManager = CommuteSlotsManager()
         guard let slot = slotsManager.activeSlotWithFallback(),
               let stopId = slotsManager.stopId(for: slot),
@@ -48,16 +53,16 @@ final class BackgroundRefreshController {
             return
         }
 
-        let pinnedStop = pinnedStop(for: stopId)
+        let favorite = favoriteStop(for: stopId)
         let storedAgencies = UserDefaults(suiteName: SharedAgenciesManager.appGroupSuiteName)?
             .string(forKey: EnabledAgencies.storageKey) ?? ""
-        let agency = pinnedStop?.agency ?? EnabledAgencies.defaultAgency(storedAgencies)
+        let agency = favorite?.agency ?? EnabledAgencies.defaultAgency(storedAgencies)
 
         let api = TransitAPI()
         let arrivals = await api.fetchArrivals(for: stopId, agency: agency)
         guard let first = arrivals.first else { return }
 
-        let stopName = pinnedStop?.name ?? "Stop \(stopId)"
+        let stopName = favorite?.name ?? "Stop \(stopId)"
         ComplicationUpdater.write(
             slot: slot,
             stopName: stopName,
@@ -71,7 +76,7 @@ final class BackgroundRefreshController {
         guard let candidate = alertSettings.qualifyingArrival(from: arrivals, for: slot) else { return }
 
         // Location check: if the user is already at the stop, suppress for the rest of today.
-        if let stop = pinnedStop, stop.hasValidLocation,
+        if let stop = favorite, stop.hasValidLocation,
            locationManager.authorizationStatus == .authorizedWhenInUse
             || locationManager.authorizationStatus == .authorizedAlways {
             if let location = try? await LocationProvider.requestLocation(),
@@ -86,6 +91,29 @@ final class BackgroundRefreshController {
             slot: slot,
             stopName: stopName,
             travelMinutes: alertSettings.travelMinutes(for: slot)
+        )
+    }
+
+    /// Populates the NearbyFavoritesWidget complication: the closest favorite
+    /// stop's next arrival. Independent of commute slot configuration — a
+    /// user with no commute stops set up can still use this complication.
+    private func refreshNearbyFavoritesComplication() async {
+        let favorites = FavoritesManager.allFavorites(in: defaults).filter { $0.hasValidLocation }
+        guard !favorites.isEmpty,
+              locationManager.authorizationStatus == .authorizedWhenInUse
+                || locationManager.authorizationStatus == .authorizedAlways,
+              let location = try? await LocationProvider.requestLocation(),
+              let nearest = favorites.min(by: { $0.distance(to: location) < $1.distance(to: location) })
+        else { return }
+
+        let api = TransitAPI()
+        let arrivals = await api.fetchArrivals(for: nearest.id, agency: nearest.agency)
+        guard let first = arrivals.first else { return }
+
+        ComplicationUpdater.updateNearby(
+            stopName: nearest.name,
+            route: first.route,
+            arrivalTime: first.arrivalTime
         )
     }
 
@@ -141,11 +169,7 @@ final class BackgroundRefreshController {
         }
     }
 
-    private func pinnedStop(for stopId: String) -> BusStop? {
-        guard let data = UserDefaults.standard.data(forKey: "PinnedStops"),
-              let pinned = try? JSONDecoder().decode([BusStop].self, from: data) else {
-            return nil
-        }
-        return pinned.first(where: { $0.id == stopId })
+    private func favoriteStop(for stopId: String) -> BusStop? {
+        FavoritesManager.favoriteStop(withId: stopId, in: defaults)
     }
 }

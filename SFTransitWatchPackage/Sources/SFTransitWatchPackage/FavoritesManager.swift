@@ -6,7 +6,7 @@ public class FavoritesManager: ObservableObject {
     @Published public var favoriteStopIds: Set<String> = []
 
     private let userDefaults: UserDefaults
-    private let favoritesKey = "FavoriteStops"
+    private static let favoritesKey = "FavoriteStops"
 
     // Only the fields needed to identify a stop and re-fetch its arrivals.
     // Routes and isFavorite are intentionally excluded.
@@ -36,7 +36,7 @@ public class FavoritesManager: ObservableObject {
     }
 
     private func reloadFavoritesIfChanged() {
-        guard let data = userDefaults.data(forKey: favoritesKey),
+        guard let data = userDefaults.data(forKey: Self.favoritesKey),
               let persisted = try? JSONDecoder().decode([PersistedFavorite].self, from: data) else {
             if !favoriteStops.isEmpty { applyStops([]) }
             return
@@ -94,7 +94,7 @@ public class FavoritesManager: ObservableObject {
     }
 
     private func loadFavorites() {
-        guard let data = userDefaults.data(forKey: favoritesKey),
+        guard let data = userDefaults.data(forKey: Self.favoritesKey),
               let persisted = try? JSONDecoder().decode([PersistedFavorite].self, from: data) else { return }
         applyStops(persisted.map {
             BusStop(id: $0.id, name: $0.name, code: $0.code,
@@ -108,7 +108,26 @@ public class FavoritesManager: ObservableObject {
                               agency: $0.agency, latitude: $0.latitude, longitude: $0.longitude)
         }
         if let data = try? JSONEncoder().encode(persisted) {
-            userDefaults.set(data, forKey: favoritesKey)
+            userDefaults.set(data, forKey: Self.favoritesKey)
+        }
+    }
+
+    /// Looks up a single favorite by stop ID without instantiating a manager
+    /// (and its `UserDefaults.didChangeNotification` observer). Used by
+    /// background-refresh code paths that just need a one-off read.
+    public static func favoriteStop(withId id: String, in userDefaults: UserDefaults = .standard) -> BusStop? {
+        allFavorites(in: userDefaults).first { $0.id == id }
+    }
+
+    /// All persisted favorites, decoded straight from UserDefaults.
+    public static func allFavorites(in userDefaults: UserDefaults = .standard) -> [BusStop] {
+        guard let data = userDefaults.data(forKey: favoritesKey),
+              let persisted = try? JSONDecoder().decode([PersistedFavorite].self, from: data) else {
+            return []
+        }
+        return persisted.map {
+            BusStop(id: $0.id, name: $0.name, code: $0.code,
+                    latitude: $0.latitude, longitude: $0.longitude, agency: $0.agency)
         }
     }
 }
