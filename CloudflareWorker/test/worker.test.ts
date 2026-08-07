@@ -831,6 +831,50 @@ describe("POST /self-provision", () => {
         const res = await SELF.fetch("https://example.com/self-provision", { method: "GET" });
         expect(res.status).toBe(405);
     });
+
+    describe("purchase vs refresh rate-limit budgets", () => {
+        it("draining the refresh budget (no `purpose`) does not block a purpose:purchase request from the same IP", async () => {
+            stubVerifiedJWS();
+            stubActiveSubscription();
+
+            for (let i = 0; i < 5; i++) {
+                const res = await postSelfProvision({ signedTransactionInfo: "x" });
+                expect(res.status).toBe(200);
+            }
+            const drainedRefresh = await postSelfProvision({ signedTransactionInfo: "x" });
+            expect(drainedRefresh.status).toBe(429);
+
+            const purchase = await postSelfProvision({ signedTransactionInfo: "x", purpose: "purchase" });
+            expect(purchase.status).toBe(200);
+        });
+
+        it("draining the purchase budget does not block a refresh (no `purpose`) request from the same IP", async () => {
+            stubVerifiedJWS();
+            stubActiveSubscription();
+
+            for (let i = 0; i < 5; i++) {
+                const res = await postSelfProvision({ signedTransactionInfo: "x", purpose: "purchase" });
+                expect(res.status).toBe(200);
+            }
+            const drainedPurchase = await postSelfProvision({ signedTransactionInfo: "x", purpose: "purchase" });
+            expect(drainedPurchase.status).toBe(429);
+
+            const refresh = await postSelfProvision({ signedTransactionInfo: "x" });
+            expect(refresh.status).toBe(200);
+        });
+
+        it("treats an unrecognized `purpose` value the same as a missing one (refresh bucket)", async () => {
+            stubVerifiedJWS();
+            stubActiveSubscription();
+
+            for (let i = 0; i < 5; i++) {
+                const res = await postSelfProvision({ signedTransactionInfo: "x", purpose: "bogus" });
+                expect(res.status).toBe(200);
+            }
+            const drained = await postSelfProvision({ signedTransactionInfo: "x" });
+            expect(drained.status).toBe(429);
+        });
+    });
 });
 
 // NOTE: this block used to exercise /StopMonitoring, but that endpoint now proxies to the

@@ -8,8 +8,17 @@ public enum SelfProvisionError: Error, Equatable {
     case serverRejected
 }
 
+/// Which budget on the worker's `/self-provision` rate limiter a request should draw from —
+/// see `PROVISION_PURCHASE_RATE_LIMIT` / `PROVISION_REFRESH_RATE_LIMIT` in the worker's index.ts.
+/// Keeping these separate means other users' passive hourly refreshes sharing the same
+/// carrier-CGNAT IP can't drain the budget a just-paid purchase needs to provision.
+public enum ProvisionPurpose: String {
+    case purchase
+    case refresh
+}
+
 public protocol SelfProvisionServiceProtocol {
-    func provision(workerURL: String, signedTransactionInfo: String) async -> Result<Void, SelfProvisionError>
+    func provision(workerURL: String, signedTransactionInfo: String, purpose: ProvisionPurpose) async -> Result<Void, SelfProvisionError>
 }
 
 public final class SelfProvisionService: SelfProvisionServiceProtocol {
@@ -23,8 +32,8 @@ public final class SelfProvisionService: SelfProvisionServiceProtocol {
         self.session = session
     }
 
-    public func provision(workerURL: String, signedTransactionInfo: String) async -> Result<Void, SelfProvisionError> {
-        logger.info("provision: starting, workerURL=\(workerURL, privacy: .public)")
+    public func provision(workerURL: String, signedTransactionInfo: String, purpose: ProvisionPurpose) async -> Result<Void, SelfProvisionError> {
+        logger.info("provision: starting, workerURL=\(workerURL, privacy: .public), purpose=\(purpose.rawValue, privacy: .public)")
 
         guard var components = URLComponents(string: workerURL) else {
             logger.error("provision: could not parse workerURL as URLComponents: \(workerURL, privacy: .public)")
@@ -46,6 +55,7 @@ public final class SelfProvisionService: SelfProvisionServiceProtocol {
             "install_id": Telemetry.shared.installId,
             "platform": currentPlatform(),
             "app_version": (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0",
+            "purpose": purpose.rawValue,
         ])
         request.timeoutInterval = 15
 
