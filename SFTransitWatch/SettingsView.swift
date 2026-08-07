@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var apiKey = ""
     @State private var showingAPIKeyAlert = false
     @State private var showingSuccessAlert = false
+    @State private var showingClearWorkerPrompt = false
     @State private var showingClearFavoritesAlert = false
     @State private var showingMorningPicker = false
     @State private var showingAfternoonPicker = false
@@ -299,6 +300,17 @@ struct SettingsView: View {
         } message: {
             Text("Your API key has been saved. The app will now use real-time data from 511.org.")
         }
+        .alert("Switch to Direct Mode?", isPresented: $showingClearWorkerPrompt) {
+            Button("Clear Worker & Use My Key", role: .destructive) {
+                ConfigurationManager.shared.clearWorkerConfig()
+                showingSuccessAlert = true
+            }
+            Button("Keep Worker", role: .cancel) {
+                showingSuccessAlert = true
+            }
+        } message: {
+            Text("You're connected to a worker proxy, so it will keep being used instead of your saved key. Clear the worker connection now to switch to using your own key directly?")
+        }
         .alert("Clear All Favorites", isPresented: $showingClearFavoritesAlert) {
             Button("Clear All", role: .destructive) {
                 favoritesManager.clearAllFavorites()
@@ -351,7 +363,12 @@ struct SettingsView: View {
 
         ConfigurationManager.shared.apiKey = apiKey
         transitAPI.setAPIKey(apiKey)
-        showingSuccessAlert = true
+
+        if ConfigurationManager.shared.isWorkerConfigured {
+            showingClearWorkerPrompt = true
+        } else {
+            showingSuccessAlert = true
+        }
     }
     
     private func open511Website() {

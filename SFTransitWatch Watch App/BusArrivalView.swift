@@ -101,6 +101,20 @@ struct BusArrivalView: View {
                     }
                 }
 
+                if let banner = transitAPI.softBanner {
+                    Section {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundColor(.secondary)
+                            Text(banner)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(banner)
+                    }
+                }
+
                 let alerts = arrivals.uniqueAlerts
                 if !alerts.isEmpty {
                     Section(header: Text("Service Alerts")) {

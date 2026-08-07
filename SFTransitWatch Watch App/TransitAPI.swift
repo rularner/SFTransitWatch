@@ -17,6 +17,7 @@ class TransitAPI: ObservableObject {
 
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var softBanner: String?
     var urlSession: URLSessionProtocol = URLSession.shared
     var now: () -> Date = { Date() }
 
@@ -92,6 +93,7 @@ class TransitAPI: ObservableObject {
 
         isLoading = true
         errorMessage = nil
+        softBanner = nil
         defer { isLoading = false }
 
         if isDirect511Mode && !hasUsableKey {
@@ -147,7 +149,11 @@ class TransitAPI: ObservableObject {
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
             let realTimeArrivals = try parse511Arrivals(data: data)
             if realTimeArrivals.isEmpty {
-                return await fetchScheduledDepartures(for: stopId, agency: agency)
+                let scheduled = await fetchScheduledDepartures(for: stopId, agency: agency)
+                if cacheStatus == "ERROR" {
+                    softBanner = "Live updates unavailable — showing scheduled times"
+                }
+                return scheduled
             }
             return realTimeArrivals
         } catch {

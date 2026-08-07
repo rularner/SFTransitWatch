@@ -97,7 +97,7 @@ describe("/StopMonitoring proxy", () => {
     expect(res.headers.get("X-Cache-Status")).toBe("STALE");
   });
 
-  it("returns an empty visit list, never an error, when the Lambda fails and there is no cache", async () => {
+  it("returns an empty visit list tagged X-Cache-Status: ERROR, never an HTTP error, when the Lambda fails and there is no cache", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => { throw new Error("network error"); });
 
     const res = await SELF.fetch("https://example.com/StopMonitoring?agency=SF&stopCode=16393", { headers: { "X-App-Token": TOKEN } });
@@ -105,6 +105,9 @@ describe("/StopMonitoring proxy", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
     expect(body.ServiceDelivery.StopMonitoringDelivery.MonitoredStopVisit).toEqual([]);
+    // Distinct from a genuine cache MISS (real empty result) so the client can surface a
+    // "backend trouble" banner instead of silently rendering this as "no buses scheduled."
+    expect(res.headers.get("X-Cache-Status")).toBe("ERROR");
   });
 
   it("normalizes the query string so reordered/extra params still produce a cache HIT", async () => {
