@@ -372,13 +372,13 @@ destination, which crashes before XCTest can attach (`SIGILL`, "Early
 unexpected exit"). Don't flip `skipped` back to `NO` on that scheme — run
 these tests via the `SFTransitWatch` (iPhone) scheme only.
 
-**Known issue:** `testActiveOriginalTransactionIdReturnsIdAfterPurchase` and
-`testPurchaseReturnsOriginalTransactionId` are currently marked
-`XCTSkipIf(true, ...)` — `Product.products(for:)` returns `productNotFound`
-because `SKTestSession(contentsOf:)` alone doesn't register the product
-catalog. Fixing this requires setting the `SFTransitWatch` scheme's Test
-action "StoreKit Configuration" to `WorkerProxySubscription.storekit`, then
-removing the `XCTSkipIf` lines.
+**Known issue:** `testLoadDisplayInfoReturnsTiersSortedByPeriod` and
+`testPurchaseReturnsEntitlementJWS` are currently marked `XCTSkipIf(true,
+...)`. The `SFTransitWatch` scheme's Test action "StoreKit Configuration" is
+already set to `WorkerProxySubscription.storekit` (fixing the old
+`productNotFound` issue), but each test has its own separate blocker — see
+the "StoreKitTest gotchas" section in `CLAUDE.md` before removing either
+`XCTSkipIf` line.
 
 ## Contributing
 
