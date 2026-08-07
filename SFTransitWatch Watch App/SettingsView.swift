@@ -45,7 +45,7 @@ struct SettingsView: View {
                     Text("To load via deep link:")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("Use a link of the form sftransitwatch://key?k=YOUR_KEY")
+                    Text("Use a link of the form sftransitwatch://key/YOUR_KEY")
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.primary)
                     Text("Then tap the link on your watch.")
@@ -270,6 +270,7 @@ struct APIKeyEntryView: View {
     @Binding var apiKey: String
     @Environment(\.dismiss) private var dismiss
     @State private var draftKey: String = ""
+    @State private var showingClearWorkerPrompt = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -288,15 +289,35 @@ struct APIKeyEntryView: View {
                 .foregroundColor(.secondary)
 
                 Button("Save") {
-                    let trimmed = draftKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                    apiKey = trimmed
-                    ConfigurationManager.shared.apiKey = trimmed
-                    dismiss()
+                    saveKey()
                 }
                 .disabled(draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding()
+        .alert("Switch to Direct Mode?", isPresented: $showingClearWorkerPrompt) {
+            Button("Clear Worker & Use My Key", role: .destructive) {
+                ConfigurationManager.shared.clearWorkerConfig()
+                dismiss()
+            }
+            Button("Keep Worker", role: .cancel) {
+                dismiss()
+            }
+        } message: {
+            Text("You're connected to a worker proxy, so it will keep being used instead of your saved key. Clear the worker connection now to switch to using your own key directly?")
+        }
+    }
+
+    private func saveKey() {
+        let trimmed = draftKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        apiKey = trimmed
+        ConfigurationManager.shared.apiKey = trimmed
+
+        if ConfigurationManager.shared.isWorkerConfigured {
+            showingClearWorkerPrompt = true
+        } else {
+            dismiss()
+        }
     }
 }
 

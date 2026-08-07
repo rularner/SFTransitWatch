@@ -130,6 +130,46 @@ final class TransitAPIFallbackTests: XCTestCase {
     }
 
     @MainActor
+    func testBackendErrorStatusSurfacesSoftBannerEvenAtHTTP200() async {
+        // Mirrors CloudflareWorker/src/gtfsrt/proxy.ts's fallback response when the reader
+        // Lambda fails and there's no cache entry: HTTP 200, empty MonitoredStopVisit[], but
+        // tagged X-Cache-Status: ERROR (not MISS) so the client can tell "backend is down"
+        // apart from a genuine "no buses scheduled" empty result.
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopMonitoring")!,
+            data: Data("{\"ServiceDelivery\":{\"StopMonitoringDelivery\":{\"MonitoredStopVisit\":[]}}}".utf8),
+            headers: ["X-Cache-Status": "ERROR"]
+        )
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopTimetable")!,
+            data: Data("{}".utf8)
+        )
+
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertEqual(api.softBanner, "Live updates unavailable — showing scheduled times")
+    }
+
+    @MainActor
+    func testGenuineEmptyResultDoesNotSurfaceBackendErrorBanner() async {
+        // Same empty MonitoredStopVisit[] shape, but a normal cache MISS — a real "no buses
+        // right now" result, not a backend failure. Must not show the error banner.
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopMonitoring")!,
+            data: Data("{\"ServiceDelivery\":{\"StopMonitoringDelivery\":{\"MonitoredStopVisit\":[]}}}".utf8),
+            headers: ["X-Cache-Status": "MISS"]
+        )
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopTimetable")!,
+            data: Data("{}".utf8)
+        )
+
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertNil(api.softBanner)
+    }
+
+    @MainActor
     func testNonEmptyStopMonitoringSkipsTimetable() async {
         let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
         let realtime = """

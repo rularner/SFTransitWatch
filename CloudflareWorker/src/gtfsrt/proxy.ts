@@ -42,7 +42,7 @@ async function writeCachedProxyResponse(cacheKey: Request, body: string, fetched
   }));
 }
 
-function clientResponse(body: string, cacheStatus: "HIT" | "MISS" | "STALE"): Response {
+function clientResponse(body: string, cacheStatus: "HIT" | "MISS" | "STALE" | "ERROR"): Response {
   return new Response(body, {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
@@ -106,6 +106,9 @@ function resolveOnwardNames(json: any, stopName: (stopId: string) => string): vo
 // the full regional feed), and read-through caches the resolved body per-colo in caches.default.
 // Never surfaces a 4xx/5xx to the client for this endpoint — falls back to a stale cache entry,
 // then to an empty MonitoredStopVisit[], matching the pre-migration degrade-gracefully contract.
+// The empty-fallback case is tagged X-Cache-Status: ERROR (distinct from a genuine MISS) so the
+// client can tell "backend is down" apart from "no buses scheduled right now" instead of silently
+// rendering both as an empty arrivals list.
 export async function handleStopMonitoring(url: URL, env: Env): Promise<Response> {
   const agency = url.searchParams.get("agency") ?? "SF";
   const cacheKey = cacheKeyFor(url);
@@ -142,6 +145,6 @@ export async function handleStopMonitoring(url: URL, env: Env): Promise<Response
   } catch (error) {
     console.error("GTFS-RT reader lambda call failed:", error);
     if (cached) return clientResponse(cached.body, "STALE");
-    return clientResponse(emptyStopMonitoringBody(), "MISS");
+    return clientResponse(emptyStopMonitoringBody(), "ERROR");
   }
 }
