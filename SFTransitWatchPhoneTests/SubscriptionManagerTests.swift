@@ -49,12 +49,7 @@ final class SubscriptionManagerTests: XCTestCase {
         }
     }
 
-    // Known issue: Product.products(for:) returns productNotFound unless the SFTransitWatch
-    // scheme's Test action StoreKit Configuration is set to WorkerProxySubscription.storekit.
-    // These stay skipped until that scheme setting is applied (see CLAUDE.md / README).
     func testLoadDisplayInfoReturnsTiersSortedByPeriod() async throws {
-        try XCTSkipIf(true, "Product.products(for:) returns productNotFound — needs the scheme's Test action StoreKit Configuration set to WorkerProxySubscription.storekit.")
-
         let manager = SubscriptionManager()
         let tiers = await manager.loadDisplayInfo()
         XCTAssertEqual(tiers.map(\.productID),
@@ -66,8 +61,6 @@ final class SubscriptionManagerTests: XCTestCase {
     }
 
     func testPurchaseReturnsEntitlementJWS() async throws {
-        try XCTSkipIf(true, "Product.products(for:) returns productNotFound — needs the scheme's Test action StoreKit Configuration set to WorkerProxySubscription.storekit.")
-
         let manager = SubscriptionManager()
         let jws = try await manager.purchase(productID: SubscriptionManager.workerProxyProductID)
         XCTAssertFalse(jws.isEmpty)
