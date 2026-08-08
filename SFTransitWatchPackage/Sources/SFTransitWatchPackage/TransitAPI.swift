@@ -162,8 +162,7 @@ public final class TransitAPI: ObservableObject {
 
         let started = Date()
         do {
-            nonisolated(unsafe) let session = urlSession
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -253,8 +252,7 @@ public final class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
         let started = Date()
         do {
-            nonisolated(unsafe) let session = urlSession
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
             let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
@@ -385,8 +383,7 @@ public final class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
 
         let started = Date()
-        nonisolated(unsafe) let session = urlSession
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -488,8 +485,7 @@ public final class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
 
         let started = Date()
-        nonisolated(unsafe) let session = urlSession
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
         guard let http = response as? HTTPURLResponse else {
             Telemetry.shared.logFetchError(endpoint: endpoint, errorKind: "network",
@@ -530,8 +526,7 @@ public final class TransitAPI: ObservableObject {
         let request = makeRequest(url: url)
         let started = Date()
         do {
-            nonisolated(unsafe) let session = urlSession
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await urlSession.data(for: request)
             let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
             let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
