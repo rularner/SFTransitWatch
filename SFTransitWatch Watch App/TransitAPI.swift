@@ -11,7 +11,7 @@ extension URLSession: URLSessionProtocol {}
 
 @MainActor
 class TransitAPI: ObservableObject {
-    private let defaultBaseURL = "https://api.511.org/transit"
+    private let defaultBaseURL = default511BaseURL
     @AppStorage("WORKER_TOKEN", store: UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName))
     private var workerToken = ""
 

@@ -10,7 +10,7 @@ import SwiftUI
 import SFTransitWatchPackage
 
 class TransitAPI: ObservableObject {
-    private let defaultBaseURL = "https://api.511.org/transit"
+    private let defaultBaseURL = default511BaseURL
     // Key synced from the phone to the watch via WatchConnectivity — lives in .standard.
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
     @AppStorage("511_API_KEY", store: UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName))

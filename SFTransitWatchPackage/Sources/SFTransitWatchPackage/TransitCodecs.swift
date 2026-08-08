@@ -8,6 +8,9 @@ public enum APIError: Error {
     case xmlParsingError
 }
 
+/// Default 511.org Open Data base URL, used when no worker proxy is configured.
+public let default511BaseURL = "https://api.511.org/transit"
+
 /// Public JSON decoders for the 511.org SIRI feeds. These hide the raw
 /// Decodable shapes (which are noisy and not useful as API surface) and
 /// return the app's own value types.
