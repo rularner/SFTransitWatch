@@ -88,6 +88,97 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(arrivals[0].destination, "Inbound")
     }
 
+    /// Regression: the SIRI-XML fallback parser must accept any of the four
+    /// SIRI time-field names (ExpectedArrivalTime, ExpectedDepartureTime,
+    /// AimedArrivalTime, AimedDepartureTime), not just ExpectedDepartureTime.
+    /// This mirrors the original hand-rolled regex's alternation before it
+    /// was replaced by SIRIXMLParser, which initially only requested
+    /// ExpectedDepartureTime and silently dropped records using the other
+    /// three field names.
+    @MainActor
+    func testParseArrivalsWithValidXMLUsingExpectedArrivalTime() async {
+        let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ServiceDelivery>
+          <StopMonitoringDelivery>
+            <MonitoredStopVisit>
+              <MonitoredVehicleJourney>
+                <LineRef>38</LineRef>
+                <DirectionRef>IB</DirectionRef>
+                <MonitoredCall>
+                  <ExpectedArrivalTime>\(isoDate)</ExpectedArrivalTime>
+                </MonitoredCall>
+              </MonitoredVehicleJourney>
+            </MonitoredStopVisit>
+          </StopMonitoringDelivery>
+        </ServiceDelivery>
+        """.data(using: .utf8)!
+
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: xml)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertFalse(arrivals.isEmpty)
+        XCTAssertEqual(arrivals[0].route, "38")
+    }
+
+    @MainActor
+    func testParseArrivalsWithValidXMLUsingAimedArrivalTime() async {
+        let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ServiceDelivery>
+          <StopMonitoringDelivery>
+            <MonitoredStopVisit>
+              <MonitoredVehicleJourney>
+                <LineRef>38</LineRef>
+                <DirectionRef>IB</DirectionRef>
+                <MonitoredCall>
+                  <AimedArrivalTime>\(isoDate)</AimedArrivalTime>
+                </MonitoredCall>
+              </MonitoredVehicleJourney>
+            </MonitoredStopVisit>
+          </StopMonitoringDelivery>
+        </ServiceDelivery>
+        """.data(using: .utf8)!
+
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: xml)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertFalse(arrivals.isEmpty)
+        XCTAssertEqual(arrivals[0].route, "38")
+    }
+
+    @MainActor
+    func testParseArrivalsWithValidXMLUsingAimedDepartureTime() async {
+        let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ServiceDelivery>
+          <StopMonitoringDelivery>
+            <MonitoredStopVisit>
+              <MonitoredVehicleJourney>
+                <LineRef>38</LineRef>
+                <DirectionRef>IB</DirectionRef>
+                <MonitoredCall>
+                  <AimedDepartureTime>\(isoDate)</AimedDepartureTime>
+                </MonitoredCall>
+              </MonitoredVehicleJourney>
+            </MonitoredStopVisit>
+          </StopMonitoringDelivery>
+        </ServiceDelivery>
+        """.data(using: .utf8)!
+
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: xml)
+
+        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertFalse(arrivals.isEmpty)
+        XCTAssertEqual(arrivals[0].route, "38")
+    }
+
     @MainActor
     func testParseArrivalsWithEmptyXML() async {
         let xml = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!

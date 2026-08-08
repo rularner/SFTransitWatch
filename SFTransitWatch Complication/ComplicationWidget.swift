@@ -20,6 +20,15 @@ struct NextArrivalEntry: TimelineEntry {
         arrivalTime: Date().addingTimeInterval(4 * 60),
         isConfigured: true
     )
+
+    static let unconfigured = NextArrivalEntry(
+        date: .now,
+        slot: nil,
+        stopName: "",
+        route: "",
+        arrivalTime: nil,
+        isConfigured: false
+    )
 }
 
 // MARK: - Shared snapshot read
@@ -52,14 +61,7 @@ private enum SnapshotStore {
         if let entry = snapshot(for: preferred, at: date) { return entry }
         let other: CommuteSlotsManager.Slot = preferred == .morning ? .afternoon : .morning
         if let entry = snapshot(for: other, at: date) { return entry }
-        return NextArrivalEntry(
-            date: date,
-            slot: nil,
-            stopName: "",
-            route: "",
-            arrivalTime: nil,
-            isConfigured: false
-        )
+        return .unconfigured
     }
 }
 

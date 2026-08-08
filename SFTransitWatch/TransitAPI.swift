@@ -406,13 +406,13 @@ class TransitAPI: ObservableObject {
         let records = SIRIXMLParser.parseRecords(
             data: data,
             entryElement: "MonitoredVehicleJourney",
-            fields: ["LineRef", "DirectionRef", "ExpectedDepartureTime"]
+            fields: ["LineRef", "DirectionRef", "ExpectedArrivalTime", "ExpectedDepartureTime", "AimedArrivalTime", "AimedDepartureTime"]
         )
         return records.compactMap { record in
             guard
                 let route = record["LineRef"],
                 let destination = record["DirectionRef"],
-                let timeString = record["ExpectedDepartureTime"],
+                let timeString = record["ExpectedArrivalTime"] ?? record["ExpectedDepartureTime"] ?? record["AimedArrivalTime"] ?? record["AimedDepartureTime"],
                 let arrivalTime = formatter.date(from: timeString)
             else { return nil }
             return BusArrival(
