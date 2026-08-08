@@ -95,7 +95,6 @@ class TransitAPI: ObservableObject {
                 break
             }
         }
-        if case .xmlParsingError? = error as? APIError { return "parse" }
         return "network"
     }
 

@@ -3,9 +3,6 @@ import Foundation
 public enum APIError: Error {
     case invalidURL
     case invalidResponse
-    case decodingError
-    case networkError
-    case xmlParsingError
 }
 
 /// Default 511.org Open Data base URL, used when no worker proxy is configured.

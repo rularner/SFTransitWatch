@@ -20,15 +20,6 @@ struct NextArrivalEntry: TimelineEntry {
         arrivalTime: Date().addingTimeInterval(4 * 60),
         isConfigured: true
     )
-
-    static let unconfigured = NextArrivalEntry(
-        date: .now,
-        slot: nil,
-        stopName: "",
-        route: "",
-        arrivalTime: nil,
-        isConfigured: false
-    )
 }
 
 // MARK: - Shared snapshot read
