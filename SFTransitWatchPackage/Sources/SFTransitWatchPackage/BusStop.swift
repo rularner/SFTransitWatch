@@ -96,3 +96,13 @@ extension BusStop {
     ]
 }
 #endif
+
+public extension CLLocationDistance {
+    /// `"123m"` under 1000m, `"1.2km"` at or above.
+    var shortFormatted: String {
+        if self < 1000 {
+            return "\(Int(self))m"
+        }
+        return String(format: "%.1fkm", self / 1000)
+    }
+}

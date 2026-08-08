@@ -10,7 +10,7 @@ import SwiftUI
 import SFTransitWatchPackage
 
 class TransitAPI: ObservableObject {
-    private let defaultBaseURL = "https://api.511.org/transit"
+    private let defaultBaseURL = default511BaseURL
     // Key synced from the phone to the watch via WatchConnectivity — lives in .standard.
     @AppStorage("511_API_KEY_FROM_PHONE") private var phoneAPIKey = ""
     @AppStorage("511_API_KEY", store: UserDefaults(suiteName: ConfigurationManager.appGroupSuiteName))
@@ -95,7 +95,6 @@ class TransitAPI: ObservableObject {
                 break
             }
         }
-        if case .xmlParsingError? = error as? APIError { return "parse" }
         return "network"
     }
 
@@ -400,76 +399,61 @@ class TransitAPI: ObservableObject {
             return jsonArrivals
         }
         Telemetry.shared.logFetchError(endpoint: "StopMonitoring", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
-        return try parseXMLArrivals(data: data)
-    }
 
-    private func parseXMLArrivals(data: Data) throws -> [BusArrival] {
-        let xmlString = String(data: data, encoding: .utf8) ?? ""
         let alerts = TransitJSON.parseSituationSummaries(from: data)
-        var arrivals: [BusArrival] = []
-        let pattern = #"<MonitoredVehicleJourney>.*?<LineRef>([^<]+)</LineRef>.*?<DirectionRef>([^<]+)</DirectionRef>.*?<(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>([^<]+)</(?:ExpectedArrivalTime|ExpectedDepartureTime|AimedArrivalTime|AimedDepartureTime)>.*?</MonitoredVehicleJourney>"#
-        let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
-        let matches = regex.matches(in: xmlString, options: [], range: NSRange(xmlString.startIndex..., in: xmlString))
+
         let formatter = ISO8601DateFormatter()
-        for match in matches {
-            if let routeRange = Range(match.range(at: 1), in: xmlString),
-               let destinationRange = Range(match.range(at: 2), in: xmlString),
-               let timeRange = Range(match.range(at: 3), in: xmlString) {
-                let rawLineRef = String(xmlString[routeRange])
-                let route = TransitJSON.cleanLineRef(rawLineRef)
-                let destination = String(xmlString[destinationRange])
-                let timeString = String(xmlString[timeRange])
-                if let arrivalTime = formatter.date(from: timeString) {
-                    arrivals.append(BusArrival(
-                        route: route,
-                        destination: TransitJSON.directionLabel(destination, lineRef: rawLineRef),
-                        arrivalTime: arrivalTime,
-                        isRealTime: true,
-                        alerts: alerts
-                    ))
-                }
-            }
+        let records = SIRIXMLParser.parseRecords(
+            data: data,
+            entryElement: "MonitoredVehicleJourney",
+            fields: ["LineRef", "DirectionRef", "ExpectedArrivalTime", "ExpectedDepartureTime", "AimedArrivalTime", "AimedDepartureTime"]
+        )
+        return records.compactMap { record in
+            guard
+                let route = record["LineRef"],
+                let destination = record["DirectionRef"],
+                let timeString = record["ExpectedArrivalTime"] ?? record["ExpectedDepartureTime"] ?? record["AimedArrivalTime"] ?? record["AimedDepartureTime"],
+                let arrivalTime = formatter.date(from: timeString)
+            else { return nil }
+            return BusArrival(
+                route: TransitJSON.cleanLineRef(route),
+                destination: TransitJSON.directionLabel(destination, lineRef: route),
+                arrivalTime: arrivalTime,
+                isRealTime: true,
+                alerts: alerts
+            )
         }
-        return arrivals
     }
 
-    
     // Parse 511.org XML response for stops
     private func parse511Stops(data: Data, agency: String = "SF") throws -> [BusStop] {
         if let jsonStops = TransitJSON.decodeStops(data, agency: agency), !jsonStops.isEmpty {
             return jsonStops
         }
         Telemetry.shared.logFetchError(endpoint: "Stops", errorKind: "json_parse_fallback", httpStatus: nil, latencyMs: 0)
-        return try parseXMLStops(data: data, agency: agency)
-    }
 
-    private func parseXMLStops(data: Data, agency: String) throws -> [BusStop] {
-        let xmlString = String(data: data, encoding: .utf8) ?? ""
-        var stops: [BusStop] = []
-        let pattern = #"<StopPlace>.*?<StopPlaceRef>([^<]+)</StopPlaceRef>.*?<StopPlaceName>([^<]+)</StopPlaceName>.*?<Location>.*?<Latitude>([^<]+)</Latitude>.*?<Longitude>([^<]+)</Longitude>.*?</Location>.*?</StopPlace>"#
-        let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
-        let matches = regex.matches(in: xmlString, options: [], range: NSRange(xmlString.startIndex..., in: xmlString))
-        for match in matches {
-            if let idRange = Range(match.range(at: 1), in: xmlString),
-               let nameRange = Range(match.range(at: 2), in: xmlString),
-               let latRange = Range(match.range(at: 3), in: xmlString),
-               let lonRange = Range(match.range(at: 4), in: xmlString) {
-                let id = String(xmlString[idRange])
-                let name = String(xmlString[nameRange])
-                let latitude = Double(xmlString[latRange]) ?? 0.0
-                let longitude = Double(xmlString[lonRange]) ?? 0.0
-                stops.append(BusStop(
-                    id: id,
-                    name: name,
-                    code: id,
-                    latitude: latitude,
-                    longitude: longitude,
-                    routes: [],
-                    agency: agency
-                ))
-            }
+        let records = SIRIXMLParser.parseRecords(
+            data: data,
+            entryElement: "StopPlace",
+            fields: ["StopPlaceRef", "StopPlaceName", "Latitude", "Longitude"]
+        )
+        return records.compactMap { record in
+            guard
+                let id = record["StopPlaceRef"],
+                let name = record["StopPlaceName"],
+                let latString = record["Latitude"], let latitude = Double(latString),
+                let lonString = record["Longitude"], let longitude = Double(lonString)
+            else { return nil }
+            return BusStop(
+                id: id,
+                name: name,
+                code: id,
+                latitude: latitude,
+                longitude: longitude,
+                routes: [],
+                agency: agency
+            )
         }
-        return stops
     }
     
     private func fetchAllStops(agency: String) async throws -> [BusStop] {

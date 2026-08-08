@@ -15,8 +15,7 @@ struct BusArrivalView: View {
     @StateObject private var countdown = RefreshCountdown(interval: BusArrivalView.refreshInterval)
     @State private var notifiedArrivalIDs: Set<String> = []
     @State private var selectedRoute: String? = nil
-    @State private var showCommutePrompt = false
-    @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
+    @StateObject private var commutePrompt = CommutePromptState()
 
     init(
         stop: BusStop,
@@ -51,23 +50,7 @@ struct BusArrivalView: View {
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
-                            Button(action: {
-                                let isAdding = !favoritesManager.isFavorite(stop.id)
-                                favoritesManager.toggleFavorite(stop)
-                                if isAdding {
-                                    let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
-                                    if !empty.isEmpty {
-                                        commuteEmptySlots = empty
-                                        showCommutePrompt = true
-                                    }
-                                }
-                            }) {
-                                Image(systemName: favoritesManager.isFavorite(stop.id) ? "star.fill" : "star")
-                                    .foregroundColor(favoritesManager.isFavorite(stop.id) ? .yellow : .gray)
-                                    .font(.title2)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .accessibilityLabel(favoritesManager.isFavorite(stop.id) ? "Remove from favorites" : "Add to favorites")
+                            FavoriteToggleButton(stop: stop, favoritesManager: favoritesManager, slotsManager: slotsManager, commutePrompt: commutePrompt)
                         }
     
                         if !stop.routes.isEmpty {
@@ -216,20 +199,7 @@ struct BusArrivalView: View {
                 Task { await loadArrivals() }
             }
         }
-        .confirmationDialog(
-            "Add to commute?",
-            isPresented: $showCommutePrompt
-        ) {
-            if commuteEmptySlots.contains(.morning) {
-                Button("Morning Commute") { slotsManager.setStopId(stop.id, for: .morning) }
-            }
-            if commuteEmptySlots.contains(.afternoon) {
-                Button("Afternoon Commute") { slotsManager.setStopId(stop.id, for: .afternoon) }
-            }
-            Button("Not Now", role: .cancel) { }
-        } message: {
-            Text("Use \"\(stop.name)\" as a commute stop?")
-        }
+        .commutePrompt(commutePrompt, stopId: stop.id, stopName: stop.name, slotsManager: slotsManager)
     }
 
     private func loadArrivals() async {

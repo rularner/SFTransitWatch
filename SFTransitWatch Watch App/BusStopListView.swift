@@ -277,8 +277,7 @@ struct BusStopRow: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var slotsManager: CommuteSlotsManager
     @AppStorage("showCommutePromptOnFavorite") private var showCommutePrompt = true
-    @State private var commutePromptStop: BusStop? = nil
-    @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
+    @StateObject private var commutePrompt = CommutePromptState()
 
     private var agencyBadgeText: String? {
         guard showAgencyBadge else { return nil }
@@ -322,7 +321,7 @@ struct BusStopRow: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     if let currentLocation = currentLocation {
                         let distance = stop.distance(to: currentLocation)
-                        Text(formatDistance(distance))
+                        Text(distance.shortFormatted)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -330,12 +329,8 @@ struct BusStopRow: View {
                     Button(action: {
                         let isAdding = !favoritesManager.isFavorite(stop.id)
                         favoritesManager.toggleFavorite(stop)
-                        if isAdding && showCommutePrompt {
-                            let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
-                            if !empty.isEmpty {
-                                commuteEmptySlots = empty
-                                commutePromptStop = stop
-                            }
+                        if showCommutePrompt {
+                            commutePrompt.offerIfAdding(isAdding, slotsManager: slotsManager)
                         }
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
@@ -371,22 +366,7 @@ struct BusStopRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
         .accessibilityHint("Tap to view arrivals")
-        .confirmationDialog(
-            "Add to commute?",
-            isPresented: Binding(get: { commutePromptStop != nil }, set: { if !$0 { commutePromptStop = nil } }),
-            presenting: commutePromptStop
-        ) { pendingStop in
-            if commuteEmptySlots.contains(.morning) {
-                Button("Morning Commute") { slotsManager.setStopId(pendingStop.id, for: .morning) }
-            }
-            if commuteEmptySlots.contains(.afternoon) {
-                Button("Afternoon Commute") { slotsManager.setStopId(pendingStop.id, for: .afternoon) }
-            }
-            Button("Never Ask") { showCommutePrompt = false }
-            Button("Not Now", role: .cancel) { }
-        } message: { pendingStop in
-            Text("Use \"\(pendingStop.name)\" as a commute stop?")
-        }
+        .commutePrompt(commutePrompt, stopId: stop.id, stopName: stop.name, slotsManager: slotsManager, showNeverAsk: true, onNeverAsk: { showCommutePrompt = false })
     }
 
     private var accessibilityDescription: String {
@@ -396,21 +376,13 @@ struct BusStopRow: View {
         }
         parts.append("stop code \(stop.code)")
         if let currentLocation = currentLocation {
-            parts.append(formatDistance(stop.distance(to: currentLocation)) + " away")
+            parts.append(stop.distance(to: currentLocation).shortFormatted + " away")
         }
         if stop.isFavorite { parts.append("favorite") }
         if !stop.routes.isEmpty {
             parts.append("routes \(stop.routes.joined(separator: ", "))")
         }
         return parts.joined(separator: ", ")
-    }
-
-    private func formatDistance(_ distance: CLLocationDistance) -> String {
-        if distance < 1000 {
-            return "\(Int(distance))m"
-        } else {
-            return String(format: "%.1fkm", distance / 1000)
-        }
     }
 }
 
