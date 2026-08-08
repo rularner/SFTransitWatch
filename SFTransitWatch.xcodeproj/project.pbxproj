@@ -49,6 +49,8 @@
 		CAFE000000000000PRIV002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
 		CAFE000000000000PRIV003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
 		CAFE000000000000PRIV004 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
+		CAFE0000000000000000TS02 /* XCUISnapshotRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000TS01 /* XCUISnapshotRunner.swift */; };
+		CAFE0000000000000000TS03 /* XCUISnapshotRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000TS01 /* XCUISnapshotRunner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -169,6 +171,7 @@
 		CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPIParsingTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T010 /* SFTransitWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = file.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		CAFE0000000000000000TS01 /* XCUISnapshotRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XCUISnapshotRunner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -255,6 +258,14 @@
 			name = "Recovered References";
 			sourceTree = "<group>";
 		};
+		CAFE0000000000000000TS00 /* TestSupport */ = {
+			isa = PBXGroup;
+			children = (
+				CAFE0000000000000000TS01 /* XCUISnapshotRunner.swift */,
+			);
+			path = TestSupport;
+			sourceTree = "<group>";
+		};
 		CAFE000000000000000018A0 = {
 			isa = PBXGroup;
 			children = (
@@ -267,6 +278,7 @@
 				84E0253F2FAD714C006B3F47 /* SFTransitWatchUITests */,
 				8477FCC52FB16F9000C98E73 /* SFTransitWatchPhoneTests */,
 				8477FCD22FB16F9E00C98E73 /* SFTransitWatchPhoneUITests */,
+				CAFE0000000000000000TS00 /* TestSupport */,
 				CAFE000000000000000018D0 /* Products */,
 				84F1E6EC2F92778100742F6A /* Recovered References */,
 				84E024852FAAE089006B3F47 /* Frameworks */,
@@ -669,6 +681,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CAFE0000000000000000TS02 /* XCUISnapshotRunner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -683,6 +696,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CAFE0000000000000000TS03 /* XCUISnapshotRunner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

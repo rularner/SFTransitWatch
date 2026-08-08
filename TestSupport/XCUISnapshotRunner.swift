@@ -9,11 +9,11 @@ enum XCUISnapshotRunner {
     /// the bundled golden — ignoring the top-of-screen band where the watchOS
     /// time lives.
     ///
-    /// Goldens live at `SFTransitWatchUITests/Goldens/<name>.png` in the source
-    /// tree and ride inside the test bundle as resources, so the test process
-    /// finds them via `Bundle(for:)` regardless of host filesystem layout. This
-    /// is what makes the tests work on Xcode Cloud, where the build step's
-    /// source paths and env vars don't propagate to the test step.
+    /// Goldens live at the calling test target's `Goldens/<name>.png` in the
+    /// source tree and ride inside the test bundle as resources, so the test
+    /// process finds them via `Bundle(for:)` regardless of host filesystem
+    /// layout. This is what makes the tests work on Xcode Cloud, where the
+    /// build step's source paths and env vars don't propagate to the test step.
     ///
     /// - On x86_64 sims (Xcode Cloud) → throws `XCTSkip` after attaching the capture.
     ///   Goldens are arm64-only because SwiftUI toolbar style + font rasterization
@@ -70,8 +70,8 @@ enum XCUISnapshotRunner {
         guard let goldenURL = bundledGoldenURL(for: name, testCase: testCase) else {
             XCTFail(
                 """
-                No bundled golden for \(name).png. Goldens live at \
-                SFTransitWatchUITests/Goldens/<name>.png and ride in the test bundle. \
+                No bundled golden for \(name).png. Goldens live at the calling \
+                test target's Goldens/<name>.png and ride in the test bundle. \
                 Record locally with `RECORD_SNAPSHOTS=1 bin/run-watch-snapshot-tests.sh`, \
                 then commit the regenerated PNGs.
                 """,
@@ -310,8 +310,9 @@ enum XCUISnapshotRunner {
     /// Source-tree path for golden recording. Only meaningful locally —
     /// `RECORD_SNAPSHOTS=1` is the only caller and Xcode Cloud doesn't record.
     private static func sourceGoldenURL(for name: String, file: StaticString) -> URL {
-        repoRoot(file: file)
-            .appendingPathComponent("SFTransitWatchUITests", isDirectory: true)
+        let callerDirName = URL(fileURLWithPath: "\(file)").deletingLastPathComponent().lastPathComponent
+        return repoRoot(file: file)
+            .appendingPathComponent(callerDirName, isDirectory: true)
             .appendingPathComponent("Goldens", isDirectory: true)
             .appendingPathComponent("\(name).png")
     }
