@@ -98,6 +98,35 @@ final class PhoneTransitAPITests: XCTestCase {
         XCTAssertEqual(arrivals[0].destination, "Outbound")
     }
 
+    /// Regression: SIRIXMLParser consolidation now drops records with missing required fields
+    /// instead of silently defaulting lat/lon to 0.0. A stop missing <Longitude> should be
+    /// filtered out from the results, not appear with longitude=0.0.
+    func testXMLFallbackDropsStopRecordsWithMissingRequiredFields() async {
+        let xml = """
+        <StopPlaces>
+          <StopPlace>
+            <StopPlaceRef>15552</StopPlaceRef>
+            <StopPlaceName>Castro Station</StopPlaceName>
+            <Location><Latitude>37.762</Latitude><Longitude>-122.435</Longitude></Location>
+          </StopPlace>
+          <StopPlace>
+            <StopPlaceRef>99999</StopPlaceRef>
+            <StopPlaceName>Malformed Stop</StopPlaceName>
+            <Location><Latitude>37.780</Latitude></Location>
+          </StopPlace>
+        </StopPlaces>
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/Stops")!, data: xml)
+
+        let results = await api.searchStops(query: "15552", agencies: ["SF"])
+
+        // Only the well-formed stop should be returned; the one missing Longitude is dropped.
+        XCTAssertNotNil(results)
+        XCTAssertEqual(results?.count, 1, "Malformed stop (missing Longitude) should be dropped")
+        XCTAssertEqual(results?.first?.code, "15552")
+        XCTAssertEqual(results?.first?.name, "Castro Station")
+    }
+
     func testSearchStopsByExactCode() async {
         let xml = """
         <StopPlaces>
