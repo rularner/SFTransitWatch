@@ -271,8 +271,7 @@ struct BusStopRow: View {
     @EnvironmentObject var favoritesManager: FavoritesManager
     @EnvironmentObject var slotsManager: CommuteSlotsManager
     @AppStorage("showCommutePromptOnFavorite") private var showCommutePrompt = true
-    @State private var commutePromptStop: BusStop? = nil
-    @State private var commuteEmptySlots: [CommuteSlotsManager.Slot] = []
+    @StateObject private var commutePrompt = CommutePromptState()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -300,7 +299,7 @@ struct BusStopRow: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     if let currentLocation = currentLocation {
                         let distance = stop.distance(to: currentLocation)
-                        Text(formatDistance(distance))
+                        Text(distance.shortFormatted)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -308,12 +307,8 @@ struct BusStopRow: View {
                     Button(action: {
                         let isAdding = !favoritesManager.isFavorite(stop.id)
                         favoritesManager.toggleFavorite(stop)
-                        if isAdding && showCommutePrompt {
-                            let empty = CommuteSlotsManager.Slot.allCases.filter { slotsManager.stopId(for: $0) == nil }
-                            if !empty.isEmpty {
-                                commuteEmptySlots = empty
-                                commutePromptStop = stop
-                            }
+                        if showCommutePrompt {
+                            commutePrompt.offerIfAdding(isAdding, slotsManager: slotsManager)
                         }
                     }) {
                         Image(systemName: stop.isFavorite ? "star.fill" : "star")
@@ -321,24 +316,10 @@ struct BusStopRow: View {
                             .font(.caption)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel(stop.isFavorite ? "Remove from favorites" : "Add to favorites")
                 }
             }
-            .confirmationDialog(
-                "Add to commute?",
-                isPresented: Binding(get: { commutePromptStop != nil }, set: { if !$0 { commutePromptStop = nil } }),
-                presenting: commutePromptStop
-            ) { pendingStop in
-                if commuteEmptySlots.contains(.morning) {
-                    Button("Morning Commute") { slotsManager.setStopId(pendingStop.id, for: .morning) }
-                }
-                if commuteEmptySlots.contains(.afternoon) {
-                    Button("Afternoon Commute") { slotsManager.setStopId(pendingStop.id, for: .afternoon) }
-                }
-                Button("Never Ask") { showCommutePrompt = false }
-                Button("Not Now", role: .cancel) { }
-            } message: { pendingStop in
-                Text("Use \"\(pendingStop.name)\" as a commute stop?")
-            }
+            .commutePrompt(commutePrompt, stopId: stop.id, stopName: stop.name, slotsManager: slotsManager, showNeverAsk: true, onNeverAsk: { showCommutePrompt = false })
 
             if !stop.routes.isEmpty {
                 HStack {
@@ -371,14 +352,6 @@ struct BusStopRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private func formatDistance(_ distance: CLLocationDistance) -> String {
-        if distance < 1000 {
-            return "\(Int(distance))m"
-        } else {
-            return String(format: "%.1fkm", distance / 1000)
-        }
     }
 }
 
