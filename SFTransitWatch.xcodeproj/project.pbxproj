@@ -42,6 +42,7 @@
 		CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C004 /* ComplicationUpdater.swift */; };
 		CAFE0000000000000000CT13 /* SFTransitWatch Complication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CAFE0000000000000000CT16 /* NearbyFavoritesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C011 /* NearbyFavoritesWidget.swift */; };
+		CAFE0000000000000000CT30 /* ArrivalComplicationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000C030 /* ArrivalComplicationView.swift */; };
 		CAFE0000000000000000CT20 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
 		CAFE0000000000000000E001 /* BusJourneyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E002 /* BusJourneyView.swift */; };
 		CAFE0000000000000000S001 /* WatchSiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S002 /* WatchSiriManager.swift */; };
@@ -156,6 +157,7 @@
 		CAFE0000000000000000C004 /* ComplicationUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationUpdater.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000C010 /* SFTransitWatch Complication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "SFTransitWatch Complication.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE0000000000000000C011 /* NearbyFavoritesWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyFavoritesWidget.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000C030 /* ArrivalComplicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrivalComplicationView.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Complication.entitlements"; sourceTree = "<group>"; };
 		CAFE0000000000000000E002 /* BusJourneyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusJourneyView.swift; sourceTree = "<group>"; };
@@ -348,6 +350,7 @@
 			children = (
 				CAFE0000000000000000C002 /* ComplicationWidget.swift */,
 				CAFE0000000000000000C011 /* NearbyFavoritesWidget.swift */,
+				CAFE0000000000000000C030 /* ArrivalComplicationView.swift */,
 				CAFE0000000000000000CT14 /* Info.plist */,
 				CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */,
 			);
@@ -723,6 +726,7 @@
 			files = (
 				CAFE0000000000000000CT10 /* ComplicationWidget.swift in Sources */,
 				CAFE0000000000000000CT16 /* NearbyFavoritesWidget.swift in Sources */,
+				CAFE0000000000000000CT30 /* ArrivalComplicationView.swift in Sources */,
 				CAFE0000000000000000CT12 /* ComplicationUpdater.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
