@@ -28,7 +28,6 @@
 		CAFE000000000000000020A1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B1 /* ContentView.swift */; };
 		CAFE000000000000000020A2 /* BusStopListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B2 /* BusStopListView.swift */; };
 		CAFE000000000000000020A3 /* BusArrivalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B3 /* BusArrivalView.swift */; };
-		CAFE000000000000000020A5 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B5 /* TransitAPI.swift */; };
 		CAFE000000000000000020A9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B9 /* SettingsView.swift */; };
 		CAFE000000000000000020AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BC /* Assets.xcassets */; };
 		CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BD /* Preview Assets.xcassets */; };
@@ -143,7 +142,6 @@
 		CAFE000000000000000020B1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020B2 /* BusStopListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopListView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020B3 /* BusArrivalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalView.swift; sourceTree = "<group>"; };
-		CAFE000000000000000020B5 /* TransitAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPI.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020B9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020BC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CAFE000000000000000020BD /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -337,7 +335,6 @@
 				CAFE000000000000000020B2 /* BusStopListView.swift */,
 				CAFE000000000000000020B3 /* BusArrivalView.swift */,
 				CAFE0000000000000000E002 /* BusJourneyView.swift */,
-				CAFE000000000000000020B5 /* TransitAPI.swift */,
 				CAFE000000000000000020B9 /* SettingsView.swift */,
 				CAFE000000000000000015E0 /* SiriManager.swift */,
 				CAFE000000000000000020FB /* PhoneSession.swift */,
@@ -727,7 +724,6 @@
 				CAFE000000000000000020A2 /* BusStopListView.swift in Sources */,
 				CAFE000000000000000020A3 /* BusArrivalView.swift in Sources */,
 				CAFE0000000000000000E001 /* BusJourneyView.swift in Sources */,
-				CAFE000000000000000020A5 /* TransitAPI.swift in Sources */,
 				CAFE000000000000000020A9 /* SettingsView.swift in Sources */,
 				CAFE000000000000000015EA /* SiriManager.swift in Sources */,
 				CAFE000000000000000020FA /* PhoneSession.swift in Sources */,
