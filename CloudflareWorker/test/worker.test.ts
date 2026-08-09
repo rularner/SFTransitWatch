@@ -752,6 +752,13 @@ describe("POST /self-provision", () => {
         expect(res.status).toBe(403);
     });
 
+    it("returns 503, not 403, when Apple's subscription API fails transiently (not a confirmed lapse)", async () => {
+        stubVerifiedJWS();
+        vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(null, { status: 500 })));
+        const res = await postSelfProvision({ signedTransactionInfo: "x" });
+        expect(res.status).toBe(503);
+    });
+
     it("returns 200 with a token for a valid transaction and active subscription", async () => {
         stubVerifiedJWS();
         stubActiveSubscription();

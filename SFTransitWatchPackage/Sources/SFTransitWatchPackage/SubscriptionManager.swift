@@ -88,10 +88,15 @@ public final class SubscriptionManager {
         }
     }
 
-    /// Force-refreshes entitlements from Apple's servers (may prompt for Apple ID
-    /// sign-in), then returns the active worker-proxy subscription's
-    /// `jwsRepresentation`. Throws `.noActiveSubscription` if none is found.
+    /// Returns the active worker-proxy subscription's `jwsRepresentation`, preferring
+    /// the locally cached entitlement so a device that's already current doesn't pay
+    /// for a server round-trip (`AppStore.sync()` may prompt for Apple ID sign-in).
+    /// Only force-refreshes from Apple's servers when nothing is cached locally.
+    /// Throws `.noActiveSubscription` if none is found either way.
     public func restore() async throws -> String {
+        if let jws = await activeEntitlementJWS() {
+            return jws
+        }
         try await AppStore.sync()
         guard let jws = await activeEntitlementJWS() else {
             throw SubscriptionManagerError.noActiveSubscription

@@ -712,6 +712,13 @@ async function handleSelfProvision(request: Request, env: Env): Promise<Response
 
     const subscription = await verifySubscription(env, verified.payload.originalTransactionId, verified.payload.environment);
     if (!subscription.active) {
+        if (!subscription.verified) {
+            // Apple's own API failed to answer (outage, rate limit, ...) — this is not
+            // evidence the subscription lapsed. Telling the client "no active subscription"
+            // here would be a false revocation; tell them to retry instead.
+            console.error(JSON.stringify({ source: "self-provision", outcome: "error", reason: "subscription_verification_unavailable" }));
+            return jsonError("Could not verify your subscription right now. Please try again.", 503, { "Retry-After": "30" });
+        }
         console.warn(JSON.stringify({ source: "self-provision", outcome: "rejected", reason: "no_active_subscription" }));
         return jsonError("No active subscription.", 403);
     }
