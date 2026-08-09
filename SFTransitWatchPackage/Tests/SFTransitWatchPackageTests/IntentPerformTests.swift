@@ -184,4 +184,139 @@ struct IntentPerformTests {
         let dialog = try #require(concrete.dialog)
         #expect(literalText(from: dialog) == "You don't have any favorite stops yet. Add one in SF Transit Watch.")
     }
+
+    // MARK: - CheckRouteArrivalsIntent — dialog text
+
+    @Test func routeArrival_emptyArrivals_returnsNoArrivalsDialog() async throws {
+        let text = CheckRouteArrivalsIntent.arrivalsDialogText(routeNumber: "54", stopName: "Geneva & Naples", arrivals: [])
+        #expect(text == "No upcoming arrivals for Geneva & Naples right now.")
+    }
+
+    @Test func routeArrival_singleArrival_speaksOne() async throws {
+        let now = Date()
+        let arrival = BusArrival(route: "54", destination: "Outbound", arrivalTime: now.addingTimeInterval(300), now: now)
+        let text = CheckRouteArrivalsIntent.arrivalsDialogText(routeNumber: "54", stopName: "Geneva & Naples", arrivals: [arrival])
+        #expect(text == "The 54 at Geneva & Naples arrives in 5 minutes.")
+    }
+
+    @Test func routeArrival_twoArrivals_speaksBoth() async throws {
+        let now = Date()
+        let first = BusArrival(route: "54", destination: "Outbound", arrivalTime: now.addingTimeInterval(300), now: now)
+        let second = BusArrival(route: "54", destination: "Outbound", arrivalTime: now.addingTimeInterval(900), now: now)
+        let text = CheckRouteArrivalsIntent.arrivalsDialogText(routeNumber: "54", stopName: "Geneva & Naples", arrivals: [first, second])
+        #expect(text == "The 54 at Geneva & Naples arrives in 5 minutes, then 15 minutes.")
+    }
+
+    // MARK: - CheckRouteArrivalsIntent — resolveStop
+
+    @Test func resolveStop_singleCandidate_returnsSingleWithoutNeedingLocation() async throws {
+        let stop = BusStop(id: "1", name: "Geneva & Naples", code: "GN", latitude: 37.7, longitude: -122.4)
+        let resolution = resolveStop(from: [stop], location: nil)
+        guard case .single(let resolved) = resolution else {
+            Issue.record("expected .single, got \(resolution)")
+            return
+        }
+        #expect(resolved.id == "1")
+    }
+
+    @Test func resolveStop_multipleCandidatesNoLocation_returnsNeedsLocation() async throws {
+        let a = BusStop(id: "1", name: "A", code: "A", latitude: 37.7, longitude: -122.4)
+        let b = BusStop(id: "2", name: "B", code: "B", latitude: 37.71, longitude: -122.41)
+        let resolution = resolveStop(from: [a, b], location: nil)
+        guard case .needsLocation = resolution else {
+            Issue.record("expected .needsLocation, got \(resolution)")
+            return
+        }
+    }
+
+    @Test func resolveStop_candidatesFarApart_picksNearestWithoutAsking() async throws {
+        // 1 degree of latitude is roughly 111km — comfortably over the 50m threshold.
+        let near = BusStop(id: "near", name: "Near", code: "N", latitude: 37.7000, longitude: -122.4000)
+        let far = BusStop(id: "far", name: "Far", code: "F", latitude: 37.8000, longitude: -122.4000)
+        let userLocation = CLLocation(latitude: 37.7001, longitude: -122.4000)
+        let resolution = resolveStop(from: [far, near], location: userLocation)
+        guard case .single(let resolved) = resolution else {
+            Issue.record("expected .single, got \(resolution)")
+            return
+        }
+        #expect(resolved.id == "near")
+    }
+
+    @Test func resolveStop_candidatesWithin50Meters_returnsAmbiguous() async throws {
+        let a = BusStop(id: "a", name: "A", code: "A", latitude: 37.70000, longitude: -122.40000)
+        // ~30m east of `a` at this latitude.
+        let b = BusStop(id: "b", name: "B", code: "B", latitude: 37.70000, longitude: -122.39965)
+        let userLocation = CLLocation(latitude: 37.70000, longitude: -122.40000)
+        let resolution = resolveStop(from: [a, b], location: userLocation)
+        guard case .ambiguous(let candidates) = resolution else {
+            Issue.record("expected .ambiguous, got \(resolution)")
+            return
+        }
+        #expect(candidates.map(\.id) == ["a", "b"])
+    }
+
+    // MARK: - CheckRouteArrivalsIntent — resolveDirection
+
+    @Test func resolveDirection_singleGroup_resolvesWithoutAsking() async throws {
+        let arrival = BusArrival(route: "54", destination: "Outbound", arrivalTime: Date(), now: Date())
+        let resolution = resolveDirection(requested: nil, groups: ["Outbound": [arrival]])
+        guard case .resolved(let key) = resolution else {
+            Issue.record("expected .resolved, got \(resolution)")
+            return
+        }
+        #expect(key == "Outbound")
+    }
+
+    @Test func resolveDirection_multipleGroupsNoRequest_needsDisambiguation() async throws {
+        let arrival = BusArrival(route: "54", destination: "x", arrivalTime: Date(), now: Date())
+        let resolution = resolveDirection(requested: nil, groups: ["Inbound": [arrival], "Outbound": [arrival]])
+        guard case .needsDisambiguation(let options) = resolution else {
+            Issue.record("expected .needsDisambiguation, got \(resolution)")
+            return
+        }
+        #expect(Set(options) == ["Inbound", "Outbound"])
+    }
+
+    @Test func resolveDirection_requestedMatchesCaseInsensitively_resolves() async throws {
+        let arrival = BusArrival(route: "54", destination: "x", arrivalTime: Date(), now: Date())
+        let resolution = resolveDirection(requested: "outbound", groups: ["Inbound": [arrival], "Outbound": [arrival]])
+        guard case .resolved(let key) = resolution else {
+            Issue.record("expected .resolved, got \(resolution)")
+            return
+        }
+        #expect(key == "Outbound")
+    }
+
+    @Test func resolveDirection_requestedNoMatch_listsAvailable() async throws {
+        let arrival = BusArrival(route: "54", destination: "x", arrivalTime: Date(), now: Date())
+        let resolution = resolveDirection(requested: "sideways", groups: ["Inbound": [arrival], "Outbound": [arrival]])
+        guard case .noMatch(let available) = resolution else {
+            Issue.record("expected .noMatch, got \(resolution)")
+            return
+        }
+        #expect(available == ["Inbound", "Outbound"])
+    }
+
+    // MARK: - CheckRouteArrivalsIntent — perform() gates
+
+    @Test func routeArrival_noAPIKeyConfigured_performReturnsConfigureDialog() async throws {
+        // apiKey already cleared in init()
+        var intent = CheckRouteArrivalsIntent()
+        intent.routeNumber = "54"
+        let result = try await intent.perform()
+        let concrete = try #require(result as? IntentResultContainer<Never, Never, Never, IntentDialog>)
+        let dialog = try #require(concrete.dialog)
+        #expect(literalText(from: dialog) == "Please configure your 511.org API key in SF Transit Watch settings.")
+    }
+
+    @Test func routeArrival_noFavorites_returnsNoFavoritesDialog() async throws {
+        ConfigurationManager.shared.apiKey = "test-key"
+        UserDefaults.standard.removeObject(forKey: "FavoriteStops")
+        var intent = CheckRouteArrivalsIntent()
+        intent.routeNumber = "54"
+        let result = try await intent.perform()
+        let concrete = try #require(result as? IntentResultContainer<Never, Never, Never, IntentDialog>)
+        let dialog = try #require(concrete.dialog)
+        #expect(literalText(from: dialog) == "You don't have any favorite stops yet. Add one in SF Transit Watch.")
+    }
 }
