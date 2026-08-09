@@ -1,17 +1,21 @@
 import XCTest
-import SFTransitWatchPackage
-@testable import SFTransitWatch_Watch_App
+@testable import SFTransitWatchPackage
 
 /// Tests for TransitAPI data parsing with simple mock responses.
 /// Focuses on verifying XML/JSON parsing works correctly.
+///
+/// Migrated from the watch app's `TransitAPIParsingTests.swift`. Several tests from that
+/// file were dropped here as exact (or near-exact, same-shape) duplicates of coverage
+/// already ported into `TransitAPITests.swift` (Task 3) — see the migration report for
+/// the full list.
+@MainActor
 final class TransitAPIParsingTests: XCTestCase {
 
     var api: TransitAPI!
     var mockSession: MockURLSession!
 
-    @MainActor
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         api = TransitAPI()
         mockSession = MockURLSession()
         api.urlSession = mockSession
@@ -20,47 +24,19 @@ final class TransitAPIParsingTests: XCTestCase {
         ConfigurationManager.shared.apiKey = "test-key"
     }
 
-    @MainActor
-    override func tearDown() {
-        super.tearDown()
+    override func tearDown() async throws {
+        try await super.tearDown()
         ConfigurationManager.shared.apiKey = ""
         ConfigurationManager.shared.workerToken = ""
         ConfigurationManager.shared.workerBaseURL = ""
     }
 
-    @MainActor
-    func testParseArrivalsWithValidXML() async {
-        let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
-        let xml = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <ServiceDelivery>
-          <StopMonitoringDelivery>
-            <MonitoredStopVisit>
-              <MonitoredVehicleJourney>
-                <LineRef>38</LineRef>
-                <DirectionRef>IB</DirectionRef>
-                <MonitoredCall>
-                  <ExpectedDepartureTime>\(isoDate)</ExpectedDepartureTime>
-                </MonitoredCall>
-              </MonitoredVehicleJourney>
-            </MonitoredStopVisit>
-          </StopMonitoringDelivery>
-        </ServiceDelivery>
-        """.data(using: .utf8)!
-
-        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: xml)
-
-        let arrivals = await api.fetchArrivals(for: "15552", agency: "SF")
-
-        XCTAssertFalse(arrivals.isEmpty)
-        XCTAssertEqual(arrivals[0].route, "38")
-    }
-
     /// Regression: the SIRI-XML fallback parser (used in direct-511 mode,
     /// which the watch hits often) assigns `destination` from the raw
     /// DirectionRef field. It must map through directionLabel, same as the
-    /// JSON decode path, so "IB"/"OB" never leak to the UI.
-    @MainActor
+    /// JSON decode path, so "IB"/"OB" never leak to the UI. Covers the "IB"
+    /// side of the mapping; TransitAPITests.testParseArrivalsWithValidXMLMapsDirectionRefToOutbound
+    /// (Task 3) covers the "OB" side.
     func testParseArrivalsWithValidXMLMapsDirectionRefToInbound() async {
         let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
         let xml = """
@@ -95,7 +71,6 @@ final class TransitAPIParsingTests: XCTestCase {
     /// was replaced by SIRIXMLParser, which initially only requested
     /// ExpectedDepartureTime and silently dropped records using the other
     /// three field names.
-    @MainActor
     func testParseArrivalsWithValidXMLUsingExpectedArrivalTime() async {
         let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
         let xml = """
@@ -123,7 +98,6 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(arrivals[0].route, "38")
     }
 
-    @MainActor
     func testParseArrivalsWithValidXMLUsingAimedArrivalTime() async {
         let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
         let xml = """
@@ -151,7 +125,6 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(arrivals[0].route, "38")
     }
 
-    @MainActor
     func testParseArrivalsWithValidXMLUsingAimedDepartureTime() async {
         let isoDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(600))
         let xml = """
@@ -179,7 +152,6 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(arrivals[0].route, "38")
     }
 
-    @MainActor
     func testParseArrivalsWithEmptyXML() async {
         let xml = "<ServiceDelivery></ServiceDelivery>".data(using: .utf8)!
         mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: xml)
@@ -189,7 +161,6 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertTrue(arrivals.isEmpty)
     }
 
-    @MainActor
     func testParseStopsWithValidXML() async {
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -213,7 +184,6 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertEqual(stops[0].id, "15552")
     }
 
-    @MainActor
     func testParseStopsWithEmptyXML() async {
         let xml = "<StopPlaces></StopPlaces>".data(using: .utf8)!
         mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/Stops")!, data: xml)
@@ -223,92 +193,7 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertTrue(stops.isEmpty)
     }
 
-    @MainActor
-    func testSearchStopsByExactCode() async {
-        let xml = """
-        <StopPlaces>
-          <StopPlace>
-            <StopPlaceRef>15552</StopPlaceRef>
-            <StopPlaceName>Castro Station</StopPlaceName>
-            <Location><Latitude>37.762</Latitude><Longitude>-122.435</Longitude></Location>
-          </StopPlace>
-          <StopPlace>
-            <StopPlaceRef>13000</StopPlaceRef>
-            <StopPlaceName>Market St &amp; 8th St</StopPlaceName>
-            <Location><Latitude>37.780</Latitude><Longitude>-122.410</Longitude></Location>
-          </StopPlace>
-        </StopPlaces>
-        """.data(using: .utf8)!
-        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/Stops")!, data: xml)
-
-        let results = await api.searchStops(query: "15552", agencies: ["SF"])
-
-        XCTAssertNotNil(results)
-        XCTAssertEqual(results?.count, 1)
-        XCTAssertEqual(results?.first?.code, "15552")
-        XCTAssertEqual(results?.first?.name, "Castro Station")
-    }
-
-    @MainActor
-    func testSearchStopsByNameSubstring() async {
-        let xml = """
-        <StopPlaces>
-          <StopPlace>
-            <StopPlaceRef>15552</StopPlaceRef>
-            <StopPlaceName>Castro Station</StopPlaceName>
-            <Location><Latitude>37.762</Latitude><Longitude>-122.435</Longitude></Location>
-          </StopPlace>
-          <StopPlace>
-            <StopPlaceRef>13000</StopPlaceRef>
-            <StopPlaceName>Market St &amp; 8th St</StopPlaceName>
-            <Location><Latitude>37.780</Latitude><Longitude>-122.410</Longitude></Location>
-          </StopPlace>
-        </StopPlaces>
-        """.data(using: .utf8)!
-        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/Stops")!, data: xml)
-
-        let results = await api.searchStops(query: "castro", agencies: ["SF"])
-
-        XCTAssertEqual(results?.count, 1)
-        XCTAssertEqual(results?.first?.name, "Castro Station")
-    }
-
-    @MainActor
-    func testSearchStopsEmptyQueryMakesNoRequests() async {
-        let results = await api.searchStops(query: "   ", agencies: ["SF"])
-
-        XCTAssertEqual(results, [BusStop](), "Whitespace-only query must return [] immediately")
-        XCTAssertEqual(mockSession.requestCount(), 0, "Must not fire any network request")
-    }
-
-    @MainActor
-    func testSearchStopsMultiAgencyMakesTwoRequests() async {
-        let xml = """
-        <StopPlaces>
-          <StopPlace>
-            <StopPlaceRef>15552</StopPlaceRef>
-            <StopPlaceName>Castro Station</StopPlaceName>
-            <Location><Latitude>37.762</Latitude><Longitude>-122.435</Longitude></Location>
-          </StopPlace>
-        </StopPlaces>
-        """.data(using: .utf8)!
-        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/Stops")!, data: xml)
-
-        let results = await api.searchStops(query: "15552", agencies: ["SF", "BA"])
-
-        XCTAssertEqual(mockSession.requestCount(), 2, "One request per agency")
-        XCTAssertEqual(results?.count, 2)
-    }
-
-    @MainActor
-    func testSearchStopsReturnsNilWhenAllAgenciesFail() async {
-        mockSession.setMockError(for: URL(string: "https://api.511.org")!,
-                                 error: URLError(.notConnectedToInternet))
-
-        let results = await api.searchStops(query: "castro", agencies: ["SF"])
-
-        XCTAssertNil(results, "Should return nil when all agency fetches fail")
-    }
+    // MARK: - TransitJSON.decodeScheduledDepartures
 
     func testDecodeScheduledDepartures_validPayload() {
         let isoIn5min = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
@@ -410,6 +295,8 @@ final class TransitAPIParsingTests: XCTestCase {
         XCTAssertNotNil(arrivals)
         XCTAssertEqual(arrivals?.count, 0, "Visit with no time must be skipped")
     }
+
+    // MARK: - TransitJSON.decodeTimetableJourneyStops
 
     func testDecodeTimetableJourneyStops_returnsStopsAfterBoarding() {
         let now = Date()

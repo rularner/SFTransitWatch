@@ -1,22 +1,22 @@
 import XCTest
-@testable import SFTransitWatch
-import SFTransitWatchPackage
+@testable import SFTransitWatchPackage
 
-final class PhoneTransitAPITests: XCTestCase {
+@MainActor
+final class TransitAPITests: XCTestCase {
     var api: TransitAPI!
     var mockSession: MockURLSession!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         api = TransitAPI()
         mockSession = MockURLSession()
         api.urlSession = mockSession
-        api.stopRoutesCache = StopRoutesCache(defaults: UserDefaults(suiteName: "PhoneTransitAPITests-\(UUID().uuidString)")!)
+        api.stopRoutesCache = StopRoutesCache(defaults: UserDefaults(suiteName: "TransitAPITests-\(UUID().uuidString)")!)
         ConfigurationManager.shared.apiKey = "test-key"
     }
 
-    override func tearDown() {
-        super.tearDown()
+    override func tearDown() async throws {
+        try await super.tearDown()
         ConfigurationManager.shared.apiKey = ""
         ConfigurationManager.shared.workerToken = ""
         ConfigurationManager.shared.workerBaseURL = ""
@@ -223,10 +223,22 @@ final class PhoneTransitAPITests: XCTestCase {
         XCTAssertEqual(mockSession.requestCount(), 3, "One Stops request per enabled agency")
     }
 
-    func testFetchNearbyStopsNoAgenciesMakesNoRequests() async {
+    /// Regression note: the phone-only original of this test asserted zero requests for an
+    /// empty `agencies` array. Task 1's merge deliberately ported `fetchNearbyStops` wholesale
+    /// from the watch app (see plan Task 1, "fetchNearbyStops ... ported from
+    /// SFTransitWatch Watch App/TransitAPI.swift"), which has always defaulted an empty
+    /// `agencies` list to `["SF"]` (`let queryAgencies = agencies.isEmpty ? ["SF"] : agencies`)
+    /// rather than phone's old "no agencies enabled -> no requests" behavior. That default-to-SF
+    /// fallback is the intentional, plan-sanctioned merged behavior, so this test is updated to
+    /// assert it instead of the dropped phone-only behavior.
+    func testFetchNearbyStopsNoAgenciesDefaultsToSF() async {
+        let emptyXML = "<StopPlaces></StopPlaces>".data(using: .utf8)!
+        mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/Stops")!, data: emptyXML)
+
         _ = await api.fetchNearbyStops(latitude: 37.762, longitude: -122.435, agencies: [])
 
-        XCTAssertEqual(mockSession.requestCount(), 0, "No requests when all agencies are filtered out")
+        XCTAssertEqual(mockSession.requestCount(), 1, "empty agencies list falls back to a single SF request")
+        XCTAssertEqual(mockSession.lastRequest()?.url?.absoluteString.contains("operator_id=SF"), true)
     }
 
     /// Cancelling a fetchNearbyStops task in flight (simulating a filter toggle that supersedes
@@ -398,6 +410,7 @@ final class PhoneTransitAPITests: XCTestCase {
         """.data(using: .utf8)!
         mockSession.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
 
+        let api = self.api!
         async let a = api.fetchArrivals(for: "15552", agency: "SF")
         async let b = api.fetchArrivals(for: "15552", agency: "SF")
         _ = await [a, b]

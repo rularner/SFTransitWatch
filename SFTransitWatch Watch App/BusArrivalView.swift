@@ -199,6 +199,9 @@ struct BusArrivalView: View {
                 Task { await loadArrivals() }
             }
         }
+        .onReceive(transitAPI.$pollInterval) { newInterval in
+            countdown.setInterval(Int(newInterval))
+        }
         .commutePrompt(commutePrompt, stopId: stop.id, stopName: stop.name, slotsManager: slotsManager)
     }
 

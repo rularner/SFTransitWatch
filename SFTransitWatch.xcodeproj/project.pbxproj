@@ -21,14 +21,12 @@
 		CAFE000000000000000013A0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000013B0 /* Preview Assets.xcassets */; };
 		CAFE000000000000000013C0 /* BusStopListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000013D0 /* BusStopListView.swift */; };
 		CAFE000000000000000013E0 /* BusArrivalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000013F0 /* BusArrivalView.swift */; };
-		CAFE000000000000000014C0 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000014D0 /* TransitAPI.swift */; };
 		CAFE000000000000000015DA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015D0 /* SettingsView.swift */; };
 		CAFE000000000000000015EA /* SiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000015E0 /* SiriManager.swift */; };
 		CAFE000000000000000020A0 /* SFTransitWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B0 /* SFTransitWatchApp.swift */; };
 		CAFE000000000000000020A1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B1 /* ContentView.swift */; };
 		CAFE000000000000000020A2 /* BusStopListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B2 /* BusStopListView.swift */; };
 		CAFE000000000000000020A3 /* BusArrivalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B3 /* BusArrivalView.swift */; };
-		CAFE000000000000000020A5 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B5 /* TransitAPI.swift */; };
 		CAFE000000000000000020A9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020B9 /* SettingsView.swift */; };
 		CAFE000000000000000020AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BC /* Assets.xcassets */; };
 		CAFE000000000000000020AD /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000000020BD /* Preview Assets.xcassets */; };
@@ -135,7 +133,6 @@
 		CAFE000000000000000013B0 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		CAFE000000000000000013D0 /* BusStopListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopListView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000013F0 /* BusArrivalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalView.swift; sourceTree = "<group>"; };
-		CAFE000000000000000014D0 /* TransitAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPI.swift; sourceTree = "<group>"; };
 		CAFE000000000000000015D0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000015E0 /* SiriManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriManager.swift; sourceTree = "<group>"; };
 		CAFE000000000000000016A0 /* SFTransitWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SFTransitWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -143,7 +140,6 @@
 		CAFE000000000000000020B1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020B2 /* BusStopListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopListView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020B3 /* BusArrivalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalView.swift; sourceTree = "<group>"; };
-		CAFE000000000000000020B5 /* TransitAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPI.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020B9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CAFE000000000000000020BC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CAFE000000000000000020BD /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -168,7 +164,6 @@
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T002 /* BusStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T003 /* FavoritesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManagerTests.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPIParsingTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T010 /* SFTransitWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = file.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		CAFE0000000000000000TS01 /* XCUISnapshotRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XCUISnapshotRunner.swift; sourceTree = "<group>"; };
@@ -292,7 +287,6 @@
 				CAFE000000000000000012D0 /* ContentView.swift */,
 				CAFE000000000000000013D0 /* BusStopListView.swift */,
 				CAFE000000000000000013F0 /* BusArrivalView.swift */,
-				CAFE000000000000000014D0 /* TransitAPI.swift */,
 				CAFE000000000000000015D0 /* SettingsView.swift */,
 				CAFE0000000000000000C004 /* ComplicationUpdater.swift */,
 				CAFE0000000000000000B001 /* BackgroundRefreshController.swift */,
@@ -337,7 +331,6 @@
 				CAFE000000000000000020B2 /* BusStopListView.swift */,
 				CAFE000000000000000020B3 /* BusArrivalView.swift */,
 				CAFE0000000000000000E002 /* BusJourneyView.swift */,
-				CAFE000000000000000020B5 /* TransitAPI.swift */,
 				CAFE000000000000000020B9 /* SettingsView.swift */,
 				CAFE000000000000000015E0 /* SiriManager.swift */,
 				CAFE000000000000000020FB /* PhoneSession.swift */,
@@ -376,7 +369,6 @@
 				CAFE0000000000000000T001 /* BusArrivalTests.swift */,
 				CAFE0000000000000000T002 /* BusStopTests.swift */,
 				CAFE0000000000000000T003 /* FavoritesManagerTests.swift */,
-				CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */,
 			);
 			path = SFTransitWatchTests;
 			sourceTree = "<group>";
@@ -708,7 +700,6 @@
 				CAFE000000000000000012C0 /* ContentView.swift in Sources */,
 				CAFE000000000000000013C0 /* BusStopListView.swift in Sources */,
 				CAFE000000000000000013E0 /* BusArrivalView.swift in Sources */,
-				CAFE000000000000000014C0 /* TransitAPI.swift in Sources */,
 				CAFE000000000000000015DA /* SettingsView.swift in Sources */,
 				CAFE0000000000000000C003 /* ComplicationUpdater.swift in Sources */,
 				CAFE0000000000000000B002 /* BackgroundRefreshController.swift in Sources */,
@@ -727,7 +718,6 @@
 				CAFE000000000000000020A2 /* BusStopListView.swift in Sources */,
 				CAFE000000000000000020A3 /* BusArrivalView.swift in Sources */,
 				CAFE0000000000000000E001 /* BusJourneyView.swift in Sources */,
-				CAFE000000000000000020A5 /* TransitAPI.swift in Sources */,
 				CAFE000000000000000020A9 /* SettingsView.swift in Sources */,
 				CAFE000000000000000015EA /* SiriManager.swift in Sources */,
 				CAFE000000000000000020FA /* PhoneSession.swift in Sources */,

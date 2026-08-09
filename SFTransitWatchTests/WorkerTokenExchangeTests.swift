@@ -74,11 +74,34 @@ class WorkerTokenExchangeTests: XCTestCase {
 }
 
 // Mock for testing
-class SimpleURLSessionMock: URLSessionProtocol {
-    var mockData: Data?
-    var mockError: Error?
-    var mockStatusCode: Int = 200
-    var lastRequest: URLRequest?
+//
+// `final` + `@unchecked Sendable` + lock-guarded state, matching the pattern used by
+// `SFTransitWatchPackageTests/MockURLSession.swift` — required because `URLSessionProtocol`
+// is `Sendable` (see commit 7b93565).
+final class SimpleURLSessionMock: URLSessionProtocol, @unchecked Sendable {
+    private let lock = NSLock()
+
+    private var _mockData: Data?
+    private var _mockError: Error?
+    private var _mockStatusCode: Int = 200
+    private var _lastRequest: URLRequest?
+
+    var mockData: Data? {
+        get { lock.withLock { _mockData } }
+        set { lock.withLock { _mockData = newValue } }
+    }
+    var mockError: Error? {
+        get { lock.withLock { _mockError } }
+        set { lock.withLock { _mockError = newValue } }
+    }
+    var mockStatusCode: Int {
+        get { lock.withLock { _mockStatusCode } }
+        set { lock.withLock { _mockStatusCode = newValue } }
+    }
+    var lastRequest: URLRequest? {
+        get { lock.withLock { _lastRequest } }
+        set { lock.withLock { _lastRequest = newValue } }
+    }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         lastRequest = request
