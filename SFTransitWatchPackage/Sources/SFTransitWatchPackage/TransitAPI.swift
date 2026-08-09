@@ -197,7 +197,9 @@ public final class TransitAPI: ObservableObject {
                 arrivalsCache[cacheKey(stopId, agency)] = CachedArrivals(arrivals: scheduled, timestamp: now())
                 resetBackoff()
                 if cacheStatus == "ERROR" {
-                    softBanner = "Live updates unavailable — showing scheduled times"
+                    softBanner = scheduled.isEmpty
+                        ? "Live updates unavailable"
+                        : "Live updates unavailable — showing scheduled times"
                 }
                 return scheduled
             }
