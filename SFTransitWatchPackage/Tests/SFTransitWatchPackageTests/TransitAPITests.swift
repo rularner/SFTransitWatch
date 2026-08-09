@@ -565,11 +565,13 @@ final class TransitAPITests: XCTestCase {
 
     // MARK: - Backend failure signaling (X-Cache-Status: ERROR)
 
-    func testBackendErrorStatusSurfacesSoftBannerEvenAtHTTP200() async {
+    func testBackendErrorStatusWithNoScheduleSurfacesUnavailableBanner() async {
         // Mirrors CloudflareWorker/src/gtfsrt/proxy.ts's fallback response when the reader
         // Lambda fails and there's no cache entry: HTTP 200, empty MonitoredStopVisit[], but
         // tagged X-Cache-Status: ERROR (not MISS) so the client can tell "backend is down"
-        // apart from a genuine "no buses scheduled" empty result.
+        // apart from a genuine "no buses scheduled" empty result. StopTimetable also comes back
+        // empty here (e.g. SF's known 511-side 412 on that endpoint), so the banner must not
+        // claim scheduled times are being shown when there's nothing to show.
         mockSession.setMockResponse(
             for: URL(string: "https://api.511.org/transit/StopMonitoring")!,
             data: Data("{\"ServiceDelivery\":{\"StopMonitoringDelivery\":{\"MonitoredStopVisit\":[]}}}".utf8),
@@ -578,6 +580,30 @@ final class TransitAPITests: XCTestCase {
         mockSession.setMockResponse(
             for: URL(string: "https://api.511.org/transit/StopTimetable")!,
             data: Data("{}".utf8)
+        )
+
+        _ = await api.fetchArrivals(for: "15552", agency: "SF")
+
+        XCTAssertEqual(api.softBanner, "Live updates unavailable")
+    }
+
+    func testBackendErrorStatusWithScheduleSurfacesScheduledBanner() async {
+        // Same backend-ERROR case, but StopTimetable does have data to fall back to — the
+        // banner should tell the user scheduled times are being shown.
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopMonitoring")!,
+            data: Data("{\"ServiceDelivery\":{\"StopMonitoringDelivery\":{\"MonitoredStopVisit\":[]}}}".utf8),
+            headers: ["X-Cache-Status": "ERROR"]
+        )
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetableData = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"Local Weekday","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"San Francisco"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/StopTimetable")!,
+            data: timetableData
         )
 
         _ = await api.fetchArrivals(for: "15552", agency: "SF")

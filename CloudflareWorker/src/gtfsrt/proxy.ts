@@ -6,7 +6,14 @@ const PROXY_CACHE_FRESH_MS = 60_000;
 // a real circular runtime dependency that breaks module init order (Cache-Control ends up
 // "max-age=undefined" until index.ts finishes evaluating). Kept as its own constant instead.
 const PROXY_CACHE_RETENTION_SECONDS = 6 * 60 * 60;
-const PROXY_TIMEOUT_MS = 3_000;
+// The reader Lambda's own timeout (template.yaml Globals.Function.Timeout) is 10s. A cold
+// container has to pay Lambda init + an S3 GetObject + JSON.parse of the whole regional
+// snapshot before it can answer (render.ts's module-scope cache is empty on a fresh
+// environment), which has been observed to take >3s and blow past the old budget here —
+// producing an ERROR fallback (empty MonitoredStopVisit) on a stop's very first request.
+// Kept comfortably under the Lambda's own 10s ceiling so a request that's genuinely stuck
+// still gets an answer before the Worker gives up.
+const PROXY_TIMEOUT_MS = 8_000;
 const STOP_NAMES_TTL_MS = 5 * 60_000;
 
 // Builds a normalized query string from exactly the params this endpoint understands, in a
