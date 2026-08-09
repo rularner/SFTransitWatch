@@ -65,6 +65,48 @@ public class LocationManager: NSObject, ObservableObject {
         #endif
         isLocationEnabled = false
     }
+
+    public func currentLocationOnce(timeout: TimeInterval) async -> CLLocation? {
+        if SnapshotMode.isActive {
+            return SnapshotMode.fixedLocation
+        }
+        guard isAuthorized else {
+            return nil
+        }
+        if let currentLocation {
+            return currentLocation
+        }
+        startLocationUpdates()
+        defer { stopLocationUpdates() }
+
+        return await withTaskGroup(of: CLLocation?.self) { group in
+            group.addTask {
+                do {
+                    return try await Task { @MainActor [weak self] () -> CLLocation? in
+                        guard let self else { return nil }
+                        let startTime = Date()
+                        while Date().timeIntervalSince(startTime) < timeout {
+                            try Task.checkCancellation()
+                            if let location = self.currentLocation {
+                                return location
+                            }
+                            try? await Task.sleep(nanoseconds: 50_000_000)
+                        }
+                        return nil
+                    }.value
+                } catch {
+                    return nil
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+    }
 }
 
 extension LocationManager: CLLocationManagerDelegate {
