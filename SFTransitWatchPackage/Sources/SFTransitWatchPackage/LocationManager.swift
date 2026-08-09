@@ -80,22 +80,33 @@ public class LocationManager: NSObject, ObservableObject {
         defer { stopLocationUpdates() }
 
         return await withTaskGroup(of: CLLocation?.self) { group in
-            group.addTask {
-                do {
-                    return try await Task { @MainActor [weak self] () -> CLLocation? in
-                        guard let self else { return nil }
-                        let startTime = Date()
-                        while Date().timeIntervalSince(startTime) < timeout {
-                            try Task.checkCancellation()
-                            if let location = self.currentLocation {
-                                return location
-                            }
-                            try? await Task.sleep(nanoseconds: 50_000_000)
+            group.addTask { [weak self] in
+                // Wrapping the polling loop in a nested unstructured `Task` here isn't
+                // just style: marking the `group.addTask` closure itself `@MainActor`
+                // hits a Swift 6 region-isolation-checker compiler bug ("pattern that
+                // the region-based isolation checker does not understand how to check")
+                // — confirmed by an actual build attempt, not assumed. This nested Task
+                // sidesteps that, but a nested unstructured Task is invisible to
+                // `group.cancelAll()` unless we explicitly wire it up: `cancelAll()`
+                // only marks *this* addTask closure as cancelled, it does not call
+                // `.cancel()` on the inner Task by itself. `withTaskCancellationHandler`
+                // below is what makes that real: when this outer task is cancelled,
+                // `onCancel` fires and explicitly cancels `pollTask`, which makes its
+                // `Task.checkCancellation()` actually throw and end the loop.
+                guard let self else { return nil }
+                let pollTask = Task { @MainActor () -> CLLocation? in
+                    while true {
+                        try Task.checkCancellation()
+                        if let location = self.currentLocation {
+                            return location
                         }
-                        return nil
-                    }.value
-                } catch {
-                    return nil
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                    }
+                }
+                return await withTaskCancellationHandler {
+                    (try? await pollTask.value) ?? nil
+                } onCancel: {
+                    pollTask.cancel()
                 }
             }
             group.addTask {

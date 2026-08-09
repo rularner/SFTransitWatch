@@ -43,4 +43,26 @@ struct LocationManagerAsyncTests {
         #expect(result == nil)
         #expect(Date().timeIntervalSince(start) >= 0.3)
     }
+
+    @Test func authorizedLocationArrivesDuringWait_returnsPromptly() async {
+        let manager = LocationManager()
+        #if !os(macOS)
+        manager.authorizationStatus = .authorizedWhenInUse
+        #else
+        manager.authorizationStatus = .authorizedAlways
+        #endif
+        manager.currentLocation = nil
+        let expectedLocation = CLLocation(latitude: 37.7749, longitude: -122.4194)
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            manager.currentLocation = expectedLocation
+        }
+
+        let start = Date()
+        let result = await manager.currentLocationOnce(timeout: 5)
+        let elapsed = Date().timeIntervalSince(start)
+        #expect(result?.coordinate.latitude == expectedLocation.coordinate.latitude)
+        #expect(elapsed < 1)
+    }
 }
