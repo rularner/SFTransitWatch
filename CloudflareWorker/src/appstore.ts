@@ -9,7 +9,10 @@ export interface AppStoreEnv {
 
 export type SubscriptionStatus =
 	| { active: true; expiresAtMs: number; environment: "Production" | "Sandbox" }
-	| { active: false };
+	// `verified: true` means Apple affirmatively answered "no active subscription" for this
+	// transaction. `verified: false` means we couldn't get a real answer (Apple API outage,
+	// rate limit, etc.) — callers must NOT treat that the same as a confirmed lapse.
+	| { active: false; verified: boolean };
 
 interface AppStoreSubscriptionResponse {
 	data?: Array<{
@@ -39,14 +42,17 @@ export async function verifySubscription(
 	if (!resp.ok) {
 		const body = await resp.text().catch(() => "");
 		console.warn(JSON.stringify({ source: "verify-sub", reason: "http_not_ok", prodStatus: prodResp.status, usedSandbox, finalStatus: resp.status, body: body.slice(0, 300) }));
-		return { active: false };
+		// A final 404 is Apple explicitly saying "no data for this transaction ID" —
+		// a real answer. Anything else (5xx, 429, unexpected 401, ...) is Apple's API
+		// itself failing to answer, not evidence the subscription doesn't exist.
+		return { active: false, verified: resp.status === 404 };
 	}
 
 	const data = (await resp.json()) as AppStoreSubscriptionResponse;
 	const last = data.data?.[0]?.lastTransactions?.[0];
 	if (!last) {
 		console.warn(JSON.stringify({ source: "verify-sub", reason: "no_last_transaction", usedSandbox, dataCount: data.data?.length ?? 0, txId: originalTransactionId, raw: JSON.stringify(data).slice(0, 500) }));
-		return { active: false };
+		return { active: false, verified: true };
 	}
 
 	const payload = decodeJwsPayload(last.signedTransactionInfo);
@@ -63,7 +69,7 @@ export async function verifySubscription(
 		return { active: true, expiresAtMs, environment };
 	}
 	console.warn(JSON.stringify({ source: "verify-sub", reason: "inactive", usedSandbox, txStatus: last.status, expiresAtMs, now: Date.now() }));
-	return { active: false };
+	return { active: false, verified: true };
 }
 
 export async function checkAppStoreAuth(env: AppStoreEnv): Promise<{ ok: boolean; status: number }> {

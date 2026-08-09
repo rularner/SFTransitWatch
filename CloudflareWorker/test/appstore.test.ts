@@ -52,7 +52,7 @@ describe("verifySubscription", () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(appStoreResponse([{ status: 2, signedTransactionInfo: jws }])));
 
         const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
-        expect(result).toEqual({ active: false });
+        expect(result).toEqual({ active: false, verified: true });
     });
 
     it("returns inactive for status 5 (revoked) even with a future expiresDate", async () => {
@@ -60,7 +60,7 @@ describe("verifySubscription", () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(appStoreResponse([{ status: 5, signedTransactionInfo: jws }])));
 
         const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
-        expect(result).toEqual({ active: false });
+        expect(result).toEqual({ active: false, verified: true });
     });
 
     it("retries against the sandbox host when production returns 404", async () => {
@@ -97,7 +97,38 @@ describe("verifySubscription", () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 })));
 
         const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
-        expect(result).toEqual({ active: false });
+        expect(result).toEqual({ active: false, verified: true });
+    });
+
+    it("returns inactive but unverified when the final host answers with a transient 5xx", async () => {
+        // Production 401 (pre-release, no prod presence) triggers the sandbox retry;
+        // sandbox itself then fails with a generic Apple-side error.
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(new Response(null, { status: 401 }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({ errorCode: 5000001, errorMessage: "An unknown error occurred. Please try again." }), { status: 500 }));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
+        expect(result).toEqual({ active: false, verified: false });
+    });
+
+    it("returns inactive but unverified when the production host answers with a transient 5xx (no sandbox retry)", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
+
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
+        expect(result).toEqual({ active: false, verified: false });
+    });
+
+    it("returns inactive and verified when the final host answers 404 (genuinely unknown transaction)", async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(new Response(null, { status: 404 }))
+            .mockResolvedValueOnce(new Response(null, { status: 404 }));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const result = await verifySubscription(TEST_ENV, "1000000000000001", "Production");
+        expect(result).toEqual({ active: false, verified: true });
     });
 
     it("does not upgrade environment when the client claims Sandbox but production host answers", async () => {
