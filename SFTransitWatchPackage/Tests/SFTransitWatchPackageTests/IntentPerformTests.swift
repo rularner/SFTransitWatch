@@ -1,7 +1,37 @@
+import AppIntents
 import CoreLocation
 import Foundation
 import Testing
 @testable import SFTransitWatchPackage
+
+// MARK: - IntentDialog text extraction
+
+/// `IntentDialog` has no public accessor for its literal text — it only conforms to
+/// `ExpressibleByStringLiteral`/`ExpressibleByStringInterpolation`, not
+/// `CustomStringConvertible`. Its single stored property (`storage`) bottoms out in a
+/// private Objective-C class (`LNStaticDeferredLocalizedString`) that Swift's `Mirror`
+/// cannot see into — that class has no Swift-visible stored properties, so a
+/// Mirror-only walk dead-ends and returns nothing. The text is only reachable through
+/// that class's own Cocoa `-description`, which is exactly what `String(describing:)`
+/// invokes: it renders as
+/// `...LocalizedStringResource(key: "<text>", defaultValue: ...)...`. That embeds a
+/// live memory address elsewhere in the dump (so comparing the *whole* description is
+/// unusable), but the `key: "..."` segment is stable, so we pull just that substring.
+///
+/// One more wrinkle: `LocalizedStringResource`'s key generation runs the literal
+/// through ICU MessageFormat escaping, which backslash-escapes apostrophes (`'` ->
+/// `\'`) because a bare `'` is an ICU quoting metacharacter — confirmed empirically
+/// against "You don't have any favorite stops..." below. Undo that escaping so the
+/// extracted text matches the original source literal exactly.
+private func literalText(from dialog: IntentDialog) -> String? {
+    let description = String(describing: dialog)
+    guard let keyStart = description.range(of: "key: \"")?.upperBound,
+          let keyEnd = description.range(of: "\", defaultValue:", range: keyStart..<description.endIndex)?.lowerBound
+    else {
+        return nil
+    }
+    return description[keyStart..<keyEnd].replacingOccurrences(of: "\\'", with: "'")
+}
 
 // MARK: - Tests
 
@@ -135,17 +165,23 @@ struct IntentPerformTests {
     @Test func favoriteArrival_noAPIKeyConfigured_performReturnsConfigureDialog() async throws {
         // apiKey already cleared in init()
         let intent = CheckFavoriteArrivalIntent()
-        _ = try await intent.perform()
-        // Dialog verification would require access to the IntentResult.dialog property;
-        // for now, verify the static dialogText function handles empty arrivals correctly
+        let result = try await intent.perform()
+        // `perform()`'s opaque `some IntentResult & ProvidesDialog` return type doesn't itself
+        // expose `.dialog` — `ProvidesDialog` is an empty marker protocol, and `dialog` is only
+        // reachable on the concrete `IntentResultContainer` struct that `.result(dialog:)`
+        // actually produces. Downcast to that concrete type to read it.
+        let concrete = try #require(result as? IntentResultContainer<Never, Never, Never, IntentDialog>)
+        let dialog = try #require(concrete.dialog)
+        #expect(literalText(from: dialog) == "Please configure your 511.org API key in SF Transit Watch settings.")
     }
 
     @Test func favoriteArrival_noFavorites_returnsNoFavoritesDialog() async throws {
         ConfigurationManager.shared.apiKey = "test-key"
         UserDefaults.standard.removeObject(forKey: "FavoriteStops")
         let intent = CheckFavoriteArrivalIntent()
-        _ = try await intent.perform()
-        // Dialog verification would require access to the IntentResult.dialog property;
-        // for now, verify the static dialogText function handles empty arrivals correctly
+        let result = try await intent.perform()
+        let concrete = try #require(result as? IntentResultContainer<Never, Never, Never, IntentDialog>)
+        let dialog = try #require(concrete.dialog)
+        #expect(literalText(from: dialog) == "You don't have any favorite stops yet. Add one in SF Transit Watch.")
     }
 }
