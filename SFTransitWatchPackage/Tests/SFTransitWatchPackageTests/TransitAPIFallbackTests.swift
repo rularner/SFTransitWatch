@@ -62,6 +62,46 @@ final class TransitAPIFallbackTests: XCTestCase {
         XCTAssertEqual(mockSession.requestCount(), 2, "Should retry after 401")
     }
 
+    /// When worker returns 401 during `fetchNearbyStops`, the private single-agency overload
+    /// must retry itself directly against 511.org, not re-enter the public multi-agency
+    /// overload. Regression test for a bug where the retry called
+    /// `fetchNearbyStops(...agencies:)` instead of `fetchNearbyStops(...agency:)`, which caused
+    /// a fresh `isLoading`/`errorMessage` pass and `withTaskGroup` for what should be a plain
+    /// self-retry — `isLoading` could flip to `false` mid-flight, and the nested call's
+    /// "couldn't reach any agency" `errorMessage` could survive even though the retry succeeded.
+    func testFetchNearbyStopsFallsBackToDirectModeOn401() async {
+        let workerURL = URL(string: "https://worker.example.com/")!
+        let directURL = URL(string: "https://api.511.org/")!
+
+        ConfigurationManager.shared.workerBaseURL = "https://worker.example.com"
+        ConfigurationManager.shared.workerToken = "worker-token"
+
+        // Worker returns 401
+        let workerResponse = HTTPURLResponse(url: workerURL, statusCode: 401, httpVersion: nil, headerFields: nil)!
+        mockSession.responses[workerURL] = (Data(), workerResponse)
+
+        // Direct mode succeeds with a non-empty stop
+        let xml = """
+        <StopPlaces>
+          <StopPlace>
+            <StopPlaceRef>15552</StopPlaceRef>
+            <StopPlaceName>Castro Station</StopPlaceName>
+            <Location><Latitude>37.762</Latitude><Longitude>-122.435</Longitude></Location>
+          </StopPlace>
+        </StopPlaces>
+        """.data(using: .utf8)!
+        let directResponse = HTTPURLResponse(url: directURL, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        mockSession.responses[directURL] = (xml, directResponse)
+
+        let stops = await api.fetchNearbyStops(latitude: 37.762, longitude: -122.435, agencies: ["SF"])
+
+        // Should have made exactly 2 requests: worker (401) then direct 511.org (success)
+        XCTAssertEqual(mockSession.requestCount(), 2, "Should retry after 401")
+        XCTAssertEqual(stops.count, 1, "retry's stop should make it back to the caller")
+        XCTAssertNil(api.errorMessage, "a successful retry should not leave the nested call's error message set")
+        XCTAssertFalse(api.isLoading, "isLoading should be false once the whole call completes")
+    }
+
     /// Missing API key shows proper error
     func testMissingAPIKeyShowsError() async {
         ConfigurationManager.shared.apiKey = ""

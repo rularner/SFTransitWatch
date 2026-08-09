@@ -164,7 +164,6 @@
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T002 /* BusStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T003 /* FavoritesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManagerTests.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitAPIParsingTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T010 /* SFTransitWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SFTransitWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = file.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		CAFE0000000000000000TS01 /* XCUISnapshotRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XCUISnapshotRunner.swift; sourceTree = "<group>"; };
@@ -370,7 +369,6 @@
 				CAFE0000000000000000T001 /* BusArrivalTests.swift */,
 				CAFE0000000000000000T002 /* BusStopTests.swift */,
 				CAFE0000000000000000T003 /* FavoritesManagerTests.swift */,
-				CAFE0000000000000000T004 /* TransitAPIParsingTests.swift */,
 			);
 			path = SFTransitWatchTests;
 			sourceTree = "<group>";
