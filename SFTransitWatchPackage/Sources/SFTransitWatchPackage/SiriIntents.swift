@@ -153,6 +153,12 @@ public struct CheckFavoriteArrivalIntent: AppIntent {
         guard let arrivals = await withTimeout(seconds: 8, operation: { await api.fetchArrivals(for: stop.id, agency: stop.agency) }) else {
             return .result(dialog: IntentDialog(stringLiteral: "Couldn't reach 511 right now, try again shortly."))
         }
+        // `fetchArrivals` never throws — it returns [] on every failure path (bad key, 429
+        // backoff, transport error) and records the failure on `errorMessage` instead. An
+        // empty array is only a genuine "no arrivals" case when `errorMessage` is nil.
+        guard api.errorMessage == nil else {
+            return .result(dialog: IntentDialog(stringLiteral: "Couldn't reach 511 right now, try again shortly."))
+        }
 
         return .result(dialog: IntentDialog(stringLiteral: Self.arrivalsDialogText(stopName: stop.name, arrivals: arrivals)))
     }
@@ -166,7 +172,10 @@ public struct CheckFavoriteArrivalIntent: AppIntent {
             return "The \(first.route) arrives at \(stopName) in \(first.minutesAway) minutes."
         }
         let second = sorted[1]
-        return "The \(first.route) arrives at \(stopName) in \(first.minutesAway) minutes, then \(second.minutesAway) minutes."
+        if second.route == first.route {
+            return "The \(first.route) arrives at \(stopName) in \(first.minutesAway) minutes, then \(second.minutesAway) minutes."
+        }
+        return "The \(first.route) arrives at \(stopName) in \(first.minutesAway) minutes, then the \(second.route) in \(second.minutesAway) minutes."
     }
 }
 
@@ -190,7 +199,11 @@ func resolveStop(from candidates: [BusStop], location: CLLocation?, disambiguati
         return .needsLocation
     }
     let sorted = candidates.sorted { $0.distance(to: location) < $1.distance(to: location) }
-    if sorted[1].distance(to: location) - sorted[0].distance(to: location) <= disambiguationThreshold {
+    // Compare the two nearest stops' distance *from each other*, not the delta of their
+    // distances from `location` — two stops on opposite sides of an intersection can be
+    // near-equidistant from the user while sitting far apart from each other, and two stops
+    // can be genuinely close together while one is much nearer to the user than the other.
+    if sorted[0].distance(to: sorted[1].location) <= disambiguationThreshold {
         return .ambiguous(sorted)
     }
     return .single(sorted[0])
@@ -247,12 +260,30 @@ public struct CheckRouteArrivalsIntent: AppIntent {
         }
 
         let api = TransitAPI()
-        var matching: [BusStop] = []
-        for favorite in favorites {
-            let routes = await api.fetchRoutes(for: favorite.id, agency: favorite.agency)
-            if routes.contains(where: { $0.caseInsensitiveCompare(routeNumber) == .orderedSame }) {
-                matching.append(favorite)
+        // fetchRoutes results are cached per stop/agency (TransitAPI.stopRoutesCache), but a
+        // cold cache still means one /StopTimetable round trip per favorite here — known
+        // limitation. Run them in parallel with a shared 8s timeout (matching the location and
+        // arrivals fetches below) so a large favorites list can't stall past every other
+        // timeout-guarded step in this intent.
+        guard let matching = await withTimeout(seconds: 8, operation: {
+            await withTaskGroup(of: (Int, BusStop?).self) { group in
+                for (index, favorite) in favorites.enumerated() {
+                    group.addTask {
+                        let routes = await api.fetchRoutes(for: favorite.id, agency: favorite.agency)
+                        let matches = routes.contains { $0.caseInsensitiveCompare(routeNumber) == .orderedSame }
+                        return (index, matches ? favorite : nil)
+                    }
+                }
+                var indexed: [(Int, BusStop)] = []
+                for await (index, stop) in group {
+                    if let stop {
+                        indexed.append((index, stop))
+                    }
+                }
+                return indexed.sorted { $0.0 < $1.0 }.map(\.1)
             }
+        }) else {
+            return .result(dialog: IntentDialog(stringLiteral: "Couldn't reach 511 right now, try again shortly."))
         }
         guard !matching.isEmpty else {
             return .result(dialog: IntentDialog(stringLiteral: "None of your favorite stops serve route \(routeNumber)."))
@@ -274,6 +305,13 @@ public struct CheckRouteArrivalsIntent: AppIntent {
         }
 
         guard let allArrivals = await withTimeout(seconds: 8, operation: { await api.fetchArrivals(for: stop.id, agency: stop.agency) }) else {
+            return .result(dialog: IntentDialog(stringLiteral: "Couldn't reach 511 right now, try again shortly."))
+        }
+        // `fetchArrivals` never throws — it returns [] on every failure path (bad key, 429
+        // backoff, transport error) and records the failure on `errorMessage` instead. An
+        // empty/route-filtered-empty result is only a genuine "no arrivals" case when
+        // `errorMessage` is nil.
+        guard api.errorMessage == nil else {
             return .result(dialog: IntentDialog(stringLiteral: "Couldn't reach 511 right now, try again shortly."))
         }
         let routeArrivals = allArrivals.filter { $0.route.caseInsensitiveCompare(routeNumber) == .orderedSame }

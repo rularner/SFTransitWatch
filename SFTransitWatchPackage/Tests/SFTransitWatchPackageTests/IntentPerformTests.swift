@@ -162,6 +162,27 @@ struct IntentPerformTests {
         #expect(text == "The 22 arrives at Market & 4th in 4 minutes, then 19 minutes.")
     }
 
+    @Test func favoriteArrival_twoArrivalsSameRoute_keepsShortForm() async throws {
+        // A favorited stop's top-two-by-time can coincidentally be the same route (this is
+        // just the existing "speaksBoth" case restated to sit next to the different-route
+        // test below for contrast).
+        let now = Date()
+        let first = BusArrival(route: "22", destination: "Fillmore", arrivalTime: now.addingTimeInterval(240), now: now)
+        let second = BusArrival(route: "22", destination: "Downtown", arrivalTime: now.addingTimeInterval(420), now: now)
+        let text = CheckFavoriteArrivalIntent.arrivalsDialogText(stopName: "Market & 4th", arrivals: [first, second])
+        #expect(text == "The 22 arrives at Market & 4th in 4 minutes, then 7 minutes.")
+    }
+
+    @Test func favoriteArrival_twoArrivalsDifferentRoutes_namesSecondRoute() async throws {
+        // A favorited stop isn't filtered by route, so the top-two-by-time can be two
+        // different routes — the dialog must not imply the second arrival is also `first.route`.
+        let now = Date()
+        let first = BusArrival(route: "22", destination: "Fillmore", arrivalTime: now.addingTimeInterval(240), now: now)
+        let second = BusArrival(route: "5", destination: "Downtown", arrivalTime: now.addingTimeInterval(420), now: now)
+        let text = CheckFavoriteArrivalIntent.arrivalsDialogText(stopName: "Market & 4th", arrivals: [first, second])
+        #expect(text == "The 22 arrives at Market & 4th in 4 minutes, then the 5 in 7 minutes.")
+    }
+
     @Test func favoriteArrival_noAPIKeyConfigured_performReturnsConfigureDialog() async throws {
         // apiKey already cleared in init()
         let intent = CheckFavoriteArrivalIntent()
@@ -253,6 +274,24 @@ struct IntentPerformTests {
             return
         }
         #expect(candidates.map(\.id) == ["a", "b"])
+    }
+
+    @Test func resolveStop_farApartButRoughlyEquidistantFromUser_returnsSingleNotAmbiguous() async throws {
+        // Distinguishes the corrected stop-to-stop distance rule from the old (buggy) rule
+        // that compared the *delta* between each candidate's distance from the user. These two
+        // stops are ~400m apart from each other (well over the 50m threshold) but each is only
+        // ~200m from the user, so the delta between their distances-from-user is tiny — under
+        // the old logic that delta alone would have triggered `.ambiguous`. Under the corrected
+        // rule (distance between the stops themselves) this must resolve to `.single`, proving
+        // the fix actually changed behavior rather than just being cosmetic.
+        let east = BusStop(id: "east", name: "East", code: "E", latitude: 37.70000, longitude: -122.397729)
+        let west = BusStop(id: "west", name: "West", code: "W", latitude: 37.70000, longitude: -122.402271)
+        let userLocation = CLLocation(latitude: 37.70000, longitude: -122.40000)
+        let resolution = resolveStop(from: [east, west], location: userLocation)
+        guard case .single = resolution else {
+            Issue.record("expected .single, got \(resolution)")
+            return
+        }
     }
 
     // MARK: - CheckRouteArrivalsIntent — resolveDirection
