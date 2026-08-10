@@ -28,6 +28,9 @@ jobs:
       statuses: read
       checks: write
       pull-requests: read
+    concurrency:
+      group: xcode-gate-${{ github.event.pull_request.head.sha || github.event.sha }}
+      cancel-in-progress: false
     steps:
       - name: Skip if this status event isn't one we watch
         id: relevant_event
