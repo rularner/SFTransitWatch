@@ -24,6 +24,15 @@ public class LocationManager: NSObject, ObservableObject {
         locationManager.headingFilter = 5
         #endif
 
+        // Seed synchronously from CLLocationManager's own status rather than waiting on
+        // the delegate's didChangeAuthorization callback. A freshly-constructed instance
+        // (e.g. one made per Siri intent invocation in SiriIntents.swift) calls
+        // currentLocationOnce() immediately with no suspension point beforehand, so the
+        // delegate never gets a run-loop turn to fire before the isAuthorized check runs —
+        // leaving authorizationStatus stuck at its .notDetermined default and making
+        // currentLocationOnce() report "unauthorized" even when access was actually granted.
+        authorizationStatus = locationManager.authorizationStatus
+
         if SnapshotMode.isActive {
             currentLocation = SnapshotMode.fixedLocation
         }

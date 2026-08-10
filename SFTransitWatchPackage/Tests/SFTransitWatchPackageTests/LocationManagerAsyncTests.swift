@@ -7,6 +7,19 @@ import CoreLocation
 @MainActor
 struct LocationManagerAsyncTests {
 
+    // Regression test for a bug where Siri intents (which construct a fresh LocationManager
+    // per invocation, see SiriIntents.swift) always got "enable location access" even when
+    // permission had actually been granted: authorizationStatus defaulted to .notDetermined
+    // and was only ever updated by the async didChangeAuthorization delegate callback, which
+    // never got a run-loop turn before the synchronous isAuthorized check in
+    // currentLocationOnce() ran. init() must seed authorizationStatus synchronously from
+    // CLLocationManager's own instance property instead of relying on that callback.
+    @Test func init_seedsAuthorizationStatusSynchronously() {
+        let manager = LocationManager()
+        let expected = CLLocationManager().authorizationStatus
+        #expect(manager.authorizationStatus == expected)
+    }
+
     @Test func unauthorized_returnsNilImmediately() async {
         let manager = LocationManager()
         manager.authorizationStatus = .notDetermined
