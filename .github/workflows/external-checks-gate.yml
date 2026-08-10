@@ -19,6 +19,14 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
   status: {}
+  # Xcode Cloud's per-platform test actions and Cloudflare's Workers Build both report as Check
+  # Runs, not Commit Statuses, so `on: status` alone never re-fires this workflow once they
+  # complete. Cloudflare in particular has no separate "aggregate" Commit Status the way Xcode
+  # Cloud's top-level "Test Run" context does, so without this trigger cloudflare-gate can never
+  # be re-evaluated after its one PR-open-time run. The `if:` conditions below allowlist by exact
+  # check-run name so this never re-triggers on the check runs this workflow writes itself.
+  check_run:
+    types: [completed]
 
 jobs:
   xcode-gate:
@@ -29,11 +37,12 @@ jobs:
       checks: write
       pull-requests: read
     concurrency:
-      group: xcode-gate-${{ github.event.pull_request.head.sha || github.event.sha }}
+      group: xcode-gate-${{ github.event.pull_request.head.sha || github.event.check_run.head_sha || github.event.sha }}
       cancel-in-progress: false
     if: >-
-      github.event_name != 'status' ||
-      contains(fromJSON('["SFTransitWatch | Test Run","SFTransitWatch | Test Run | Test - iOS","SFTransitWatch | Test Run | Test - watchOS"]'), github.event.context)
+      (github.event_name != 'status' && github.event_name != 'check_run') ||
+      (github.event_name == 'status' && contains(fromJSON('["SFTransitWatch | Test Run","SFTransitWatch | Test Run | Test - iOS","SFTransitWatch | Test Run | Test - watchOS"]'), github.event.context)) ||
+      (github.event_name == 'check_run' && contains(fromJSON('["SFTransitWatch | Test Run | Test - iOS","SFTransitWatch | Test Run | Test - watchOS"]'), github.event.check_run.name))
     steps:
       - name: Resolve target SHA and base ref
         id: target
@@ -44,7 +53,11 @@ jobs:
             SHA="${{ github.event.pull_request.head.sha }}"
             BASE_REF="${{ github.event.pull_request.base.ref }}"
           else
-            SHA="${{ github.event.sha }}"
+            if [ "${{ github.event_name }}" = "check_run" ]; then
+              SHA="${{ github.event.check_run.head_sha }}"
+            else
+              SHA="${{ github.event.sha }}"
+            fi
             PR_JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
               --jq "[.[] | select(.state == \"open\" and .head.sha == \"$SHA\")][0]")
             if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
@@ -182,11 +195,12 @@ jobs:
       checks: write
       pull-requests: read
     concurrency:
-      group: cloudflare-gate-${{ github.event.pull_request.head.sha || github.event.sha }}
+      group: cloudflare-gate-${{ github.event.pull_request.head.sha || github.event.check_run.head_sha || github.event.sha }}
       cancel-in-progress: false
     if: >-
-      github.event_name != 'status' ||
-      github.event.context == 'Workers Builds: sftransitwatch'
+      (github.event_name != 'status' && github.event_name != 'check_run') ||
+      (github.event_name == 'status' && github.event.context == 'Workers Builds: sftransitwatch') ||
+      (github.event_name == 'check_run' && github.event.check_run.name == 'Workers Builds: sftransitwatch')
     steps:
       - name: Resolve target SHA and base ref
         id: target
@@ -197,7 +211,11 @@ jobs:
             SHA="${{ github.event.pull_request.head.sha }}"
             BASE_REF="${{ github.event.pull_request.base.ref }}"
           else
-            SHA="${{ github.event.sha }}"
+            if [ "${{ github.event_name }}" = "check_run" ]; then
+              SHA="${{ github.event.check_run.head_sha }}"
+            else
+              SHA="${{ github.event.sha }}"
+            fi
             PR_JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
               --jq "[.[] | select(.state == \"open\" and .head.sha == \"$SHA\")][0]")
             if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
