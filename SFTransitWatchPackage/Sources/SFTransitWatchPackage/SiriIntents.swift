@@ -271,6 +271,62 @@ func favoritesServingRoute(
     return nil
 }
 
+/// Starts one arrivals lookup per favorite in parallel and waits up to `timeout` seconds for
+/// every lookup to report in, returning `(stop, matchingArrivals)` pairs — in original favorite
+/// order — for every favorite with at least one arrival whose destination matches `direction`,
+/// or `nil` if the deadline passes first.
+///
+/// Mirrors `favoritesServingRoute`'s unstructured-Task/AsyncStream/deadline-as-stream-element
+/// design and for the same reason: cancelling an in-flight `fetchArrivals` call when the
+/// deadline wins would risk landing a stale/empty result in `TransitAPI`'s arrivals cache.
+/// Hitting the deadline abandons only the *wait* — lookups keep running to completion.
+@MainActor
+func favoritesWithArrivalsInDirection(
+    among favorites: [BusStop],
+    direction: String,
+    timeout: TimeInterval,
+    fetchArrivals: @escaping @Sendable @MainActor (BusStop) async -> [BusArrival]
+) async -> [(stop: BusStop, arrivals: [BusArrival])]? {
+    enum Report: Sendable {
+        case lookup(index: Int, stop: BusStop, matches: [BusArrival])
+        case deadline
+    }
+
+    guard !favorites.isEmpty else { return [] }
+
+    let (stream, continuation) = AsyncStream<Report>.makeStream()
+    for (index, favorite) in favorites.enumerated() {
+        Task { @MainActor in
+            let arrivals = await fetchArrivals(favorite)
+            let matches = arrivals.filter { $0.destination.caseInsensitiveCompare(direction) == .orderedSame }
+            continuation.yield(.lookup(index: index, stop: favorite, matches: matches))
+        }
+    }
+    let timer = Task {
+        try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+        continuation.yield(.deadline)
+    }
+    defer { timer.cancel() }
+
+    var results: [(index: Int, stop: BusStop, arrivals: [BusArrival])] = []
+    var reported = 0
+    for await report in stream {
+        switch report {
+        case .deadline:
+            return nil
+        case .lookup(let index, let stop, let matches):
+            if !matches.isEmpty {
+                results.append((index, stop, matches))
+            }
+            reported += 1
+            if reported == favorites.count {
+                return results.sorted { $0.index < $1.index }.map { ($0.stop, $0.arrivals) }
+            }
+        }
+    }
+    return nil
+}
+
 enum DirectionResolution {
     case resolved(String)
     case noMatch(available: [String])
@@ -322,6 +378,55 @@ public struct CheckRouteArrivalsIntent: AppIntent {
         }
 
         let api = TransitAPI()
+
+        // Caltrain has no rider-facing "route number" — 511.org's LineRef for it is a
+        // service-pattern name (e.g. "L LOCAL"), not something anyone would say to Siri.
+        // Bus/Muni riders naturally answer Siri's "what route?" prompt with a number or
+        // letter, but Caltrain riders naturally answer with a direction. Recognize that
+        // answer and look up by direction instead of failing to match a route.
+        if let requestedDirection = TransitJSON.caltrainDirectionLabels.first(where: {
+            $0.caseInsensitiveCompare(routeNumber) == .orderedSame
+        }) {
+            let caltrainFavorites = favorites.filter { $0.agency == TransitAgencyChoice.caltrain.rawValue }
+            guard !caltrainFavorites.isEmpty else {
+                return .result(dialog: IntentDialog(stringLiteral: "You don't have any favorite Caltrain stops."))
+            }
+
+            guard let matches = await favoritesWithArrivalsInDirection(
+                among: caltrainFavorites,
+                direction: requestedDirection,
+                timeout: 8,
+                fetchArrivals: { await api.fetchArrivals(for: $0.id, agency: $0.agency) }
+            ) else {
+                return .result(dialog: IntentDialog(stringLiteral: "Couldn't reach 511 right now, try again shortly."))
+            }
+            guard !matches.isEmpty else {
+                return .result(dialog: IntentDialog(stringLiteral: "None of your favorite Caltrain stops have \(requestedDirection.lowercased()) arrivals right now."))
+            }
+
+            let location = matches.count > 1 ? await LocationManager().currentLocationOnce(timeout: 8) : nil
+            let chosen: (stop: BusStop, arrivals: [BusArrival])
+            switch resolveStop(from: matches.map(\.stop), location: location) {
+            case .single(let resolved):
+                chosen = matches.first { $0.stop.id == resolved.id }!
+            case .needsLocation:
+                return .result(dialog: IntentDialog(stringLiteral: "Enable location access for SF Transit Watch to use this."))
+            case .ambiguous(let candidates):
+                let chosenName = try await $stopChoice.requestDisambiguation(
+                    among: candidates.map { $0.name },
+                    dialog: IntentDialog(stringLiteral: "Which stop?")
+                )
+                let resolvedStop = candidates.first { $0.name == chosenName } ?? candidates[0]
+                chosen = matches.first { $0.stop.id == resolvedStop.id }!
+            }
+
+            return .result(dialog: IntentDialog(stringLiteral: Self.directionArrivalsDialogText(
+                direction: requestedDirection,
+                stopName: chosen.stop.name,
+                arrivals: chosen.arrivals
+            )))
+        }
+
         // fetchRoutes results are cached per stop/agency (TransitAPI.stopRoutesCache), but a
         // cold cache still means one /StopTimetable round trip per favorite here — known
         // limitation. Run them in parallel with a shared 8s deadline (matching the location and
@@ -406,5 +511,17 @@ public struct CheckRouteArrivalsIntent: AppIntent {
         }
         let second = sorted[1]
         return "The \(routeNumber) at \(stopName) arrives in \(first.minutesAway) minutes, then \(second.minutesAway) minutes."
+    }
+
+    static func directionArrivalsDialogText(direction: String, stopName: String, arrivals: [BusArrival]) -> String {
+        let sorted = arrivals.sorted { $0.arrivalTime < $1.arrivalTime }
+        guard let first = sorted.first else {
+            return "No upcoming \(direction.lowercased()) arrivals for \(stopName) right now."
+        }
+        if sorted.count == 1 {
+            return "The next \(direction.lowercased()) train at \(stopName) arrives in \(first.minutesAway) minutes."
+        }
+        let second = sorted[1]
+        return "The next \(direction.lowercased()) train at \(stopName) arrives in \(first.minutesAway) minutes, then \(second.minutesAway) minutes."
     }
 }

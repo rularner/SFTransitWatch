@@ -5,6 +5,11 @@ public struct SiriShortcutsView: View {
 
     public var body: some View {
         List {
+            Section(header: Text("Hands-free")) {
+                SiriPhraseRow(phrase: "What's my next bus in SF Transit Watch")
+                SiriPhraseRow(phrase: "Check route arrivals in SF Transit Watch")
+            }
+
             Section(header: Text("Say to Siri")) {
                 SiriPhraseRow(phrase: "Find nearby stops in SF Transit Watch")
                 SiriPhraseRow(phrase: "Check bus times in SF Transit Watch")
@@ -14,16 +19,11 @@ public struct SiriShortcutsView: View {
                 SiriPhraseRow(phrase: "Nearby transit in SF Transit Watch")
             }
 
-            Section(header: Text("Hands-free")) {
-                SiriPhraseRow(phrase: "What's my next bus in SF Transit Watch")
-                SiriPhraseRow(phrase: "Check route arrivals in SF Transit Watch")
-            }
-
             Section(header: Text("How it works")) {
-                Text("The first set of phrases opens SF Transit Watch directly to the relevant screen. No setup required — they work as soon as the app is installed.")
+                Text("The hands-free phrases speak the answer out loud without opening the app. After saying the phrase, Siri will ask you to specify the route or direction if needed.")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("The hands-free phrases speak the answer out loud without opening the app. After saying the phrase, Siri will ask you to specify the route or direction if needed.")
+                Text("The other phrases open SF Transit Watch directly to the relevant screen. No setup required — they work as soon as the app is installed.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
