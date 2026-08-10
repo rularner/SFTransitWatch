@@ -26,7 +26,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # 1. Get the latest run on main
-          LATEST_RUN=$(gh run list --branch main --limit 1 --json databaseId,status,conclusion,url -q '.[0]')
+          #
+          # --event push is required: `on: status`-triggered workflows (e.g. External Checks
+          # Gate, which fires on every third-party status update for any open PR) always get
+          # attributed to the default branch by GitHub, not the branch the status was actually
+          # for. Without this filter, `gh run list --branch main` intermittently picks up one of
+          # those runs mid-flight and this gate falsely reports "main is currently deploying".
+          LATEST_RUN=$(gh run list --branch main --event push --limit 1 --json databaseId,status,conclusion,url -q '.[0]')
 
           if [ -z "$LATEST_RUN" ] || [ "$LATEST_RUN" = "null" ]; then
             echo "No workflow runs found on main yet; skipping gate."

@@ -44,6 +44,7 @@
 		CAFE0000000000000000CT20 /* SFTransitWatchPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 84F0010100000000000010B1 /* SFTransitWatchPackage */; };
 		CAFE0000000000000000E001 /* BusJourneyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000E002 /* BusJourneyView.swift */; };
 		CAFE0000000000000000S001 /* WatchSiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S002 /* WatchSiriManager.swift */; };
+		CAFE0000000000000000S003 /* PhoneSiriManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFE0000000000000000S004 /* PhoneSiriManager.swift */; };
 		CAFE000000000000PRIV002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
 		CAFE000000000000PRIV003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
 		CAFE000000000000PRIV004 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CAFE000000000000PRIV001 /* PrivacyInfo.xcprivacy */; };
@@ -159,8 +160,9 @@
 		CAFE0000000000000000CT14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CAFE0000000000000000CT15 /* SFTransitWatch Complication.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SFTransitWatch Complication.entitlements"; sourceTree = "<group>"; };
 		CAFE0000000000000000E002 /* BusJourneyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusJourneyView.swift; sourceTree = "<group>"; };
-		CAFE0000000000000000ENT0 /* SFTransitWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SFTransitWatch.entitlements; sourceTree = "<group>"; };
 		CAFE0000000000000000S002 /* WatchSiriManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSiriManager.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000S004 /* PhoneSiriManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSiriManager.swift; sourceTree = "<group>"; };
+		CAFE0000000000000000ENT0 /* SFTransitWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SFTransitWatch.entitlements; sourceTree = "<group>"; };
 		CAFE0000000000000000T001 /* BusArrivalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusArrivalTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T002 /* BusStopTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusStopTests.swift; sourceTree = "<group>"; };
 		CAFE0000000000000000T003 /* FavoritesManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManagerTests.swift; sourceTree = "<group>"; };
@@ -333,6 +335,7 @@
 				CAFE0000000000000000E002 /* BusJourneyView.swift */,
 				CAFE000000000000000020B9 /* SettingsView.swift */,
 				CAFE000000000000000015E0 /* SiriManager.swift */,
+				CAFE0000000000000000S004 /* PhoneSiriManager.swift */,
 				CAFE000000000000000020FB /* PhoneSession.swift */,
 				CAFE000000000000000020BC /* Assets.xcassets */,
 				CAFE000000000000000020BE /* Info.plist */,
@@ -720,6 +723,7 @@
 				CAFE0000000000000000E001 /* BusJourneyView.swift in Sources */,
 				CAFE000000000000000020A9 /* SettingsView.swift in Sources */,
 				CAFE000000000000000015EA /* SiriManager.swift in Sources */,
+				CAFE0000000000000000S003 /* PhoneSiriManager.swift in Sources */,
 				CAFE000000000000000020FA /* PhoneSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

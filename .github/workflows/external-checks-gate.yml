@@ -92,8 +92,26 @@ jobs:
 
           SHA="${{ steps.target.outputs.sha }}"
           COMBINED=$(gh api "repos/${{ github.repository }}/commits/$SHA/status")
+          CHECK_RUNS=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs")
+          # Xcode Cloud reports the top-level "Test Run" context via the Commit Status API, but
+          # reports the per-platform "Test - iOS" / "Test - watchOS" actions as Check Runs
+          # instead -- they never show up in .statuses[]. Check both APIs so neither source of
+          # truth is silently treated as "still pending" forever.
           get_state() {
-            echo "$COMBINED" | jq -r --arg ctx "$1" '.statuses[] | select(.context == $ctx) | .state'
+            local ctx="$1" state
+            state=$(echo "$COMBINED" | jq -r --arg ctx "$ctx" '.statuses[] | select(.context == $ctx) | .state' | head -n1)
+            if [ -n "$state" ]; then
+              echo "$state"
+              return
+            fi
+            echo "$CHECK_RUNS" | jq -r --arg ctx "$ctx" '
+              .check_runs[] | select(.name == $ctx) |
+              if .status != "completed" then "pending"
+              elif .conclusion == "success" then "success"
+              elif (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled" or .conclusion == "action_required") then "failure"
+              else "pending"
+              end
+            ' | head -n1
           }
           S1=$(get_state "SFTransitWatch | Test Run")
           S2=$(get_state "SFTransitWatch | Test Run | Test - iOS")
@@ -226,7 +244,21 @@ jobs:
 
           SHA="${{ steps.target.outputs.sha }}"
           COMBINED=$(gh api "repos/${{ github.repository }}/commits/$SHA/status")
-          STATE=$(echo "$COMBINED" | jq -r '.statuses[] | select(.context == "Workers Builds: sftransitwatch") | .state')
+          STATE=$(echo "$COMBINED" | jq -r '.statuses[] | select(.context == "Workers Builds: sftransitwatch") | .state' | head -n1)
+          # Cloudflare has been observed reporting this context as a Check Run in some cases
+          # instead of a Commit Status -- same gotcha as Xcode Cloud's per-platform test actions.
+          # Fall back to the Checks API so a Check Run source doesn't read as "always pending".
+          if [ -z "$STATE" ]; then
+            CHECK_RUNS=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs")
+            STATE=$(echo "$CHECK_RUNS" | jq -r '
+              .check_runs[] | select(.name == "Workers Builds: sftransitwatch") |
+              if .status != "completed" then "pending"
+              elif .conclusion == "success" then "success"
+              elif (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled" or .conclusion == "action_required") then "failure"
+              else "pending"
+              end
+            ' | head -n1)
+          fi
 
           case "$STATE" in
             success)
