@@ -1,0 +1,275 @@
+name: External Checks Gate
+
+# Replaces shim-required-checks.yml. Xcode Cloud and Cloudflare Workers Builds report via
+# GitHub's Commit Status API and skip posting entirely when a push/PR doesn't touch their
+# relevant files. The repo's Ruleset pins each required check to its specific reporting app
+# (Xcode Cloud's integration, Cloudflare's), so a synthetic status posted under their context
+# name from a GitHub Actions workflow no longer satisfies it -- same context, wrong app.
+#
+# Each job here publishes its OWN Checks API check run instead, which is always sourced by the
+# "GitHub Actions" app. It mirrors the real external system's live status when the changed files
+# are relevant to that system, or reports success immediately when they aren't (replacing the
+# old shim's skip logic). See docs/superpowers/specs/2026-08-09-external-checks-gate-design.md.
+#
+# Keep the relevance patterns below in sync by hand with:
+#   - Cloudflare dashboard -> Workers & Pages -> sftransitwatch -> Settings -> Builds -> Build watch paths
+#   - App Store Connect -> Xcode Cloud -> SFTransitWatch workflow -> Start Conditions
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  status: {}
+
+jobs:
+  xcode-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: read
+      checks: write
+      pull-requests: read
+    concurrency:
+      group: xcode-gate-${{ github.event.pull_request.head.sha || github.event.sha }}
+      cancel-in-progress: false
+    if: >-
+      github.event_name != 'status' ||
+      contains(fromJSON('["SFTransitWatch | Test Run","SFTransitWatch | Test Run | Test - iOS","SFTransitWatch | Test Run | Test - watchOS"]'), github.event.context)
+    steps:
+      - name: Resolve target SHA and base ref
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SHA="${{ github.event.pull_request.head.sha }}"
+            BASE_REF="${{ github.event.pull_request.base.ref }}"
+          else
+            SHA="${{ github.event.sha }}"
+            PR_JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
+              --jq "[.[] | select(.state == \"open\" and .head.sha == \"$SHA\")][0]")
+            if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
+              echo "No open PR found for $SHA -- nothing to gate."
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            BASE_REF=$(echo "$PR_JSON" | jq -r '.base.ref')
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.target.outputs.found == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          fetch-depth: 0
+
+      - name: List changed files
+        if: steps.target.outputs.found == 'true'
+        run: |
+          MERGE_BASE=$(git merge-base "origin/${{ steps.target.outputs.base_ref }}" "${{ steps.target.outputs.sha }}")
+          git diff --name-only "$MERGE_BASE" "${{ steps.target.outputs.sha }}" > /tmp/xcode-changed-files.txt
+          echo "--- changed files (vs merge-base $MERGE_BASE) ---"
+          cat /tmp/xcode-changed-files.txt
+
+      - name: Decide gate result
+        if: steps.target.outputs.found == 'true'
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          IRRELEVANT_PATTERN='^(AwsLambda/|CloudflareWorker/|docs/|\.github/|CLAUDE\.md$|LICENSE$|LICENSE\..*$|README\.md$|TODO\.md$|build\.log$|\.gitignore$|\.gitattributes$|\.editorconfig$)'
+          RELEVANT_FILES=$(grep -vE "$IRRELEVANT_PATTERN" /tmp/xcode-changed-files.txt || true)
+
+          if [ -z "$RELEVANT_FILES" ]; then
+            echo "status=completed" >> "$GITHUB_OUTPUT"
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+            echo "title=No Xcode-relevant changes" >> "$GITHUB_OUTPUT"
+            echo "summary=No changed files matched Xcode Cloud's relevant path filters -- skipped." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SHA="${{ steps.target.outputs.sha }}"
+          COMBINED=$(gh api "repos/${{ github.repository }}/commits/$SHA/status")
+          get_state() {
+            echo "$COMBINED" | jq -r --arg ctx "$1" '.statuses[] | select(.context == $ctx) | .state'
+          }
+          S1=$(get_state "SFTransitWatch | Test Run")
+          S2=$(get_state "SFTransitWatch | Test Run | Test - iOS")
+          S3=$(get_state "SFTransitWatch | Test Run | Test - watchOS")
+
+          OVERALL="success"
+          for S in "$S1" "$S2" "$S3"; do
+            if [ "$S" = "failure" ] || [ "$S" = "error" ]; then
+              OVERALL="failure"
+              break
+            elif [ -z "$S" ] || [ "$S" = "pending" ]; then
+              OVERALL="pending"
+            fi
+          done
+
+          SUMMARY="Test Run: ${S1:-missing}, iOS: ${S2:-missing}, watchOS: ${S3:-missing}"
+          case "$OVERALL" in
+            success)
+              echo "status=completed" >> "$GITHUB_OUTPUT"
+              echo "conclusion=success" >> "$GITHUB_OUTPUT"
+              echo "title=Xcode Cloud checks passed" >> "$GITHUB_OUTPUT"
+              ;;
+            failure)
+              echo "status=completed" >> "$GITHUB_OUTPUT"
+              echo "conclusion=failure" >> "$GITHUB_OUTPUT"
+              echo "title=Xcode Cloud checks failed" >> "$GITHUB_OUTPUT"
+              ;;
+            pending)
+              echo "status=in_progress" >> "$GITHUB_OUTPUT"
+              echo "title=Waiting on Xcode Cloud" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+          echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+
+      - name: Write check run
+        if: steps.target.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          SHA="${{ steps.target.outputs.sha }}"
+          NAME="Xcode Cloud Gate"
+          STATUS="${{ steps.decide.outputs.status }}"
+          CONCLUSION="${{ steps.decide.outputs.conclusion }}"
+          TITLE="${{ steps.decide.outputs.title }}"
+          SUMMARY="${{ steps.decide.outputs.summary }}"
+
+          EXISTING_ID=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" \
+            --jq ".check_runs[] | select(.name == \"$NAME\") | .id" | head -n1)
+
+          ARGS=(-f "name=$NAME" -f "head_sha=$SHA" -f "status=$STATUS" \
+            -f "output[title]=$TITLE" -f "output[summary]=$SUMMARY")
+          if [ "$STATUS" = "completed" ]; then
+            ARGS+=(-f "conclusion=$CONCLUSION")
+          fi
+
+          if [ -n "$EXISTING_ID" ]; then
+            gh api "repos/${{ github.repository }}/check-runs/$EXISTING_ID" -X PATCH "${ARGS[@]}"
+          else
+            gh api "repos/${{ github.repository }}/check-runs" -X POST "${ARGS[@]}"
+          fi
+
+  cloudflare-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: read
+      checks: write
+      pull-requests: read
+    concurrency:
+      group: cloudflare-gate-${{ github.event.pull_request.head.sha || github.event.sha }}
+      cancel-in-progress: false
+    if: >-
+      github.event_name != 'status' ||
+      github.event.context == 'Workers Builds: sftransitwatch'
+    steps:
+      - name: Resolve target SHA and base ref
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SHA="${{ github.event.pull_request.head.sha }}"
+            BASE_REF="${{ github.event.pull_request.base.ref }}"
+          else
+            SHA="${{ github.event.sha }}"
+            PR_JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
+              --jq "[.[] | select(.state == \"open\" and .head.sha == \"$SHA\")][0]")
+            if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
+              echo "No open PR found for $SHA -- nothing to gate."
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            BASE_REF=$(echo "$PR_JSON" | jq -r '.base.ref')
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.target.outputs.found == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          fetch-depth: 0
+
+      - name: List changed files
+        if: steps.target.outputs.found == 'true'
+        run: |
+          MERGE_BASE=$(git merge-base "origin/${{ steps.target.outputs.base_ref }}" "${{ steps.target.outputs.sha }}")
+          git diff --name-only "$MERGE_BASE" "${{ steps.target.outputs.sha }}" > /tmp/cloudflare-changed-files.txt
+          echo "--- changed files (vs merge-base $MERGE_BASE) ---"
+          cat /tmp/cloudflare-changed-files.txt
+
+      - name: Decide gate result
+        if: steps.target.outputs.found == 'true'
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEVANT_FILES=$(grep -E '^CloudflareWorker/' /tmp/cloudflare-changed-files.txt || true)
+
+          if [ -z "$RELEVANT_FILES" ]; then
+            echo "status=completed" >> "$GITHUB_OUTPUT"
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+            echo "title=No Cloudflare-relevant changes" >> "$GITHUB_OUTPUT"
+            echo "summary=No changed files under CloudflareWorker/ -- skipped." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SHA="${{ steps.target.outputs.sha }}"
+          COMBINED=$(gh api "repos/${{ github.repository }}/commits/$SHA/status")
+          STATE=$(echo "$COMBINED" | jq -r '.statuses[] | select(.context == "Workers Builds: sftransitwatch") | .state')
+
+          case "$STATE" in
+            success)
+              echo "status=completed" >> "$GITHUB_OUTPUT"
+              echo "conclusion=success" >> "$GITHUB_OUTPUT"
+              echo "title=Cloudflare Workers build passed" >> "$GITHUB_OUTPUT"
+              ;;
+            failure|error)
+              echo "status=completed" >> "$GITHUB_OUTPUT"
+              echo "conclusion=failure" >> "$GITHUB_OUTPUT"
+              echo "title=Cloudflare Workers build failed" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "status=in_progress" >> "$GITHUB_OUTPUT"
+              echo "title=Waiting on Cloudflare Workers build" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+          echo "summary=Workers Builds: sftransitwatch state: ${STATE:-missing}" >> "$GITHUB_OUTPUT"
+
+      - name: Write check run
+        if: steps.target.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          SHA="${{ steps.target.outputs.sha }}"
+          NAME="Cloudflare Gate"
+          STATUS="${{ steps.decide.outputs.status }}"
+          CONCLUSION="${{ steps.decide.outputs.conclusion }}"
+          TITLE="${{ steps.decide.outputs.title }}"
+          SUMMARY="${{ steps.decide.outputs.summary }}"
+
+          EXISTING_ID=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" \
+            --jq ".check_runs[] | select(.name == \"$NAME\") | .id" | head -n1)
+
+          ARGS=(-f "name=$NAME" -f "head_sha=$SHA" -f "status=$STATUS" \
+            -f "output[title]=$TITLE" -f "output[summary]=$SUMMARY")
+          if [ "$STATUS" = "completed" ]; then
+            ARGS+=(-f "conclusion=$CONCLUSION")
+          fi
+
+          if [ -n "$EXISTING_ID" ]; then
+            gh api "repos/${{ github.repository }}/check-runs/$EXISTING_ID" -X PATCH "${ARGS[@]}"
+          else
+            gh api "repos/${{ github.repository }}/check-runs" -X POST "${ARGS[@]}"
+          fi
