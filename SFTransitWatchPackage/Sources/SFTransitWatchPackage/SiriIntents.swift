@@ -209,6 +209,68 @@ func resolveStop(from candidates: [BusStop], location: CLLocation?, disambiguati
     return .single(sorted[0])
 }
 
+/// Starts one route lookup per favorite in parallel and waits up to `timeout` seconds for
+/// every lookup to report in, returning the favorites that serve `routeNumber` (in their
+/// original order) — or `nil` if the deadline passes first.
+///
+/// Deliberately *not* built on `withTimeout`/`withTaskGroup`. A task group's timeout race
+/// has to call `group.cancelAll()` to let the group's scope close, and that cancels the
+/// still-in-flight lookups too. That's actively harmful here: `TransitAPI.fetchRoutes`
+/// swallows a cancelled `URLSession` request as `[]` and then writes that `[]` into
+/// `StopRoutesCache` with a 7-day TTL, so one slow-network Siri invocation could leave a
+/// stop cached as "serves no routes" for a week. Instead the lookups are unstructured
+/// `Task`s (which never inherit cancellation from their spawning context and which nothing
+/// here ever cancels) reporting through an `AsyncStream`, and the deadline is just another
+/// element in that same stream. Hitting the deadline abandons the *wait* — the lookups keep
+/// running to completion in the background and cache whatever the real answer turns out to
+/// be. The only task this cancels is its own sleeping timer.
+@MainActor
+func favoritesServingRoute(
+    among favorites: [BusStop],
+    routeNumber: String,
+    timeout: TimeInterval,
+    fetchRoutes: @escaping @Sendable @MainActor (BusStop) async -> [String]
+) async -> [BusStop]? {
+    enum Report: Sendable {
+        case lookup(index: Int, match: BusStop?)
+        case deadline
+    }
+
+    guard !favorites.isEmpty else { return [] }
+
+    let (stream, continuation) = AsyncStream<Report>.makeStream()
+    for (index, favorite) in favorites.enumerated() {
+        Task { @MainActor in
+            let routes = await fetchRoutes(favorite)
+            let matches = routes.contains { $0.caseInsensitiveCompare(routeNumber) == .orderedSame }
+            continuation.yield(.lookup(index: index, match: matches ? favorite : nil))
+        }
+    }
+    let timer = Task {
+        try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+        continuation.yield(.deadline)
+    }
+    defer { timer.cancel() }
+
+    var matches: [(index: Int, stop: BusStop)] = []
+    var reported = 0
+    for await report in stream {
+        switch report {
+        case .deadline:
+            return nil
+        case .lookup(let index, let match):
+            if let match {
+                matches.append((index, match))
+            }
+            reported += 1
+            if reported == favorites.count {
+                return matches.sorted { $0.index < $1.index }.map(\.stop)
+            }
+        }
+    }
+    return nil
+}
+
 enum DirectionResolution {
     case resolved(String)
     case noMatch(available: [String])
@@ -262,27 +324,16 @@ public struct CheckRouteArrivalsIntent: AppIntent {
         let api = TransitAPI()
         // fetchRoutes results are cached per stop/agency (TransitAPI.stopRoutesCache), but a
         // cold cache still means one /StopTimetable round trip per favorite here — known
-        // limitation. Run them in parallel with a shared 8s timeout (matching the location and
+        // limitation. Run them in parallel with a shared 8s deadline (matching the location and
         // arrivals fetches below) so a large favorites list can't stall past every other
-        // timeout-guarded step in this intent.
-        guard let matching = await withTimeout(seconds: 8, operation: {
-            await withTaskGroup(of: (Int, BusStop?).self) { group in
-                for (index, favorite) in favorites.enumerated() {
-                    group.addTask {
-                        let routes = await api.fetchRoutes(for: favorite.id, agency: favorite.agency)
-                        let matches = routes.contains { $0.caseInsensitiveCompare(routeNumber) == .orderedSame }
-                        return (index, matches ? favorite : nil)
-                    }
-                }
-                var indexed: [(Int, BusStop)] = []
-                for await (index, stop) in group {
-                    if let stop {
-                        indexed.append((index, stop))
-                    }
-                }
-                return indexed.sorted { $0.0 < $1.0 }.map(\.1)
-            }
-        }) else {
+        // timeout-guarded step in this intent. Hitting that deadline abandons the wait but
+        // deliberately leaves the lookups running — see `favoritesServingRoute`.
+        guard let matching = await favoritesServingRoute(
+            among: favorites,
+            routeNumber: routeNumber,
+            timeout: 8,
+            fetchRoutes: { await api.fetchRoutes(for: $0.id, agency: $0.agency) }
+        ) else {
             return .result(dialog: IntentDialog(stringLiteral: "Couldn't reach 511 right now, try again shortly."))
         }
         guard !matching.isEmpty else {

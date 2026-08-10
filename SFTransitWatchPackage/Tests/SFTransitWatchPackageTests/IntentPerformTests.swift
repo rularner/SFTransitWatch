@@ -33,6 +33,24 @@ private func literalText(from dialog: IntentDialog) -> String? {
     return description[keyStart..<keyEnd].replacingOccurrences(of: "\\'", with: "'")
 }
 
+/// Records whether a background route lookup ran to completion and whether it saw itself as
+/// cancelled. Lock-guarded because it's written from a `Task` the test body outlives.
+private final class LookupProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _completed = false
+    private var _sawCancellation = false
+
+    var completed: Bool { lock.withLock { _completed } }
+    var sawCancellation: Bool { lock.withLock { _sawCancellation } }
+
+    func finish(cancelled: Bool) {
+        lock.withLock {
+            _completed = true
+            _sawCancellation = cancelled
+        }
+    }
+}
+
 // MARK: - Tests
 
 @Suite(.serialized)
@@ -357,5 +375,90 @@ struct IntentPerformTests {
         let concrete = try #require(result as? IntentResultContainer<Never, Never, Never, IntentDialog>)
         let dialog = try #require(concrete.dialog)
         #expect(literalText(from: dialog) == "You don't have any favorite stops yet. Add one in SF Transit Watch.")
+    }
+
+    // MARK: - CheckRouteArrivalsIntent — favoritesServingRoute
+
+    @Test func favoritesServingRoute_allLookupsFinish_returnsMatchesInOriginalOrder() async throws {
+        let a = BusStop(id: "a", name: "A", code: "A", latitude: 37.70, longitude: -122.40)
+        let b = BusStop(id: "b", name: "B", code: "B", latitude: 37.71, longitude: -122.41)
+        let c = BusStop(id: "c", name: "C", code: "C", latitude: 37.72, longitude: -122.42)
+        let result = await favoritesServingRoute(among: [a, b, c], routeNumber: "54", timeout: 5) { stop in
+            // Finish out of order so the index-restoring sort is actually exercised.
+            switch stop.id {
+            case "a": try? await Task.sleep(nanoseconds: 60_000_000); return ["54"]
+            case "b": return ["38", "38R"]
+            default: try? await Task.sleep(nanoseconds: 20_000_000); return ["54R", "54"]
+            }
+        }
+        #expect(result?.map(\.id) == ["a", "c"])
+    }
+
+    /// Regression guard. The route-matching phase used to be a `withTaskGroup` raced against a
+    /// timeout via `withTimeout`, whose `group.cancelAll()` cancelled every still-in-flight
+    /// `fetchRoutes` call when the deadline won. That mattered because a cancelled lookup does
+    /// not fail loudly — it returns `[]`, which `fetchRoutes` then caches for 7 days as "this
+    /// stop serves no routes". One slow-network Siri invocation could therefore make "when is
+    /// the next 54" answer "none of your favorites serve route 54" for a week. The deadline must
+    /// abandon the *wait* only; the lookups have to keep running.
+    @Test func favoritesServingRoute_deadlineFires_lookupsKeepRunningUncancelled() async throws {
+        let stop = BusStop(id: "1", name: "Geneva & Naples", code: "GN", latitude: 37.7, longitude: -122.4)
+        let probe = LookupProbe()
+
+        let started = Date()
+        let result = await favoritesServingRoute(among: [stop], routeNumber: "54", timeout: 0.1) { _ in
+            // `try?` on purpose: if this task were cancelled, the sleep returns early and the
+            // probe records `sawCancellation`, which is exactly the failure we're guarding
+            // against — rather than the sleep silently swallowing it.
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            probe.finish(cancelled: Task.isCancelled)
+            return ["54"]
+        }
+
+        #expect(result == nil, "the deadline must win and produce the try-again dialog")
+        #expect(Date().timeIntervalSince(started) < 0.35, "perform() must not block on the abandoned lookup")
+        #expect(probe.completed == false, "sanity: the lookup is still in flight at this point")
+
+        try await Task.sleep(nanoseconds: 900_000_000)
+        #expect(probe.completed, "the abandoned lookup must still run to completion")
+        #expect(probe.sawCancellation == false, "the abandoned lookup must never be cancelled")
+    }
+
+    /// End-to-end version of the above against the real `TransitAPI` + `StopRoutesCache`: after
+    /// the deadline fires, the background lookup must land the stop's *actual* routes in the
+    /// 7-day cache. Under the old `cancelAll()` behaviour the mock session's delay would throw
+    /// `CancellationError`, `fetchScheduledDepartures` would swallow it as `[]`, and the cache
+    /// would be poisoned with an empty route list.
+    @MainActor
+    @Test func favoritesServingRoute_deadlineFires_backgroundLookupCachesRealRoutes() async throws {
+        let api = TransitAPI()
+        let mock = MockURLSession()
+        api.urlSession = mock
+        let cache = StopRoutesCache(defaults: UserDefaults(suiteName: "RouteLookupTimeout-\(UUID().uuidString)")!)
+        api.stopRoutesCache = cache
+        ConfigurationManager.shared.apiKey = "test-key"
+        ConfigurationManager.shared.workerBaseURL = ""
+        ConfigurationManager.shared.workerToken = ""
+
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let timetable = """
+        {"Siri":{"ServiceDelivery":{"StopTimetableDelivery":{"TimetabledStopVisit":[
+          {"TargetedVehicleJourney":{"LineRef":"SF:54","DirectionRef":"N","TargetedCall":{"AimedDepartureTime":"\(isoIn5)","DestinationDisplay":"Outbound"}}}
+        ]}}}}
+        """.data(using: .utf8)!
+        mock.setMockResponse(for: URL(string: "https://api.511.org/transit/StopTimetable")!, data: timetable)
+        mock.delaySeconds = 0.4
+
+        let stop = BusStop(id: "1234", name: "Geneva & Naples", code: "GN", latitude: 37.7, longitude: -122.4)
+        let result = await favoritesServingRoute(among: [stop], routeNumber: "54", timeout: 0.1) {
+            await api.fetchRoutes(for: $0.id, agency: $0.agency)
+        }
+        #expect(result == nil)
+        #expect(cache.routes(for: "1234", agency: "SF") == nil, "sanity: nothing cached yet at the deadline")
+
+        try await Task.sleep(nanoseconds: 900_000_000)
+        #expect(cache.routes(for: "1234", agency: "SF") == ["54"], "cache must hold the real routes, not a cancelled []")
+
+        ConfigurationManager.shared.apiKey = ""
     }
 }
