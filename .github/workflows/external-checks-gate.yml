@@ -31,23 +31,11 @@ jobs:
     concurrency:
       group: xcode-gate-${{ github.event.pull_request.head.sha || github.event.sha }}
       cancel-in-progress: false
+    if: >-
+      github.event_name != 'status' ||
+      contains(fromJSON('["SFTransitWatch | Test Run","SFTransitWatch | Test Run | Test - iOS","SFTransitWatch | Test Run | Test - watchOS"]'), github.event.context)
     steps:
-      - name: Skip if this status event isn't one we watch
-        id: relevant_event
-        run: |
-          if [ "${{ github.event_name }}" = "status" ]; then
-            case "${{ github.event.context }}" in
-              "SFTransitWatch | Test Run"|"SFTransitWatch | Test Run | Test - iOS"|"SFTransitWatch | Test Run | Test - watchOS")
-                echo "watched=true" >> "$GITHUB_OUTPUT" ;;
-              *)
-                echo "watched=false" >> "$GITHUB_OUTPUT" ;;
-            esac
-          else
-            echo "watched=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Resolve target SHA and base ref
-        if: steps.relevant_event.outputs.watched == 'true'
         id: target
         env:
           GH_TOKEN: ${{ github.token }}
@@ -71,14 +59,14 @@ jobs:
           echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
 
       - name: List changed files
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         run: |
           MERGE_BASE=$(git merge-base "origin/${{ steps.target.outputs.base_ref }}" "${{ steps.target.outputs.sha }}")
           git diff --name-only "$MERGE_BASE" "${{ steps.target.outputs.sha }}" > /tmp/xcode-changed-files.txt
@@ -86,7 +74,7 @@ jobs:
           cat /tmp/xcode-changed-files.txt
 
       - name: Decide gate result
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         id: decide
         env:
           GH_TOKEN: ${{ github.token }}
@@ -141,10 +129,11 @@ jobs:
           echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
 
       - name: Write check run
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -o pipefail
           SHA="${{ steps.target.outputs.sha }}"
           NAME="Xcode Cloud Gate"
           STATUS="${{ steps.decide.outputs.status }}"
@@ -177,22 +166,11 @@ jobs:
     concurrency:
       group: cloudflare-gate-${{ github.event.pull_request.head.sha || github.event.sha }}
       cancel-in-progress: false
+    if: >-
+      github.event_name != 'status' ||
+      github.event.context == 'Workers Builds: sftransitwatch'
     steps:
-      - name: Skip if this status event isn't one we watch
-        id: relevant_event
-        run: |
-          if [ "${{ github.event_name }}" = "status" ]; then
-            if [ "${{ github.event.context }}" = "Workers Builds: sftransitwatch" ]; then
-              echo "watched=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "watched=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "watched=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Resolve target SHA and base ref
-        if: steps.relevant_event.outputs.watched == 'true'
         id: target
         env:
           GH_TOKEN: ${{ github.token }}
@@ -216,14 +194,14 @@ jobs:
           echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
 
       - name: List changed files
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         run: |
           MERGE_BASE=$(git merge-base "origin/${{ steps.target.outputs.base_ref }}" "${{ steps.target.outputs.sha }}")
           git diff --name-only "$MERGE_BASE" "${{ steps.target.outputs.sha }}" > /tmp/cloudflare-changed-files.txt
@@ -231,7 +209,7 @@ jobs:
           cat /tmp/cloudflare-changed-files.txt
 
       - name: Decide gate result
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         id: decide
         env:
           GH_TOKEN: ${{ github.token }}
@@ -269,10 +247,11 @@ jobs:
           echo "summary=Workers Builds: sftransitwatch state: ${STATE:-missing}" >> "$GITHUB_OUTPUT"
 
       - name: Write check run
-        if: steps.target.outputs.found == 'true' && steps.relevant_event.outputs.watched == 'true'
+        if: steps.target.outputs.found == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -o pipefail
           SHA="${{ steps.target.outputs.sha }}"
           NAME="Cloudflare Gate"
           STATUS="${{ steps.decide.outputs.status }}"
