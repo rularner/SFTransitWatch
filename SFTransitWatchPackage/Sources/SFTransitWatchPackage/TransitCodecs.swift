@@ -57,6 +57,14 @@ public enum TransitJSON {
         }
     }
 
+    /// The direction vocabulary `directionLabel` produces for Caltrain — derived from that
+    /// function rather than re-listing "Northbound"/"Southbound" as separate literals, so
+    /// there's one source of truth for what Caltrain calls its two directions.
+    public static let caltrainDirectionLabels: Set<String> = [
+        directionLabel("IB", lineRef: "CT:"),
+        directionLabel("OB", lineRef: "CT:")
+    ]
+
     /// Decodes a `/Stops` JSON payload into BusStops. Returns nil if the
     /// payload doesn't decode (caller can fall back to XML parsing). The
     /// `agency` arg tags every returned stop, since stop codes are scoped.

@@ -377,6 +377,122 @@ struct IntentPerformTests {
         #expect(literalText(from: dialog) == "You don't have any favorite stops yet. Add one in SF Transit Watch.")
     }
 
+    // MARK: - CheckRouteArrivalsIntent — Caltrain direction fallback
+
+    @Test func caltrainDirectionLabels_matchesDirectionLabelOutput() async throws {
+        #expect(TransitJSON.caltrainDirectionLabels == ["Southbound", "Northbound"])
+    }
+
+    @Test func directionArrival_emptyArrivals_returnsNoArrivalsDialog() async throws {
+        let text = CheckRouteArrivalsIntent.directionArrivalsDialogText(direction: "Southbound", stopName: "San Mateo", arrivals: [])
+        #expect(text == "No upcoming southbound arrivals for San Mateo right now.")
+    }
+
+    @Test func directionArrival_singleArrival_speaksOne() async throws {
+        let now = Date()
+        let arrival = BusArrival(route: "L LOCAL", destination: "Southbound", arrivalTime: now.addingTimeInterval(300), now: now)
+        let text = CheckRouteArrivalsIntent.directionArrivalsDialogText(direction: "Southbound", stopName: "San Mateo", arrivals: [arrival])
+        #expect(text == "The next southbound train at San Mateo arrives in 5 minutes.")
+    }
+
+    @Test func directionArrival_twoArrivals_speaksBoth() async throws {
+        let now = Date()
+        let first = BusArrival(route: "L LOCAL", destination: "Southbound", arrivalTime: now.addingTimeInterval(300), now: now)
+        let second = BusArrival(route: "L LOCAL", destination: "Southbound", arrivalTime: now.addingTimeInterval(900), now: now)
+        let text = CheckRouteArrivalsIntent.directionArrivalsDialogText(direction: "Southbound", stopName: "San Mateo", arrivals: [first, second])
+        #expect(text == "The next southbound train at San Mateo arrives in 5 minutes, then 15 minutes.")
+    }
+
+    @MainActor
+    @Test func routeArrival_directionWordWithNoCaltrainFavorites_returnsNoCaltrainFavoritesDialog() async throws {
+        ConfigurationManager.shared.apiKey = "test-key"
+        let manager = FavoritesManager()
+        manager.clearAllFavorites()
+        manager.toggleFavorite(BusStop(id: "muni-1", name: "Market & 4th", code: "M4", latitude: 37.7, longitude: -122.4, agency: "SF"))
+        defer { manager.clearAllFavorites() }
+
+        var intent = CheckRouteArrivalsIntent()
+        intent.routeNumber = "southbound"
+        let result = try await intent.perform()
+        let concrete = try #require(result as? IntentResultContainer<Never, Never, Never, IntentDialog>)
+        let dialog = try #require(concrete.dialog)
+        #expect(literalText(from: dialog) == "You don't have any favorite Caltrain stops.")
+    }
+
+    // MARK: - CheckRouteArrivalsIntent — favoritesWithArrivalsInDirection
+
+    @Test func favoritesWithArrivalsInDirection_allLookupsFinish_returnsOnlyMatchingStopsInOrder() async throws {
+        let now = Date()
+        let a = BusStop(id: "a", name: "A", code: "A", latitude: 37.70, longitude: -122.40, agency: "CT")
+        let b = BusStop(id: "b", name: "B", code: "B", latitude: 37.71, longitude: -122.41, agency: "CT")
+        let c = BusStop(id: "c", name: "C", code: "C", latitude: 37.72, longitude: -122.42, agency: "CT")
+        let south = BusArrival(route: "L LOCAL", destination: "Southbound", arrivalTime: now.addingTimeInterval(300), now: now)
+        let north = BusArrival(route: "L LOCAL", destination: "Northbound", arrivalTime: now.addingTimeInterval(300), now: now)
+
+        let result = await favoritesWithArrivalsInDirection(among: [a, b, c], direction: "Southbound", timeout: 5) { stop in
+            switch stop.id {
+            // Finish out of order so the index-restoring sort is actually exercised.
+            case "a": try? await Task.sleep(nanoseconds: 40_000_000); return [south]
+            case "b": return [north]
+            default: return [south]
+            }
+        }
+        #expect(result?.map(\.stop.id) == ["a", "c"])
+        #expect(result?.first?.arrivals.map(\.id) == [south.id])
+    }
+
+    /// Mirrors `favoritesServingRoute_deadlineFires_lookupsKeepRunningUncancelled`'s regression
+    /// guard for the same reason: an abandoned-but-cancelled `fetchArrivals` call must not be
+    /// able to poison the (shorter-lived, but still real) arrivals cache.
+    @Test func favoritesWithArrivalsInDirection_deadlineFires_lookupsKeepRunningUncancelled() async throws {
+        let stop = BusStop(id: "1", name: "San Mateo", code: "SM", latitude: 37.5, longitude: -122.3, agency: "CT")
+        let probe = LookupProbe()
+
+        let started = Date()
+        let result = await favoritesWithArrivalsInDirection(among: [stop], direction: "Southbound", timeout: 0.1) { _ in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            probe.finish(cancelled: Task.isCancelled)
+            return []
+        }
+
+        #expect(result == nil, "the deadline must win and produce the try-again dialog")
+        #expect(Date().timeIntervalSince(started) < 0.35, "perform() must not block on the abandoned lookup")
+
+        try await Task.sleep(nanoseconds: 900_000_000)
+        #expect(probe.completed, "the abandoned lookup must still run to completion")
+        #expect(probe.sawCancellation == false, "the abandoned lookup must never be cancelled")
+    }
+
+    /// End-to-end against the real `TransitAPI` + `TransitJSON.decodeArrivals`: proves the
+    /// Caltrain direction fallback actually lines up with what `directionLabel` produces for a
+    /// real StopMonitoring payload, not just with hand-built `BusArrival` fixtures above.
+    @MainActor
+    @Test func favoritesWithArrivalsInDirection_realCaltrainPayload_matchesSouthboundLabel() async throws {
+        let api = TransitAPI()
+        let mock = MockURLSession()
+        api.urlSession = mock
+        ConfigurationManager.shared.apiKey = "test-key"
+        ConfigurationManager.shared.workerBaseURL = ""
+        ConfigurationManager.shared.workerToken = ""
+
+        let isoIn5 = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let realtime = """
+        {"ServiceDelivery":{"StopMonitoringDelivery":{"MonitoredStopVisit":[
+          {"MonitoredVehicleJourney":{"LineRef":"CT:L_LOCAL","DirectionRef":"IB","MonitoredCall":{"ExpectedDepartureTime":"\(isoIn5)"},"OnwardCalls":{}}}
+        ]}}}
+        """.data(using: .utf8)!
+        mock.setMockResponse(for: URL(string: "https://api.511.org/transit/StopMonitoring")!, data: realtime)
+
+        let stop = BusStop(id: "caltrain-1", name: "San Mateo", code: "SM", latitude: 37.5, longitude: -122.3, agency: "CT")
+        let result = await favoritesWithArrivalsInDirection(among: [stop], direction: "Southbound", timeout: 5) {
+            await api.fetchArrivals(for: $0.id, agency: $0.agency)
+        }
+        #expect(result?.map(\.stop.id) == ["caltrain-1"])
+        #expect(result?.first?.arrivals.first?.route == "L LOCAL")
+
+        ConfigurationManager.shared.apiKey = ""
+    }
+
     // MARK: - CheckRouteArrivalsIntent — favoritesServingRoute
 
     @Test func favoritesServingRoute_allLookupsFinish_returnsMatchesInOriginalOrder() async throws {
