@@ -8,6 +8,8 @@ public class LocationManager: NSObject, ObservableObject {
     @Published public var currentLocation: CLLocation?
     @Published public var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published public var isLocationEnabled = false
+    private var hasReceivedAuthorizationCallback = false
+    private var authorizationSettledContinuation: CheckedContinuation<Void, Never>?
     // Heading (compass) is only available on iOS/watchOS. The macOS build of this
     // package exists purely so `swift test` can run the logic tests on the host,
     // so heading is compiled out there. CLHeading itself doesn't exist on macOS.
