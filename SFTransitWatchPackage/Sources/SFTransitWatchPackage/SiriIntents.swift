@@ -143,7 +143,7 @@ public struct CheckFavoriteArrivalIntent: AppIntent {
         if favorites.count == 1 {
             stop = favorites[0]
         } else {
-            guard let location = await LocationManager().currentLocationOnce(timeout: 8) else {
+            guard let location = await LocationManager.awaitingAuthorization().currentLocationOnce(timeout: 8) else {
                 return .result(dialog: IntentDialog(stringLiteral: "Enable location access for SF Transit Watch to use this."))
             }
             stop = nearestFavorite(among: favorites, location: location)
@@ -404,7 +404,7 @@ public struct CheckRouteArrivalsIntent: AppIntent {
                 return .result(dialog: IntentDialog(stringLiteral: "None of your favorite Caltrain stops have \(requestedDirection.lowercased()) arrivals right now."))
             }
 
-            let location = matches.count > 1 ? await LocationManager().currentLocationOnce(timeout: 8) : nil
+            let location = matches.count > 1 ? await LocationManager.awaitingAuthorization().currentLocationOnce(timeout: 8) : nil
             let chosen: (stop: BusStop, arrivals: [BusArrival])
             switch resolveStop(from: matches.map(\.stop), location: location) {
             case .single(let resolved):
@@ -445,7 +445,7 @@ public struct CheckRouteArrivalsIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "None of your favorite stops serve route \(routeNumber)."))
         }
 
-        let location = matching.count > 1 ? await LocationManager().currentLocationOnce(timeout: 8) : nil
+        let location = matching.count > 1 ? await LocationManager.awaitingAuthorization().currentLocationOnce(timeout: 8) : nil
         let stop: BusStop
         switch resolveStop(from: matching, location: location) {
         case .single(let resolved):

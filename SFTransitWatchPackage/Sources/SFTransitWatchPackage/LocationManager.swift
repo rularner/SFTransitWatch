@@ -26,13 +26,15 @@ public class LocationManager: NSObject, ObservableObject {
         locationManager.headingFilter = 5
         #endif
 
-        // Seed synchronously from CLLocationManager's own status rather than waiting on
-        // the delegate's didChangeAuthorization callback. A freshly-constructed instance
-        // (e.g. one made per Siri intent invocation in SiriIntents.swift) calls
-        // currentLocationOnce() immediately with no suspension point beforehand, so the
-        // delegate never gets a run-loop turn to fire before the isAuthorized check runs —
-        // leaving authorizationStatus stuck at its .notDetermined default and making
-        // currentLocationOnce() report "unauthorized" even when access was actually granted.
+        // Seed synchronously from CLLocationManager's own status as a best-effort default —
+        // better than the .notDetermined default above, but NOT authoritative. CoreLocation
+        // resolves authorizationStatus asynchronously via locationd; on a freshly-started
+        // process the very first synchronous read of this property can itself still return a
+        // stale value, corrected moments later through the delegate's authorization-change
+        // callback below. Callers that need the authoritative status (like Siri intents,
+        // which construct a fresh LocationManager per invocation and may run in a cold
+        // process — see SiriIntents.swift) should use `awaitingAuthorization()` instead of
+        // this initializer directly.
         authorizationStatus = locationManager.authorizationStatus
 
         if SnapshotMode.isActive {
@@ -43,6 +45,33 @@ public class LocationManager: NSObject, ObservableObject {
     public func requestLocationPermission() {
         if SnapshotMode.isActive { return }
         locationManager.requestWhenInUseAuthorization()
+    }
+
+    /// Constructs a `LocationManager` and waits for the authoritative authorization status
+    /// from CoreLocation's delegate callback (bounded, in case it never arrives) before
+    /// returning, instead of trusting the synchronous best-effort seed in `init()`. Use this
+    /// at call sites — like Siri intents — that check `isAuthorized`/call
+    /// `currentLocationOnce()` immediately with no other suspension point beforehand, where a
+    /// stale cold-process seed would otherwise be mistaken for the real status.
+    public static func awaitingAuthorization() async -> LocationManager {
+        let manager = LocationManager()
+        await manager.waitForAuthorizationSettled()
+        return manager
+    }
+
+    private func waitForAuthorizationSettled() async {
+        guard !hasReceivedAuthorizationCallback else { return }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            authorizationSettledContinuation = continuation
+            // Bounded fallback in case the delegate callback never arrives: resumes and
+            // clears the continuation itself, so if the callback (which does the same thing)
+            // already ran first, this is a harmless no-op via the nil check.
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                self.authorizationSettledContinuation?.resume()
+                self.authorizationSettledContinuation = nil
+            }
+        }
     }
 
     private var isAuthorized: Bool {
@@ -146,6 +175,9 @@ extension LocationManager: CLLocationManagerDelegate {
     public nonisolated func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         Task { @MainActor in
             authorizationStatus = status
+            hasReceivedAuthorizationCallback = true
+            authorizationSettledContinuation?.resume()
+            authorizationSettledContinuation = nil
             if isAuthorized {
                 startLocationUpdates()
             } else if status == .denied || status == .restricted {
