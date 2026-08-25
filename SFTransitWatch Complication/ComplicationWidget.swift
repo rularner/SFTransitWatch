@@ -7,6 +7,7 @@ import SwiftUI
 struct NextArrivalEntry: TimelineEntry {
     let date: Date
     let slot: CommuteSlotsManager.Slot?
+    let stopId: String?
     let stopName: String
     let route: String
     let arrivalTime: Date?
@@ -15,6 +16,7 @@ struct NextArrivalEntry: TimelineEntry {
     static let placeholder = NextArrivalEntry(
         date: .now,
         slot: .morning,
+        stopId: "SF:16992",
         stopName: "Market & 4th",
         route: "38",
         arrivalTime: Date().addingTimeInterval(4 * 60),
@@ -24,6 +26,7 @@ struct NextArrivalEntry: TimelineEntry {
     static let unconfigured = NextArrivalEntry(
         date: .now,
         slot: nil,
+        stopId: nil,
         stopName: "",
         route: "",
         arrivalTime: nil,
@@ -47,6 +50,7 @@ private enum SnapshotStore {
         return NextArrivalEntry(
             date: date,
             slot: slot,
+            stopId: configuredStopId,
             stopName: stopName,
             route: route,
             arrivalTime: arrivalTime,

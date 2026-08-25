@@ -17,6 +17,7 @@ struct SFTransitWatchApp: App {
     @State private var isPurchasing = false
     @State private var isRestoring = false
     @State private var restoreError: String?
+    @State private var deepLinkedStop: BusStop?
     @StateObject private var favoritesManager = FavoritesManager()
     @StateObject private var slotsManager = CommuteSlotsManager()
     private let provisionService = SelfProvisionService.makeFromBundle()
@@ -29,7 +30,7 @@ struct SFTransitWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(deepLinkedStop: $deepLinkedStop)
                 .task {
                     guard !ConfigurationManager.shared.isConfigured else { return }
                     // If the companion iPhone app is installed, wait for WatchConnectivity
@@ -46,6 +47,10 @@ struct SFTransitWatchApp: App {
                     }
                     if let bootstrap = WorkerConfigLink.workerBootstrap(from: url) {
                         pendingBootstrap = PendingBootstrap(url: bootstrap.url, code: bootstrap.code)
+                        return
+                    }
+                    if let stopId = WorkerConfigLink.stopId(from: url) {
+                        deepLinkedStop = FavoritesManager.favoriteStop(withId: stopId, in: .standard)
                     }
                 }
                 .sheet(isPresented: $showingSetup, onDismiss: {

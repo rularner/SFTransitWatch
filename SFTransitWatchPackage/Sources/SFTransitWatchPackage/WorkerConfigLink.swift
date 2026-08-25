@@ -24,4 +24,24 @@ public enum WorkerConfigLink {
               parsed.scheme == "https" else { return nil }
         return (url: workerURL, code: code)
     }
+
+    /// Builds a deep link that opens the app straight to a stop's arrivals —
+    /// used by the complication's `widgetURL` so tapping it jumps directly to
+    /// that stop instead of the app's default landing screen.
+    public static func stopURL(id: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = "sftransitwatch"
+        components.host = "stop"
+        components.queryItems = [URLQueryItem(name: "id", value: id)]
+        return components.url
+    }
+
+    /// Parses a stop deep link in the form: sftransitwatch://stop?id=<stop-id>
+    public static func stopId(from url: URL) -> String? {
+        guard url.scheme == "sftransitwatch", url.host == "stop" else { return nil }
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let id = components.queryItems?.first(where: { $0.name == "id" })?.value,
+              !id.isEmpty else { return nil }
+        return id
+    }
 }

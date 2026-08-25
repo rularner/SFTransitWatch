@@ -351,6 +351,77 @@ final class TransitAPITests: XCTestCase {
         XCTAssertFalse(stops[0].isRealTime)
     }
 
+    /// Regression: the 511.org Route Timetable feed only returns bare stop IDs
+    /// (`ScheduledStopPointRef.ref`), never names — `decodeTimetableJourneyStops` uses the ID
+    /// as a placeholder name. `fetchJourneyStops` must resolve real names via `/Stops` before
+    /// returning, otherwise the journey view shows stop IDs (this hit Caltrain in production
+    /// because Caltrain's StopMonitoring falls back to the Timetable schedule far more often
+    /// than SF/Muni, whose real-time onward calls already carry resolved names).
+    func testFetchJourneyStops_resolvesStopNamesFromStopsEndpoint() async {
+        let now = Date()
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.hour, .minute], from: now.addingTimeInterval(300))
+        let h = comps.hour ?? 10
+        let m = comps.minute ?? 5
+        let pad = { (n: Int) in String(format: "%02d", n) }
+        let t1 = "\(pad(h)):\(pad(m)):00"
+        let t2 = "\(pad((h * 60 + m + 5) / 60 % 24)):\(pad((m + 5) % 60)):00"
+
+        let timetableData = """
+        {
+          "Content": {
+            "TimetableFrame": [{
+              "Name": "Local Weekday:IB:WEEKDAY",
+              "vehicleJourneys": {
+                "ServiceJourney": [{
+                  "JourneyPatternView": {"DirectionRef":{"ref":"IB"}},
+                  "calls": {"Call": [
+                    {"ScheduledStopPointRef":{"ref":"70021"},"Arrival":{"Time":"\(t1)","DaysOffset":"0"},"Departure":{"Time":"\(t1)","DaysOffset":"0"},"order":"1"},
+                    {"ScheduledStopPointRef":{"ref":"70022"},"Arrival":{"Time":"\(t2)","DaysOffset":"0"},"Departure":{"Time":"\(t2)","DaysOffset":"0"},"order":"2"}
+                  ]},
+                  "id": "trip-1"
+                }]
+              }
+            }]
+          }
+        }
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/Timetable")!,
+            data: timetableData
+        )
+
+        let stopsData = """
+        {
+          "Contents": {
+            "dataObjects": {
+              "ScheduledStopPoint": [
+                {"id": "70021", "Name": "Bayshore Caltrain", "Location": {"Latitude": "37.708", "Longitude": "-122.402"}},
+                {"id": "70022", "Name": "So. San Francisco Caltrain", "Location": {"Latitude": "37.655", "Longitude": "-122.404"}}
+              ]
+            }
+          }
+        }
+        """.data(using: .utf8)!
+        mockSession.setMockResponse(
+            for: URL(string: "https://api.511.org/transit/Stops")!,
+            data: stopsData
+        )
+
+        let stops = await api.fetchJourneyStops(
+            route: "Local Weekday",
+            destination: "IB",
+            boardingStopId: "70021",
+            boardingTime: now.addingTimeInterval(300),
+            agency: "CT"
+        )
+
+        XCTAssertEqual(stops.count, 2)
+        XCTAssertEqual(stops[0].id, "70021")
+        XCTAssertEqual(stops[0].name, "Bayshore Caltrain", "Must resolve the real stop name, not leave the bare stop ID")
+        XCTAssertEqual(stops[1].name, "So. San Francisco Caltrain")
+    }
+
     func testFetchJourneyStops_noMatch_returnsEmpty() async {
         let timetableData = """
         {"Content": {"TimetableFrame": [{"Name": "38:IB:WEEKDAY","vehicleJourneys":{"ServiceJourney":[]}}]}}
