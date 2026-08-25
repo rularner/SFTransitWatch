@@ -1,8 +1,10 @@
+import SFTransitWatchPackage
 import SwiftUI
 import WidgetKit
 
 /// Common shape both `NextArrivalEntry` and `NearbyFavoritesEntry` already have.
 protocol ArrivalComplicationEntry {
+    var stopId: String? { get }
     var stopName: String { get }
     var route: String { get }
     var arrivalTime: Date? { get }
@@ -17,13 +19,16 @@ struct ArrivalComplicationEntryView<Entry: ArrivalComplicationEntry>: View {
         if !entry.isConfigured {
             unconfiguredView
         } else {
-            switch family {
-            case .accessoryCircular:    circularView
-            case .accessoryRectangular: rectangularView
-            case .accessoryCorner:      cornerView
-            case .accessoryInline:      inlineView
-            default:                    circularView
+            Group {
+                switch family {
+                case .accessoryCircular:    circularView
+                case .accessoryRectangular: rectangularView
+                case .accessoryCorner:      cornerView
+                case .accessoryInline:      inlineView
+                default:                    circularView
+                }
             }
+            .widgetURL(entry.stopId.flatMap(WorkerConfigLink.stopURL(id:)))
         }
     }
 

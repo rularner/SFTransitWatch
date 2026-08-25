@@ -24,7 +24,23 @@ enum ComplicationUpdater {
         slotsManager: CommuteSlotsManager
     ) {
         guard let slot = slotsManager.slot(for: stopId) else { return }
+        updateSlot(slot, stopName: stopName, route: route, arrivalTime: arrivalTime)
+    }
+
+    /// Writes the slot's snapshot and reloads widget timelines only when the
+    /// route or arrival time actually changed. The arrivals screen polls
+    /// every 30s, and calling `reloadAllTimelines()` unconditionally on every
+    /// poll burns through WidgetKit's reload budget — see
+    /// `ComplicationSnapshot.hasChanged`.
+    static func updateSlot(_ slot: CommuteSlotsManager.Slot, stopName: String, route: String, arrivalTime: Date) {
+        let changed = ComplicationSnapshot.hasChanged(
+            existingRoute: defaults.string(forKey: StorageKey.route(slot)),
+            existingArrivalTime: defaults.object(forKey: StorageKey.arrivalTime(slot)) as? Date,
+            newRoute: route,
+            newArrivalTime: arrivalTime
+        )
         write(slot: slot, stopName: stopName, route: route, arrivalTime: arrivalTime)
+        guard changed else { return }
         WidgetCenter.shared.reloadAllTimelines()
     }
 
@@ -49,6 +65,7 @@ enum ComplicationUpdater {
         }
 
         // Nearby favorites keys
+        static let nearbyStopId = "complication_nearby_stop_id"
         static let nearbyStopName = "complication_nearby_stop_name"
         static let nearbyRoute = "complication_nearby_route"
         static let nearbyArrivalTime = "complication_nearby_arrival_time"
@@ -56,13 +73,22 @@ enum ComplicationUpdater {
 
     @MainActor
     static func updateNearby(
+        stopId: String,
         stopName: String,
         route: String,
         arrivalTime: Date
     ) {
+        let changed = ComplicationSnapshot.hasChanged(
+            existingRoute: defaults.string(forKey: StorageKey.nearbyRoute),
+            existingArrivalTime: defaults.object(forKey: StorageKey.nearbyArrivalTime) as? Date,
+            newRoute: route,
+            newArrivalTime: arrivalTime
+        )
+        defaults.set(stopId, forKey: StorageKey.nearbyStopId)
         defaults.set(stopName, forKey: StorageKey.nearbyStopName)
         defaults.set(route, forKey: StorageKey.nearbyRoute)
         defaults.set(arrivalTime, forKey: StorageKey.nearbyArrivalTime)
+        guard changed else { return }
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

@@ -6,6 +6,7 @@ import SwiftUI
 
 struct NearbyFavoritesEntry: TimelineEntry {
     let date: Date
+    let stopId: String?
     let stopName: String
     let route: String
     let arrivalTime: Date?
@@ -13,6 +14,7 @@ struct NearbyFavoritesEntry: TimelineEntry {
 
     static let placeholder = NearbyFavoritesEntry(
         date: .now,
+        stopId: "SF:16992",
         stopName: "Market & 4th",
         route: "38",
         arrivalTime: Date().addingTimeInterval(4 * 60),
@@ -21,6 +23,7 @@ struct NearbyFavoritesEntry: TimelineEntry {
 
     static let unconfigured = NearbyFavoritesEntry(
         date: .now,
+        stopId: nil,
         stopName: "",
         route: "",
         arrivalTime: nil,
@@ -34,6 +37,7 @@ private enum NearbyFavoritesSnapshotStore {
     static let defaults = UserDefaults(suiteName: CommuteSlotsManager.appGroupSuiteName) ?? .standard
 
     static func snapshot(at date: Date) -> NearbyFavoritesEntry {
+        let stopId = defaults.string(forKey: ComplicationUpdater.StorageKey.nearbyStopId)
         let stopName = defaults.string(forKey: ComplicationUpdater.StorageKey.nearbyStopName) ?? ""
         let route = defaults.string(forKey: ComplicationUpdater.StorageKey.nearbyRoute) ?? ""
         let arrivalTime = defaults.object(forKey: ComplicationUpdater.StorageKey.nearbyArrivalTime) as? Date
@@ -42,6 +46,7 @@ private enum NearbyFavoritesSnapshotStore {
 
         return NearbyFavoritesEntry(
             date: date,
+            stopId: stopId,
             stopName: stopName,
             route: route,
             arrivalTime: arrivalTime,

@@ -62,6 +62,22 @@ class DeepLinkIntegrationTests: XCTestCase {
         XCTAssertNil(WorkerConfigLink.workerBootstrap(from: url))
     }
 
+    func testStopLinkRoundTrips() {
+        let stopId = "SF:16992"
+        let url = WorkerConfigLink.stopURL(id: stopId)!
+        XCTAssertEqual(WorkerConfigLink.stopId(from: url), stopId)
+    }
+
+    func testStopLinkRejectsOtherHosts() {
+        let url = URL(string: "sftransitwatch://key/abc")!
+        XCTAssertNil(WorkerConfigLink.stopId(from: url))
+    }
+
+    func testStopLinkRejectsMissingId() {
+        let url = URL(string: "sftransitwatch://stop")!
+        XCTAssertNil(WorkerConfigLink.stopId(from: url))
+    }
+
     func testWorkerConfigClear() {
         ConfigurationManager.shared.setWorkerConfig(
             url: "https://api.example.com",

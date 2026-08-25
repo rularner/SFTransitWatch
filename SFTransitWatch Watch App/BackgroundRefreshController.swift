@@ -1,7 +1,6 @@
 import Foundation
 import WatchKit
 import UserNotifications
-import WidgetKit
 import CoreLocation
 import SFTransitWatchPackage
 
@@ -63,13 +62,7 @@ final class BackgroundRefreshController {
         guard let first = arrivals.first else { return }
 
         let stopName = favorite?.name ?? "Stop \(stopId)"
-        ComplicationUpdater.write(
-            slot: slot,
-            stopName: stopName,
-            route: first.route,
-            arrivalTime: first.arrivalTime
-        )
-        WidgetCenter.shared.reloadAllTimelines()
+        ComplicationUpdater.updateSlot(slot, stopName: stopName, route: first.route, arrivalTime: first.arrivalTime)
 
         // Fresh instance always reads latest UserDefaults — same pattern as CommuteSlotsManager above.
         let alertSettings = AlertSettingsManager()
@@ -111,6 +104,7 @@ final class BackgroundRefreshController {
         guard let first = arrivals.first else { return }
 
         ComplicationUpdater.updateNearby(
+            stopId: nearest.id,
             stopName: nearest.name,
             route: first.route,
             arrivalTime: first.arrivalTime

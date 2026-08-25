@@ -2,6 +2,9 @@ import SwiftUI
 import SFTransitWatchPackage
 
 struct ContentView: View {
+    @Binding var deepLinkedStop: BusStop?
+    @State private var path: [BusStop] = []
+
     var body: some View {
         Group {
             if SnapshotMode.showArrivalDirectly {
@@ -12,7 +15,7 @@ struct ContentView: View {
                     )
                 }
             } else {
-                NavigationStack {
+                NavigationStack(path: $path) {
                     BusStopListView()
                         .navigationTitle("SF Transit")
                         .toolbar {
@@ -22,14 +25,22 @@ struct ContentView: View {
                                 }
                             }
                         }
+                        .navigationDestination(for: BusStop.self) { stop in
+                            BusArrivalView(stop: stop)
+                        }
                 }
             }
+        }
+        .onChange(of: deepLinkedStop) { _, newStop in
+            guard let newStop else { return }
+            path = [newStop]
+            deepLinkedStop = nil
         }
     }
 }
 
 #Preview {
-    ContentView()
+    ContentView(deepLinkedStop: .constant(nil))
         .environmentObject(FavoritesManager())
         .environmentObject(CommuteSlotsManager())
 }

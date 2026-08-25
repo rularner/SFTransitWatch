@@ -533,13 +533,27 @@ public final class TransitAPI: ObservableObject {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
             let cacheStatus = http.value(forHTTPHeaderField: "X-Cache-Status")
             Telemetry.shared.logFetchOutcome(endpoint: endpoint, httpStatus: 200, latencyMs: latencyMs, cacheStatus: cacheStatus)
-            return TransitJSON.decodeTimetableJourneyStops(
+            let stops = TransitJSON.decodeTimetableJourneyStops(
                 data: data,
                 boardingStopId: boardingStopId,
                 boardingTime: boardingTime
             ) ?? []
+            return await resolvingStopNames(stops, agency: agency)
         } catch {
             return []
+        }
+    }
+
+    // NeTEx Route Timetable calls only carry `ScheduledStopPointRef` (a bare stop ID) —
+    // `decodeTimetableJourneyStops` uses that ID as a placeholder name. Resolve real names
+    // here from `/Stops`, the same endpoint stop search already uses. Best-effort: if the
+    // lookup fails, the stops still render (just with IDs instead of names).
+    private func resolvingStopNames(_ stops: [OnwardStop], agency: String) async -> [OnwardStop] {
+        guard !stops.isEmpty, let allStops = try? await fetchAllStops(agency: agency) else { return stops }
+        let namesById = Dictionary(uniqueKeysWithValues: allStops.map { ($0.id, $0.name) })
+        return stops.map { stop in
+            guard let name = namesById[stop.id], name != stop.name else { return stop }
+            return OnwardStop(id: stop.id, name: name, arrivalTime: stop.arrivalTime, isRealTime: stop.isRealTime, now: now())
         }
     }
 
